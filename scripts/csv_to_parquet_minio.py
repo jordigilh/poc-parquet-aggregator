@@ -126,8 +126,21 @@ def main():
             print(f"   {year}-{month:02d}-{day:02d}: {len(day_df)} rows → {s3_dir}/")
 
             try:
-                # Convert to Parquet
-                table = pa.Table.from_pandas(day_df)
+                # Convert to Parquet with explicit schema (no dictionary encoding)
+                # This prevents type conflicts when reading multiple files
+                schema = pa.Schema.from_pandas(day_df)
+
+                # Replace any dictionary-encoded fields with plain string types
+                new_fields = []
+                for field in schema:
+                    if pa.types.is_dictionary(field.type):
+                        # Convert dictionary type to plain string
+                        new_fields.append(pa.field(field.name, pa.string()))
+                    else:
+                        new_fields.append(field)
+
+                schema = pa.schema(new_fields)
+                table = pa.Table.from_pandas(day_df, schema=schema)
 
                 # Write to MinIO
                 with fs.open(s3_path, 'wb') as f:
