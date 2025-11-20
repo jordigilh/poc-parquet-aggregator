@@ -53,7 +53,7 @@ class PerformanceBenchmark:
         """
         # Force garbage collection before measurement
         gc.collect()
-        
+
         # Initial measurements
         mem_before = self.get_memory_usage()
         cpu_before = self.process.cpu_times()
@@ -196,7 +196,7 @@ class PerformanceBenchmark:
 
         # Aggregate pod usage
         aggregator = PodAggregator(self.config, enabled_tag_keys)
-        
+
         aggregated_df, aggregation_measurement = self.measure_phase(
             "Aggregate pod usage",
             aggregator.aggregate,
