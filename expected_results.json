@@ -1,0 +1,10 @@
+usage_start,usage_end,namespace,node,resource_id,pod_usage_cpu_core_hours,pod_request_cpu_core_hours,pod_effective_usage_cpu_core_hours,pod_limit_cpu_core_hours,pod_usage_memory_gigabyte_hours,pod_request_memory_gigabyte_hours,pod_effective_usage_memory_gigabyte_hours,pod_limit_memory_gigabyte_hours,node_capacity_cpu_cores,node_capacity_cpu_core_hours,node_capacity_memory_gigabytes,node_capacity_memory_gigabyte_hours,data_source
+2025-11-01,2025-11-01,test-app,poc_node_compute_1,100001,2.0,2.0,2.0,4.0,4.0,4.0,4.0,8.0,4.0,96.0,16.0,384.0,Pod
+2025-11-01,2025-11-01,monitoring,poc_node_compute_1,100001,0.75,0.75,0.75,1.5,1.5,1.5,1.5,3.0,4.0,96.0,16.0,384.0,Pod
+2025-11-01,2025-11-01,kube-system,poc_node_master_1,100002,12.0,12.0,12.0,24.0,24.0,24.0,24.0,48.0,2.0,48.0,8.0,192.0,Pod
+2025-11-02,2025-11-02,test-app,poc_node_compute_1,100001,2.0,2.0,2.0,4.0,4.0,4.0,4.0,8.0,4.0,96.0,16.0,384.0,Pod
+2025-11-02,2025-11-02,monitoring,poc_node_compute_1,100001,0.75,0.75,0.75,1.5,1.5,1.5,1.5,3.0,4.0,96.0,16.0,384.0,Pod
+2025-11-02,2025-11-02,kube-system,poc_node_master_1,100002,12.0,12.0,12.0,24.0,24.0,24.0,24.0,48.0,2.0,48.0,8.0,192.0,Pod
+2025-11-03,2025-11-03,test-app,poc_node_compute_1,100001,2.0,2.0,2.0,4.0,4.0,4.0,4.0,8.0,4.0,96.0,16.0,384.0,Pod
+2025-11-03,2025-11-03,monitoring,poc_node_compute_1,100001,0.75,0.75,0.75,1.5,1.5,1.5,1.5,3.0,4.0,96.0,16.0,384.0,Pod
+2025-11-03,2025-11-03,kube-system,poc_node_master_1,100002,12.0,12.0,12.0,24.0,24.0,24.0,24.0,48.0,2.0,48.0,8.0,192.0,Pod

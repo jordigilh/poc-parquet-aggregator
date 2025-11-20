@@ -1,0 +1,83 @@
+# OCP Parquet Aggregator POC Configuration
+# Environment variables can be used with ${VAR_NAME} syntax
+
+s3:
+  endpoint: "${S3_ENDPOINT}"  # e.g., "https://s3-openshift-storage.apps.cluster.example.com"
+  access_key: "${S3_ACCESS_KEY}"
+  secret_key: "${S3_SECRET_KEY}"
+  bucket: "${S3_BUCKET:-cost-management}"
+  use_ssl: true
+  verify_ssl: false  # Set to true for production with valid certs
+  region: "us-east-1"  # Required for some S3 implementations
+
+postgresql:
+  host: "${POSTGRES_HOST:-postgresql.cost-management.svc.cluster.local}"
+  port: 5432
+  database: "${POSTGRES_DB:-koku}"
+  user: "${POSTGRES_USER:-koku}"
+  password: "${POSTGRES_PASSWORD}"
+  schema: "${POSTGRES_SCHEMA:-org1234567}"  # Tenant schema
+
+ocp:
+  # Provider configuration
+  provider_uuid: "${OCP_PROVIDER_UUID}"
+  cluster_id: "${OCP_CLUSTER_ID}"
+  cluster_alias: "${OCP_CLUSTER_ALIAS:-OCP Cluster}"
+  report_period_id: 1
+
+  # Date range for processing
+  year: "${OCP_YEAR:-2025}"
+  month: "${OCP_MONTH:-11}"  # Two-digit format: 01, 02, ... 12
+  start_date: "${OCP_START_DATE:-2025-11-01}"
+  end_date: "${OCP_END_DATE:-2025-11-30}"
+
+  # S3 paths (Parquet files follow MASU's structure)
+  # Pattern: data/{org_id}/OCP/source={provider_uuid}/year={year}/month={month}/day=XX/
+  # The glob pattern will find files in day=XX subdirectories
+  # Note: For POC, we're using hourly data (no _daily suffix)
+  parquet_path_pod: "data/${ORG_ID}/OCP/source={provider_uuid}/year={year}/month={month}/*/openshift_pod_usage_line_items"
+  parquet_path_pod_hourly: "data/${ORG_ID}/OCP/source={provider_uuid}/year={year}/month={month}/*/openshift_pod_usage_line_items"
+  parquet_path_storage: "data/${ORG_ID}/OCP/source={provider_uuid}/year={year}/month={month}/*/openshift_storage_usage_line_items"
+  parquet_path_node_labels: "data/${ORG_ID}/OCP/source={provider_uuid}/year={year}/month={month}/*/openshift_node_labels_line_items"
+  parquet_path_namespace_labels: "data/${ORG_ID}/OCP/source={provider_uuid}/year={year}/month={month}/*/openshift_namespace_labels_line_items"
+
+performance:
+  # Parallel processing
+  max_workers: 4  # Concurrent file processing
+
+  # Memory management
+  chunk_size: 10000  # Rows per processing chunk
+  use_streaming: true  # Stream large files instead of loading into memory
+
+  # Batch inserts to PostgreSQL
+  db_batch_size: 1000
+
+  # Caching
+  cache_enabled_tags: true  # Cache PostgreSQL enabled tags query
+
+logging:
+  level: "${LOG_LEVEL:-INFO}"  # DEBUG, INFO, WARNING, ERROR
+  format: "console"  # json or console
+  show_sql: false  # Log SQL statements
+
+validation:
+  # Compare with Trino results
+  enabled: true
+  tolerance: 0.0001  # 0.01% tolerance for floating-point comparison
+  sample_size: 100  # Number of random rows to validate in detail
+
+  # Run Trino SQL for comparison
+  trino:
+    enabled: false  # Set to true to run dual validation
+    host: "${TRINO_HOST:-trino-coordinator.cost-management.svc.cluster.local}"
+    port: 8080
+    catalog: "hive"
+    user: "koku"
+
+# Feature flags for incremental POC development
+features:
+  pod_aggregation: true
+  storage_aggregation: false  # Phase 2
+  unallocated_capacity: false  # Phase 3
+  cost_category: true  # Include cost category joins
+
