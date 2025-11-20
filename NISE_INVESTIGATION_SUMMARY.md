@@ -1,6 +1,6 @@
 # Nise Investigation Summary
 
-**Date**: November 20, 2025  
+**Date**: November 20, 2025
 **Issue**: Nise not generating CSV files for benchmark data
 
 ---
@@ -125,7 +125,7 @@ For OCP with `--write-monthly`:
    # Before:
    start_date: 2025-10-01
    end_date: 2025-10-01
-   
+
    # After:
    start_date: last_month
    ```
@@ -228,27 +228,27 @@ python3 scripts/benchmark_performance.py \
 ## Blocking Issues Resolved
 
 ### ✅ Issue 1: Nise Silent Failure
-**Status**: RESOLVED  
+**Status**: RESOLVED
 **Solution**: Remove `end_date` when it equals `start_date`
 
 ### ✅ Issue 2: Output Location Confusion
-**Status**: RESOLVED  
+**Status**: RESOLVED
 **Solution**: `cd` to output directory before running nise with `--write-monthly`
 
 ### ✅ Issue 3: Empty CSV Files
-**Status**: RESOLVED  
-**Root Cause**: Same start/end date  
+**Status**: RESOLVED
+**Root Cause**: Same start/end date
 **Solution**: Use `start_date` only, let nise generate full month
 
 ---
 
 ## Status: Ready for Empirical Benchmarking
 
-**Nise Data Generation**: ✅ **WORKING**  
-**Benchmark Script**: ✅ **FIXED**  
+**Nise Data Generation**: ✅ **WORKING**
+**Benchmark Script**: ✅ **FIXED**
 **Next Blocker**: Parquet type compatibility (from earlier investigation)
 
-**Recommendation**: 
+**Recommendation**:
 1. Generate nise data at multiple scales ✅ (script ready)
 2. Fix Parquet type compatibility issue (dictionary encoding)
 3. Run comprehensive empirical benchmarks
