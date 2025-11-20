@@ -1,7 +1,7 @@
 # Scalability Analysis: POC vs Trino+Hive
 
-**Date**: 2025-11-20  
-**Concern**: How well will the custom code solution scale compared to Trino+Hive?  
+**Date**: 2025-11-20
+**Concern**: How well will the custom code solution scale compared to Trino+Hive?
 **Status**: Comprehensive analysis with mitigation strategies
 
 ---
@@ -96,8 +96,8 @@ for chunk in read_parquet_chunked(files, chunk_size):
     write_to_db(aggregated)
 ```
 
-**Memory**: Constant (2 GB regardless of data size)  
-**Time**: Linear with data size  
+**Memory**: Constant (2 GB regardless of data size)
+**Time**: Linear with data size
 **Scalability**: ✅ **Unlimited** - Can handle any data size
 
 ##### Option D: Hybrid (Partition + Streaming)
@@ -603,10 +603,10 @@ Total: 80 pods, 8M rows, 5 minutes (parallel)
 def incremental_aggregate(date):
     # Get last processed timestamp
     last_processed = get_last_processed_timestamp()
-    
+
     # Only read new files
     new_files = list_files_since(last_processed)
-    
+
     # Process only new data
     aggregate(new_files)
 ```
@@ -723,7 +723,7 @@ Large (10M rows/day):
 
 ### 1. Golang Rewrite (Future)
 
-**Current**: Python + Pandas  
+**Current**: Python + Pandas
 **Proposed**: Golang + Arrow
 
 **Benefits**:
@@ -746,7 +746,7 @@ Golang:  25K rows/sec, 5 MB/1K rows
 
 ### 2. Arrow-Based Processing
 
-**Current**: Pandas DataFrames (Python objects)  
+**Current**: Pandas DataFrames (Python objects)
 **Proposed**: Apache Arrow (columnar, zero-copy)
 
 **Benefits**:
@@ -758,7 +758,7 @@ Golang:  25K rows/sec, 5 MB/1K rows
 
 ### 3. Distributed Processing Framework
 
-**Current**: Kubernetes Jobs (manual partitioning)  
+**Current**: Kubernetes Jobs (manual partitioning)
 **Proposed**: Apache Spark or Dask
 
 **Benefits**:
@@ -774,7 +774,7 @@ Golang:  25K rows/sec, 5 MB/1K rows
 
 ### 4. Incremental Processing
 
-**Current**: Reprocess all data daily  
+**Current**: Reprocess all data daily
 **Proposed**: Only process changed data
 
 **Benefits**:
@@ -789,10 +789,10 @@ Golang:  25K rows/sec, 5 MB/1K rows
 def incremental_aggregate(date):
     # Track last processed timestamp per cluster
     last_processed = get_last_processed(cluster_id, date)
-    
+
     # Only read new files
     new_files = list_files_after(last_processed)
-    
+
     # Process incrementally
     new_data = read_parquet(new_files)
     aggregate_and_merge(new_data)
@@ -912,7 +912,7 @@ Phase 4 (Month 7+): Evaluate enhancements
 
 ---
 
-**Date**: 2025-11-20  
-**Status**: ✅ Scalability Validated  
+**Date**: 2025-11-20
+**Status**: ✅ Scalability Validated
 **Recommendation**: ✅ PROCEED with phased rollout
 

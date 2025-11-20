@@ -1,16 +1,16 @@
 # Performance Analysis & Memory Estimates
 
-**Date**: 2025-11-20  
-**Based On**: IQE Production Test Results (7 scenarios)  
+**Date**: 2025-11-20
+**Based On**: IQE Production Test Results (7 scenarios)
 **Status**: Measured from actual POC execution
 
 ---
 
 ## Executive Summary
 
-**Processing Rate**: 3,000 - 7,000 rows/sec  
-**Memory per 1K rows**: ~15-25 MB  
-**Compression Ratio**: 4x - 23x (input → output)  
+**Processing Rate**: 3,000 - 7,000 rows/sec
+**Memory per 1K rows**: ~15-25 MB
+**Compression Ratio**: 4x - 23x (input → output)
 **Latency**: < 1 second for typical workloads
 
 ---
@@ -66,7 +66,7 @@ Total per row: ~572 bytes
 Per 1K rows: ~572 KB
 ```
 
-**Pandas DataFrame overhead**: ~1.5x raw data size  
+**Pandas DataFrame overhead**: ~1.5x raw data size
 **Actual memory per 1K input rows**: ~850 KB - 1 MB
 
 #### 2. Label Data (Node + Namespace)
@@ -343,7 +343,7 @@ TOTAL                    2.0s     100%
 
 ### 1. Streaming Mode (Future)
 
-**Current**: Load all data into memory  
+**Current**: Load all data into memory
 **Proposed**: Process in chunks
 
 ```python
@@ -363,7 +363,7 @@ for chunk in read_parquet_chunked(files, chunk_size):
 
 ### 2. Parallel File Reading
 
-**Current**: Sequential file reading  
+**Current**: Sequential file reading
 **Proposed**: Parallel with ThreadPoolExecutor
 
 ```python
@@ -382,7 +382,7 @@ combined = pd.concat(dfs)
 
 ### 3. Columnar Filtering
 
-**Current**: Read all columns  
+**Current**: Read all columns
 **Proposed**: Read only needed columns
 
 ```python
@@ -402,7 +402,7 @@ df = read_parquet(file, columns=columns)
 
 ### 4. Incremental Aggregation
 
-**Current**: Aggregate all at once  
+**Current**: Aggregate all at once
 **Proposed**: Pre-aggregate per file, then combine
 
 ```python
@@ -662,9 +662,9 @@ df['label_id'] = df['pod_labels'].apply(lambda x: hash(x))
 
 The POC demonstrates **excellent memory efficiency** for typical workloads:
 
-✅ **Small workloads** (10K rows): 100 MB, < 2 seconds  
-✅ **Medium workloads** (100K rows): 1 GB, < 30 seconds  
-✅ **Large workloads** (1M rows): 10 GB, < 5 minutes  
+✅ **Small workloads** (10K rows): 100 MB, < 2 seconds
+✅ **Medium workloads** (100K rows): 1 GB, < 30 seconds
+✅ **Large workloads** (1M rows): 10 GB, < 5 minutes
 
 **Key Takeaways**:
 1. Memory scales linearly: ~10 MB per 1K rows
@@ -677,7 +677,7 @@ The POC demonstrates **excellent memory efficiency** for typical workloads:
 
 ---
 
-**Date**: 2025-11-20  
-**Based On**: IQE Production Test Results  
+**Date**: 2025-11-20
+**Based On**: IQE Production Test Results
 **Status**: ✅ Validated with Real Data
 
