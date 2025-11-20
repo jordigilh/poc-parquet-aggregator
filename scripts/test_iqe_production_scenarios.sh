@@ -3,6 +3,10 @@
 
 set -e
 
+# Get script directory and POC root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+POC_DIR="$(dirname "$SCRIPT_DIR")"
+
 export IQE_PLUGIN_DIR=/Users/jgil/go/src/github.com/insights-onprem/iqe-cost-management-plugin
 
 # Production IQE scenarios - ONLY scenarios actually used in IQE test suite
@@ -49,7 +53,7 @@ for scenario_info in "${SCENARIOS[@]}"; do
         continue
     fi
 
-    if IQE_YAML="$yaml_file" timeout 300 ./scripts/run_iqe_validation.sh > /tmp/iqe_test_${yaml_file}.log 2>&1; then
+    if IQE_YAML="$yaml_file" timeout 300 bash -c "cd ${POC_DIR} && ./scripts/run_iqe_validation.sh" > /tmp/iqe_test_${yaml_file}.log 2>&1; then
         echo "✅ PASSED: $description"
         RESULTS+=("✅ $description ($yaml_file)")
         ((PASSED++))

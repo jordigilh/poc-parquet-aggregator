@@ -59,11 +59,11 @@ for IQE_YAML in "${SCENARIOS[@]}"; do
     echo "========================================================================"
     echo "Benchmarking: ${IQE_YAML}"
     echo "========================================================================"
-    
+
     # Generate unique UUID for this test
     export OCP_PROVIDER_UUID=$(uuidgen | tr '[:upper:]' '[:lower:]')
     export CLUSTER_ID="iqe-test-cluster"
-    
+
     # Step 1: Generate nise data
     echo "Step 1: Generating nise data..."
     "${SCRIPT_DIR}/generate_iqe_test_data.sh" "${IQE_YAML}" || {
@@ -71,7 +71,7 @@ for IQE_YAML in "${SCENARIOS[@]}"; do
         FAILED=$((FAILED + 1))
         continue
     }
-    
+
     # Step 2: Convert to Parquet and upload to MinIO
     echo "Step 2: Converting to Parquet..."
     python3 "${SCRIPT_DIR}/csv_to_parquet_minio.py" "/tmp/nise-iqe-data" || {
@@ -79,7 +79,7 @@ for IQE_YAML in "${SCENARIOS[@]}"; do
         FAILED=$((FAILED + 1))
         continue
     }
-    
+
     # Step 3: Detect which months have data
     echo "Step 3: Detecting data months..."
     MONTHS_TO_PROCESS=$(python3 -c "
@@ -94,7 +94,7 @@ try:
         files = fs.glob(f'cost-management/data/*/OCP/source={provider_uuid}/year=2025/month={month_str}/**/*.parquet')
         if len(files) > 0:
             months_with_data.append(month_str)
-    
+
     if months_with_data:
         print(months_with_data[0])  # Use first month for benchmark
     else:
@@ -102,27 +102,27 @@ try:
 except Exception as e:
     print('11')
 " 2>&1)
-    
+
     export POC_YEAR=2025
     export POC_MONTH=${MONTHS_TO_PROCESS}
-    
+
     echo "  Provider UUID: ${OCP_PROVIDER_UUID}"
     echo "  Year/Month: ${POC_YEAR}-${POC_MONTH}"
-    
+
     # Step 4: Run benchmark
     echo "Step 4: Running benchmark..."
     BENCHMARK_OUTPUT="${OUTPUT_DIR}/benchmark_${IQE_YAML%.yml}_$(date +%Y%m%d_%H%M%S).json"
-    
+
     python3 "${SCRIPT_DIR}/benchmark_performance.py" \
         --provider-uuid "${OCP_PROVIDER_UUID}" \
         --year "${POC_YEAR}" \
         --month "${POC_MONTH}" \
         --output "${BENCHMARK_OUTPUT}" 2>&1 | tee "${OUTPUT_DIR}/benchmark_${IQE_YAML%.yml}.log"
-    
+
     if [ $? -eq 0 ]; then
         echo "✅ Benchmark completed: ${IQE_YAML}"
         PASSED=$((PASSED + 1))
-        
+
         # Extract key metrics and add to summary
         echo "## ${IQE_YAML}" >> "${RESULTS_FILE}"
         echo "" >> "${RESULTS_FILE}"
@@ -154,7 +154,7 @@ EOF
         echo "❌ Benchmark failed: ${IQE_YAML}"
         FAILED=$((FAILED + 1))
     fi
-    
+
     echo ""
 done
 

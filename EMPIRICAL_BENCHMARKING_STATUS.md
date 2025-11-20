@@ -1,7 +1,7 @@
 # Empirical Benchmarking Status
 
-**Date**: 2025-11-20  
-**Status**: ⏳ In Progress  
+**Date**: 2025-11-20
+**Status**: ⏳ In Progress
 **Current Figures**: Theoretical estimates
 
 ---
@@ -82,16 +82,16 @@ class PerformanceBenchmark:
         mem_before = process.memory_info().rss
         cpu_before = process.cpu_times()
         time_start = time.time()
-        
+
         # Execute
         result = func()
-        
+
         # After execution
         time_end = time.time()
         cpu_after = process.cpu_times()
         mem_after = process.memory_info().rss
         mem_peak = process.memory_info().rss
-        
+
         return {
             'duration_seconds': time_end - time_start,
             'memory_before_bytes': mem_before,
@@ -147,7 +147,7 @@ class PerformanceBenchmark:
 
 **Question**: Are our estimates accurate?
 
-**Theoretical**: 10 MB per 1K rows  
+**Theoretical**: 10 MB per 1K rows
 **Empirical**: TBD (need to measure)
 
 **Impact**: If actual is 15 MB, we need 50% more memory than estimated
@@ -156,7 +156,7 @@ class PerformanceBenchmark:
 
 **Question**: Which phase uses the most memory?
 
-**Theoretical**: Aggregation (assumed)  
+**Theoretical**: Aggregation (assumed)
 **Empirical**: TBD (need to measure)
 
 **Impact**: Can optimize the right phase
@@ -165,7 +165,7 @@ class PerformanceBenchmark:
 
 **Question**: Do optimizations actually work?
 
-**Theoretical**: 50% memory reduction  
+**Theoretical**: 50% memory reduction
 **Empirical**: TBD (need before/after measurements)
 
 **Impact**: Validate optimization effectiveness
@@ -174,7 +174,7 @@ class PerformanceBenchmark:
 
 **Question**: What container size do we need?
 
-**Theoretical**: 2 GB for 100K rows (estimated)  
+**Theoretical**: 2 GB for 100K rows (estimated)
 **Empirical**: TBD (need actual measurements)
 
 **Impact**: Right-size production containers
@@ -275,7 +275,7 @@ class PerformanceBenchmark:
    export OCP_PROVIDER_UUID="<uuid-from-test>"
    export POC_YEAR="2025"
    export POC_MONTH="10"  # or 11, depending on test
-   
+
    python3 scripts/benchmark_performance.py \
        --provider-uuid "$OCP_PROVIDER_UUID" \
        --year "$POC_YEAR" \
@@ -289,7 +289,7 @@ class PerformanceBenchmark:
    import json
    with open('benchmark_results/empirical_small.json') as f:
        data = json.load(f)
-   
+
    print(f"Input rows: {data['input_rows_daily']:,}")
    print(f"Peak memory: {data['peak_memory_bytes'] / 1024**3:.2f} GB")
    print(f"Memory per 1K rows: {data['memory_per_1k_input_rows_bytes'] / 1024**2:.1f} MB")
@@ -329,7 +329,7 @@ class PerformanceBenchmark:
 
 ---
 
-**Date**: 2025-11-20  
-**Status**: ⏳ Benchmarking infrastructure ready, awaiting test data  
+**Date**: 2025-11-20
+**Status**: ⏳ Benchmarking infrastructure ready, awaiting test data
 **Next Step**: Run IQE test + benchmark to get empirical measurements
 
