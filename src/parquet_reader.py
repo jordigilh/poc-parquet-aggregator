@@ -5,6 +5,7 @@ import pyarrow.parquet as pq
 import pandas as pd
 from typing import Dict, Iterator, List, Optional
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .utils import get_logger, PerformanceTimer, format_bytes
 
@@ -255,23 +256,9 @@ class ParquetReader:
                     yield from self.read_parquet_streaming(file, chunk_size)
             return stream_all_files()
         else:
-            # Read all files and concatenate
-            dfs = []
-            for file in files:
-                df = self.read_parquet_file(file)
-                if not df.empty:
-                    dfs.append(df)
-
-            if not dfs:
-                return pd.DataFrame()
-
-            # Concatenate all dataframes
-            combined_df = pd.concat(dfs, ignore_index=True)
-            self.logger.info(
-                f"Combined {len(dfs)} files",
-                total_rows=len(combined_df)
-            )
-            return combined_df
+            # Use parallel reading for better performance
+            parallel_workers = self.config.get('performance', {}).get('parallel_readers', 4)
+            return self._read_files_parallel(files, parallel_workers)
 
     def read_node_labels_line_items(
         self,
@@ -358,6 +345,91 @@ class ParquetReader:
         combined_df = pd.concat(dfs, ignore_index=True)
         self.logger.info(f"Combined {len(dfs)} namespace label files", total_rows=len(combined_df))
         return combined_df
+
+    def _read_files_parallel(
+        self,
+        files: List[str],
+        max_workers: int = 4,
+        columns: Optional[List[str]] = None
+    ) -> pd.DataFrame:
+        """Read multiple Parquet files in parallel.
+
+        Args:
+            files: List of S3 URIs
+            max_workers: Number of parallel workers
+            columns: Optional list of columns to read
+
+        Returns:
+            Combined DataFrame
+        """
+        if not files:
+            return pd.DataFrame()
+
+        self.logger.info(
+            f"Reading {len(files)} files in parallel",
+            workers=max_workers
+        )
+
+        dfs = []
+        with PerformanceTimer(f"Parallel read ({len(files)} files)", self.logger):
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Submit all file reads
+                future_to_file = {
+                    executor.submit(self.read_parquet_file, file, columns): file
+                    for file in files
+                }
+
+                # Collect results as they complete
+                for future in as_completed(future_to_file):
+                    file = future_to_file[future]
+                    try:
+                        df = future.result()
+                        if not df.empty:
+                            dfs.append(df)
+                    except Exception as e:
+                        self.logger.error(
+                            f"Failed to read file in parallel",
+                            file=file,
+                            error=str(e)
+                        )
+                        # Continue with other files
+
+        if not dfs:
+            return pd.DataFrame()
+
+        # Concatenate all dataframes
+        combined_df = pd.concat(dfs, ignore_index=True)
+        self.logger.info(
+            f"Combined {len(dfs)} files",
+            total_rows=len(combined_df)
+        )
+        return combined_df
+
+    def get_optimal_columns_pod_usage(self) -> List[str]:
+        """Get optimal column list for pod usage (reduce memory).
+
+        Returns:
+            List of essential columns
+        """
+        return [
+            'interval_start',
+            'namespace',
+            'node',
+            'pod',
+            'resource_id',
+            'pod_labels',
+            'pod_usage_cpu_core_seconds',
+            'pod_request_cpu_core_seconds',
+            'pod_limit_cpu_core_seconds',
+            'pod_effective_usage_cpu_core_seconds',
+            'pod_usage_memory_byte_seconds',
+            'pod_request_memory_byte_seconds',
+            'pod_limit_memory_byte_seconds',
+            'pod_effective_usage_memory_byte_seconds',
+            'node_capacity_cpu_core_seconds',
+            'node_capacity_memory_byte_seconds',
+            'source'
+        ]
 
     def test_connectivity(self) -> bool:
         """Test S3 connectivity.

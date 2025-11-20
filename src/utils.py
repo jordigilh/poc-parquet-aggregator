@@ -376,3 +376,97 @@ def format_duration(seconds: float) -> str:
         minutes = int((seconds % 3600) // 60)
         return f"{hours}h {minutes}m"
 
+
+
+def optimize_dataframe_memory(df, categorical_columns=None, logger=None):
+    """Optimize DataFrame memory usage.
+
+    Args:
+        df: pandas DataFrame
+        categorical_columns: List of columns to convert to categorical
+        logger: Optional logger
+
+    Returns:
+        Optimized DataFrame
+    """
+    import pandas as pd
+    import gc
+    
+    if df.empty:
+        return df
+    
+    initial_memory = df.memory_usage(deep=True).sum()
+    
+    # Convert string columns to categorical if specified
+    if categorical_columns:
+        for col in categorical_columns:
+            if col in df.columns and df[col].dtype == 'object':
+                df[col] = df[col].astype('category')
+    
+    # Downcast numeric columns
+    for col in df.select_dtypes(include=['float64']).columns:
+        df[col] = pd.to_numeric(df[col], downcast='float')
+    
+    for col in df.select_dtypes(include=['int64']).columns:
+        df[col] = pd.to_numeric(df[col], downcast='integer')
+    
+    final_memory = df.memory_usage(deep=True).sum()
+    reduction = (1 - final_memory / initial_memory) * 100
+    
+    if logger:
+        logger.info(
+            "Memory optimization complete",
+            initial=format_bytes(initial_memory),
+            final=format_bytes(final_memory),
+            reduction_percent=f"{reduction:.1f}%"
+        )
+    
+    # Force garbage collection
+    gc.collect()
+    
+    return df
+
+
+def cleanup_memory(logger=None):
+    """Force garbage collection to free memory.
+
+    Args:
+        logger: Optional logger
+    """
+    import gc
+    
+    collected = gc.collect()
+    
+    if logger:
+        logger.debug(f"Garbage collection: freed {collected} objects")
+
+
+def get_memory_usage():
+    """Get current process memory usage.
+
+    Returns:
+        Memory usage in bytes
+    """
+    import psutil
+    import os
+    
+    process = psutil.Process(os.getpid())
+    return process.memory_info().rss
+
+
+def log_memory_usage(logger, context=""):
+    """Log current memory usage.
+
+    Args:
+        logger: Logger instance
+        context: Optional context string
+    """
+    try:
+        memory_bytes = get_memory_usage()
+        logger.info(
+            f"Memory usage{': ' + context if context else ''}",
+            memory=format_bytes(memory_bytes)
+        )
+    except ImportError:
+        # psutil not available
+        pass

@@ -1,6 +1,6 @@
 # Label Precedence Compliance Assessment
 
-**Date**: 2025-11-20  
+**Date**: 2025-11-20
 **Reference**: [Red Hat Cost Management - Value Precedence in Tags](https://docs.redhat.com/en/documentation/cost_management_service/1-latest/html-single/managing_cost_data_using_tagging/index#value-precedence-tagging_planning-your-tagging-strategy)
 
 ---
@@ -22,7 +22,7 @@ The POC correctly implements the **Pod → Namespace → Node** precedence order
 According to Red Hat's official documentation:
 
 > **1.3.1.1. Namespace, node, and pod labels**
-> 
+>
 > When you group by tag, cost management merges the labels from the pod, namespace, and node. If the same label appears on the pod, namespace, and node, **the pod value takes precedence over the namespace value, and the namespace value takes precedence over the node value**.
 
 **Precedence Order (Highest to Lowest)**:
@@ -42,7 +42,7 @@ When the same key appears at multiple levels, the value from the higher-priority
 
 ### Code Location
 
-File: `src/aggregator_pod.py`  
+File: `src/aggregator_pod.py`
 Function: `_merge_all_labels()` (lines 253-278)
 
 ### Implementation
@@ -78,7 +78,7 @@ def _merge_all_labels(
 
 ### Merge Logic
 
-File: `src/utils.py`  
+File: `src/utils.py`
 Function: `merge_label_dicts()`
 
 ```python
@@ -269,7 +269,7 @@ df['pod_labels_filtered'] = df['pod_labels_dict'].apply(
 
 **Red Hat Requirement**: "Each tag or label key must be unique for every resource."
 
-**POC Implementation**: 
+**POC Implementation**:
 - Dictionary merge ensures only one value per key
 - Later sources override earlier ones
 - No duplicate keys in final output
@@ -414,7 +414,7 @@ pod_labels = {"environment": "dev"}    # Lowercase e
 
 **Scenario**: Resource with many labels (approaching 64 limit)
 
-**POC Behavior**: 
+**POC Behavior**:
 - Handles all labels efficiently
 - No performance degradation
 - Tested with IQE scenarios containing 20+ labels per resource
@@ -532,8 +532,8 @@ The implementation not only follows the Red Hat documentation but has been valid
 
 ---
 
-**Date**: 2025-11-20  
-**Status**: ✅ COMPLIANT  
-**Reviewer**: AI Code Analysis  
+**Date**: 2025-11-20
+**Status**: ✅ COMPLIANT
+**Reviewer**: AI Code Analysis
 **Approved**: Ready for production
 

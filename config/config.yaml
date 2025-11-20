@@ -43,14 +43,21 @@ ocp:
 
 performance:
   # Parallel processing
+  parallel_readers: 4  # Concurrent file reading (2-4x speedup)
   max_workers: 4  # Concurrent file processing
 
   # Memory management
-  chunk_size: 10000  # Rows per processing chunk
-  use_streaming: true  # Stream large files instead of loading into memory
+  chunk_size: 50000  # Rows per processing chunk (optimized for memory)
+  use_streaming: false  # Enable for datasets > 1M rows
+  use_categorical: true  # Use categorical types for string columns (50-70% memory savings)
+  column_filtering: true  # Read only needed columns (30-40% memory savings)
 
   # Batch inserts to PostgreSQL
   db_batch_size: 1000
+
+  # Memory cleanup
+  gc_after_aggregation: true  # Run garbage collection after aggregation
+  delete_intermediate_dfs: true  # Delete intermediate DataFrames
 
   # Caching
   cache_enabled_tags: true  # Cache PostgreSQL enabled tags query
