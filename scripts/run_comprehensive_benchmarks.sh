@@ -66,15 +66,15 @@ FAILED=0
 for SCALE_INFO in "${SCALES[@]}"; do
     ROWS=$(echo $SCALE_INFO | cut -d: -f1)
     DESCRIPTION=$(echo $SCALE_INFO | cut -d: -f2)
-    
+
     echo "========================================================================"
     echo "Benchmarking: ${DESCRIPTION}"
     echo "========================================================================"
-    
+
     # Generate unique UUID for this test
     PROVIDER_UUID=$(uuidgen | tr '[:upper:]' '[:lower:]')
     export OCP_PROVIDER_UUID="${PROVIDER_UUID}"
-    
+
     # Step 1: Generate synthetic data
     echo "Step 1: Generating ${ROWS} rows of synthetic data..."
     python3 "${SCRIPT_DIR}/generate_synthetic_data.py" \
@@ -88,7 +88,7 @@ for SCALE_INFO in "${SCALES[@]}"; do
         FAILED=$((FAILED + 1))
         continue
     }
-    
+
     # Step 2: Initialize database (truncate)
     echo "Step 2: Initializing database..."
     python3 << EOF
@@ -105,21 +105,21 @@ conn.commit()
 conn.close()
 print("✓ Database truncated")
 EOF
-    
+
     # Step 3: Run benchmark
     echo "Step 3: Running benchmark..."
     BENCHMARK_OUTPUT="${OUTPUT_DIR}/benchmark_${ROWS}_rows_$(date +%Y%m%d_%H%M%S).json"
-    
+
     python3 "${SCRIPT_DIR}/benchmark_performance.py" \
         --provider-uuid "${PROVIDER_UUID}" \
         --year "${POC_YEAR}" \
         --month "${POC_MONTH}" \
         --output "${BENCHMARK_OUTPUT}" 2>&1 | tee "${OUTPUT_DIR}/benchmark_${ROWS}_rows.log"
-    
+
     if [ $? -eq 0 ] && [ -f "${BENCHMARK_OUTPUT}" ]; then
         echo "✅ Benchmark completed: ${ROWS} rows"
         PASSED=$((PASSED + 1))
-        
+
         # Extract metrics and add to summary
         echo "## ${DESCRIPTION}" >> "${RESULTS_FILE}"
         echo "" >> "${RESULTS_FILE}"
@@ -166,7 +166,7 @@ EOF
         echo "❌ Benchmark failed: ${ROWS} rows"
         FAILED=$((FAILED + 1))
     fi
-    
+
     echo ""
 done
 
@@ -179,7 +179,7 @@ echo "|------|-------------|----------------|----------|-----------------|------
 for SCALE_INFO in "${SCALES[@]}"; do
     ROWS=$(echo $SCALE_INFO | cut -d: -f1)
     JSON_FILE=$(ls -t "${OUTPUT_DIR}/benchmark_${ROWS}_rows_"*.json 2>/dev/null | head -1)
-    
+
     if [ -f "${JSON_FILE}" ]; then
         python3 << EOF >> "${RESULTS_FILE}"
 import json
