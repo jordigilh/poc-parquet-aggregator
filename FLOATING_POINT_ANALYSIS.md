@@ -1,6 +1,6 @@
 # Floating Point vs DECIMAL Analysis
 
-**Date**: November 20, 2025  
+**Date**: November 20, 2025
 **Question**: Does Trino use floating points for financial/monetary figures?
 
 ---
@@ -267,7 +267,7 @@ Pandas `to_sql()` with psycopg2 automatically maps:
 - ⚠️ Should verify cost fields use Decimal type if/when cost calculations are added
 - ✅ No immediate concern for pure resource aggregation (current POC scope)
 
-**Recommendation**: 
+**Recommendation**:
 - For current POC (resource aggregation only): **No changes needed** - float64 is correct
 - For future cost calculations: **Use Decimal type** for all monetary values and cost-related ratios
 - For production: **Consider DECIMAL migration** for all financial calculations

@@ -81,22 +81,21 @@ EOF
 for ns_idx in $(seq 1 ${NAMESPACES}); do
     NAMESPACE="namespace-${ns_idx}"
     PODS_PER_NS=$((PODS / NAMESPACES))
-    
+
     for pod_idx in $(seq 1 ${PODS_PER_NS}); do
         NODE_IDX=$(( (pod_idx % NODES) + 1 ))
         NODE="node-${NODE_IDX}"
         POD="pod-${ns_idx}-${pod_idx}"
-        
+
         # Random resource values
         CPU_REQUEST=$(awk -v min=0.1 -v max=2.0 'BEGIN{srand(); print min+rand()*(max-min)}')
         CPU_LIMIT=$(awk -v req=${CPU_REQUEST} 'BEGIN{print req * (1.2 + rand() * 0.8)}')
         MEM_REQUEST=$(awk -v min=128 -v max=2048 'BEGIN{srand(); print int(min+rand()*(max-min))}')
         MEM_LIMIT=$(awk -v req=${MEM_REQUEST} 'BEGIN{print int(req * (1.2 + rand() * 0.3))}')
-        
+
         cat >> "${YAML_FILE}" << EOFGEN
   - OCPGenerator:
-      start_date: 2025-10-01
-      end_date: 2025-10-01
+      start_date: last_month
       nodes:
         - node:
           node_name: ${NODE}
@@ -129,27 +128,30 @@ echo ""
 
 # Generate nise data
 echo "Generating nise data..."
+cd "${OUTPUT_DIR}"
 nise report ocp \
     --static-report-file "${YAML_FILE}" \
     --ocp-cluster-id "${CLUSTER_ID}" \
     --write-monthly \
     --file-row-limit 100000 \
-    2>&1 | tee "${OUTPUT_DIR}/nise_${SCALE}.log"
+    2>&1 | tee "nise_${SCALE}.log"
 
-# Find the generated data directory
-NISE_OUTPUT=$(find /tmp -maxdepth 1 -name "nise-data-*" -type d -mmin -5 | head -1)
+# Check for generated CSV files (nise writes to current directory with --write-monthly)
+NISE_CSV_FILES=$(ls -1 October-*-${CLUSTER_ID}-*.csv 2>/dev/null | head -1)
 
-if [ -z "${NISE_OUTPUT}" ]; then
-    echo "❌ Failed to find nise output directory"
+if [ -z "${NISE_CSV_FILES}" ]; then
+    echo "❌ Failed to find nise CSV files"
+    echo "Expected pattern: October-*-${CLUSTER_ID}-*.csv"
+    ls -la October-*.csv 2>/dev/null || echo "No CSV files found"
     exit 1
 fi
 
 echo ""
-echo "✓ Nise data generated: ${NISE_OUTPUT}"
+echo "✓ Nise data generated: ${OUTPUT_DIR}"
 
 # Count rows
 TOTAL_ROWS=0
-for csv in "${NISE_OUTPUT}"/openshift_report.*.csv; do
+for csv in October-*-${CLUSTER_ID}-*.csv; do
     if [ -f "$csv" ]; then
         ROWS=$(wc -l < "$csv")
         ROWS=$((ROWS - 1))  # Subtract header
@@ -166,12 +168,12 @@ echo "Scale: ${DESCRIPTION}"
 echo "Total rows: ${TOTAL_ROWS}"
 echo "Provider UUID: ${PROVIDER_UUID}"
 echo "Cluster ID: ${CLUSTER_ID}"
-echo "Nise output: ${NISE_OUTPUT}"
+echo "Nise output: ${OUTPUT_DIR}"
 echo "YAML config: ${YAML_FILE}"
 echo ""
 echo "Next steps:"
 echo "  1. Convert to Parquet and upload to MinIO:"
-echo "     python3 scripts/csv_to_parquet_minio.py ${NISE_OUTPUT}"
+echo "     python3 scripts/csv_to_parquet_minio.py ${OUTPUT_DIR}"
 echo ""
 echo "  2. Run benchmark:"
 echo "     export OCP_PROVIDER_UUID='${PROVIDER_UUID}'"
