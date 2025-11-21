@@ -40,14 +40,46 @@ case "$SCALE" in
         DAYS=1
         DESCRIPTION="Very Large (100K rows)"
         ;;
+    xxlarge)
+        PODS=2500
+        NAMESPACES=20
+        NODES=30
+        DAYS=1
+        DESCRIPTION="Extra Large (250K rows)"
+        ;;
+    production-small)
+        PODS=5000
+        NAMESPACES=25
+        NODES=40
+        DAYS=1
+        DESCRIPTION="Production Small (500K rows)"
+        ;;
+    production-medium)
+        PODS=10000
+        NAMESPACES=30
+        NODES=50
+        DAYS=1
+        DESCRIPTION="Production Medium (1M rows)"
+        ;;
+    production-large)
+        PODS=20000
+        NAMESPACES=40
+        NODES=100
+        DAYS=1
+        DESCRIPTION="Production Large (2M rows)"
+        ;;
     *)
-        echo "Usage: $0 {small|medium|large|xlarge} [output_dir]"
+        echo "Usage: $0 {small|medium|large|xlarge|xxlarge|production-small|production-medium|production-large} [output_dir]"
         echo ""
         echo "Scales:"
-        echo "  small   - 10 pods, 2 namespaces, 2 nodes, 1 day (~1K rows)"
-        echo "  medium  - 100 pods, 5 namespaces, 5 nodes, 1 day (~10K rows)"
-        echo "  large   - 500 pods, 10 namespaces, 10 nodes, 1 day (~50K rows)"
-        echo "  xlarge  - 1000 pods, 10 namespaces, 20 nodes, 1 day (~100K rows)"
+        echo "  small             - 10 pods, 2 namespaces, 2 nodes, 1 day (~1K rows)"
+        echo "  medium            - 100 pods, 5 namespaces, 5 nodes, 1 day (~10K rows)"
+        echo "  large             - 500 pods, 10 namespaces, 10 nodes, 1 day (~50K rows)"
+        echo "  xlarge            - 1000 pods, 10 namespaces, 20 nodes, 1 day (~100K rows)"
+        echo "  xxlarge           - 2500 pods, 20 namespaces, 30 nodes, 1 day (~250K rows)"
+        echo "  production-small  - 5000 pods, 25 namespaces, 40 nodes, 1 day (~500K rows)"
+        echo "  production-medium - 10000 pods, 30 namespaces, 50 nodes, 1 day (~1M rows)"
+        echo "  production-large  - 20000 pods, 40 namespaces, 100 nodes, 1 day (~2M rows)"
         exit 1
         ;;
 esac

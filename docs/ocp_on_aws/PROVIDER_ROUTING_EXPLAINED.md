@@ -20,7 +20,7 @@ This is a critical design question. The answer involves understanding:
 ## Provider Types Overview
 
 ### 1. **OCP (OpenShift Container Platform)**
-**Data Sources**: 
+**Data Sources**:
 - OCP Parquet files only (pod usage, storage, labels)
 
 **What it does**:
@@ -29,14 +29,14 @@ This is a critical design question. The answer involves understanding:
 - Calculates capacity metrics
 - Outputs: `reporting_ocpusagelineitem_daily_summary_p`
 
-**When to use**: 
+**When to use**:
 - Standalone OpenShift clusters
 - No cloud provider integration
 
 ---
 
 ### 2. **OCP on AWS (OpenShift on AWS)**
-**Data Sources**: 
+**Data Sources**:
 - OCP Parquet files (pod usage, storage, labels)
 - AWS Parquet files (Cost and Usage Report)
 
@@ -46,21 +46,21 @@ This is a critical design question. The answer involves understanding:
 - Applies label precedence (inherited from OCP)
 - Outputs: 9 summary tables including AWS cost breakdown
 
-**When to use**: 
+**When to use**:
 - OpenShift running on AWS
 - Need to show AWS infrastructure costs per namespace
 
 ---
 
 ### 3. **AWS (Amazon Web Services)** ⚠️ Not in Current Scope
-**Data Sources**: 
+**Data Sources**:
 - AWS Parquet files only (Cost and Usage Report)
 
 **What it does**:
 - Aggregates AWS costs without OCP context
 - Standard AWS cost reporting
 
-**When to use**: 
+**When to use**:
 - Pure AWS workloads (no OpenShift)
 - AWS cost analysis without container attribution
 
@@ -83,7 +83,7 @@ aggregation:
       type: "OCP"                    # ← Explicitly set
       enabled: true
       source_uuid: "abc-123-ocp"
-      
+
     - name: "production-ocp-on-aws"
       type: "OCP_AWS"                # ← Explicitly set
       enabled: true
@@ -118,18 +118,18 @@ The provider type is **automatically detected** based on available data:
 def detect_provider_type(source_uuid: str, s3_bucket: str) -> str:
     """
     Auto-detect provider type based on available Parquet files.
-    
+
     Logic:
     - If only OCP files exist → OCP
     - If both OCP and AWS files exist → OCP_AWS
     - If only AWS files exist → AWS (not supported yet)
-    
+
     Returns:
         "OCP", "OCP_AWS", or "AWS"
     """
     has_ocp_data = check_s3_path_exists(f"{s3_bucket}/openshift_pod_usage_line_items_daily/source={source_uuid}/")
     has_aws_data = check_s3_path_exists(f"{s3_bucket}/aws_line_items_daily/source={source_uuid}/")
-    
+
     if has_ocp_data and has_aws_data:
         return "OCP_AWS"
     elif has_ocp_data:
@@ -160,23 +160,23 @@ Combine configuration with validation:
 def validate_and_route(provider_config: dict) -> str:
     """
     Validate configured provider type against available data.
-    
+
     1. Read provider type from config
     2. Validate that required data sources exist
     3. Return validated provider type
-    
+
     Raises:
         ValueError if configuration doesn't match available data
     """
     configured_type = provider_config['type']
-    
+
     # Validate based on configured type
     if configured_type == "OCP":
         # Ensure OCP data exists
         if not has_ocp_data(provider_config['source_uuid']):
             raise ValueError(f"OCP provider configured but no OCP data found")
         return "OCP"
-    
+
     elif configured_type == "OCP_AWS":
         # Ensure both OCP and AWS data exist
         if not has_ocp_data(provider_config['ocp_source_uuid']):
@@ -184,7 +184,7 @@ def validate_and_route(provider_config: dict) -> str:
         if not has_aws_data(provider_config['aws_source_uuid']):
             raise ValueError(f"OCP_AWS provider configured but no AWS data found")
         return "OCP_AWS"
-    
+
     else:
         raise ValueError(f"Unknown provider type: {configured_type}")
 ```
@@ -218,43 +218,43 @@ def main():
     # Load configuration
     with open('config/config.yaml', 'r') as f:
         config = yaml.safe_load(f)
-    
+
     logger = setup_logging(config)
     postgres_conn = get_postgres_connection(config)
-    
+
     # Process each configured provider
     for provider in config['aggregation']['providers']:
         if not provider.get('enabled', True):
             logger.info(f"Skipping disabled provider: {provider['name']}")
             continue
-        
+
         provider_type = provider['type']
         logger.info(f"Processing provider: {provider['name']} (type: {provider_type})")
-        
+
         # Route to appropriate pipeline based on type
         if provider_type == "OCP":
             run_ocp_pipeline(provider, config, logger, postgres_conn)
-        
+
         elif provider_type == "OCP_AWS":
             run_ocpaws_pipeline(provider, config, logger, postgres_conn)
-        
+
         else:
             logger.error(f"Unknown provider type: {provider_type}")
             raise ValueError(f"Unsupported provider type: {provider_type}")
-    
+
     logger.info("All providers processed successfully")
 
 
 def run_ocp_pipeline(provider: dict, config: dict, logger, postgres_conn):
     """
     Run OCP-only aggregation pipeline.
-    
+
     This is the EXISTING POC logic.
     """
     logger.info("=" * 80)
     logger.info(f"Running OCP Pipeline for {provider['name']}")
     logger.info("=" * 80)
-    
+
     pipeline = OCPPipeline(config, logger, postgres_conn)
     pipeline.run(
         source_uuid=provider['source_uuid'],
@@ -262,20 +262,20 @@ def run_ocp_pipeline(provider: dict, config: dict, logger, postgres_conn):
         month=config['date_range']['month'],
         schema=config['database']['schema']
     )
-    
+
     logger.info(f"OCP Pipeline complete for {provider['name']}")
 
 
 def run_ocpaws_pipeline(provider: dict, config: dict, logger, postgres_conn):
     """
     Run OCP on AWS aggregation pipeline.
-    
+
     This is the NEW logic from the implementation guide.
     """
     logger.info("=" * 80)
     logger.info(f"Running OCP on AWS Pipeline for {provider['name']}")
     logger.info("=" * 80)
-    
+
     pipeline = OCPAWSPipeline(config, logger, postgres_conn)
     pipeline.run(
         aws_source_uuid=provider['aws_source_uuid'],
@@ -287,7 +287,7 @@ def run_ocpaws_pipeline(provider: dict, config: dict, logger, postgres_conn):
         schema=config['database']['schema'],
         markup=provider.get('markup', 0.0)
     )
-    
+
     logger.info(f"OCP on AWS Pipeline complete for {provider['name']}")
 
 
@@ -363,7 +363,7 @@ aggregation:
       type: "OCP"
       enabled: true
       source_uuid: "550e8400-e29b-41d4-a716-446655440000"
-    
+
     # OCP on AWS cluster
     - name: "aws-east-cluster"
       type: "OCP_AWS"
@@ -371,7 +371,7 @@ aggregation:
       ocp_source_uuid: "660e8400-e29b-41d4-a716-446655440001"
       aws_source_uuid: "770e8400-e29b-41d4-a716-446655440002"
       markup: 0.10
-    
+
     # Another OCP on AWS cluster
     - name: "aws-west-cluster"
       type: "OCP_AWS"
@@ -390,7 +390,7 @@ database:
   schema: "org1234567"
 ```
 
-**Result**: 
+**Result**:
 1. Runs OCP pipeline for on-prem cluster
 2. Runs OCP on AWS pipeline for aws-east cluster
 3. Runs OCP on AWS pipeline for aws-west cluster
@@ -529,7 +529,7 @@ providers:
 
 class AWSPipeline:
     """Pipeline for pure AWS cost aggregation (no OCP)."""
-    
+
     def run(self, source_uuid, year, month, schema):
         # AWS-only aggregation logic
         pass

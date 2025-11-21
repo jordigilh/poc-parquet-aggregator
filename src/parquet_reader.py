@@ -117,6 +117,10 @@ class ParquetReader:
 
                 df = table.to_pandas()
 
+                # Apply memory optimization if enabled (50-70% memory savings)
+                if self.config.get('performance', {}).get('use_categorical', True):
+                    df = self._optimize_dataframe_memory(df)
+
                 # Calculate size
                 memory_usage = df.memory_usage(deep=True).sum()
 
@@ -249,16 +253,22 @@ class ParquetReader:
         )
 
         # Read and concatenate all files
+        # Use column filtering if enabled (30-40% memory savings)
+        columns = None
+        if self.config.get('performance', {}).get('column_filtering', True):
+            columns = self.get_optimal_columns_pod_usage()
+            self.logger.info(f"Column filtering enabled: reading {len(columns)} of ~50 columns")
+        
         if streaming:
             # For streaming, yield chunks from all files sequentially
             def stream_all_files():
                 for file in files:
-                    yield from self.read_parquet_streaming(file, chunk_size)
+                    yield from self.read_parquet_streaming(file, chunk_size, columns=columns)
             return stream_all_files()
         else:
             # Use parallel reading for better performance
             parallel_workers = self.config.get('performance', {}).get('parallel_readers', 4)
-            return self._read_files_parallel(files, parallel_workers)
+            return self._read_files_parallel(files, parallel_workers, columns=columns)
 
     def read_node_labels_line_items(
         self,
@@ -410,6 +420,10 @@ class ParquetReader:
 
         Returns:
             List of essential columns
+            
+        Note: pod_effective_usage_* columns are NOT included because they are
+        computed at runtime in aggregator_pod.py, not present in source Parquet files.
+        Also, 'source' column is not in input Parquet - it's added later as provider_uuid.
         """
         return [
             'interval_start',
@@ -421,15 +435,47 @@ class ParquetReader:
             'pod_usage_cpu_core_seconds',
             'pod_request_cpu_core_seconds',
             'pod_limit_cpu_core_seconds',
-            'pod_effective_usage_cpu_core_seconds',
+            # 'pod_effective_usage_cpu_core_seconds',  # REMOVED: Computed at runtime, not in source
             'pod_usage_memory_byte_seconds',
             'pod_request_memory_byte_seconds',
             'pod_limit_memory_byte_seconds',
-            'pod_effective_usage_memory_byte_seconds',
+            # 'pod_effective_usage_memory_byte_seconds',  # REMOVED: Computed at runtime, not in source
             'node_capacity_cpu_core_seconds',
-            'node_capacity_memory_byte_seconds',
-            'source'
+            'node_capacity_memory_byte_seconds'
+            # 'source' is NOT in input data - it's added later in _format_output()
         ]
+
+    def _optimize_dataframe_memory(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Optimize DataFrame memory by using categorical types.
+        
+        String columns that repeat frequently (namespace, node, pod) use a lot of memory.
+        Converting to categorical can save 50-70% memory.
+        
+        Args:
+            df: Input DataFrame
+            
+        Returns:
+            Optimized DataFrame with categorical types
+        """
+        # String columns that repeat a lot → use categorical (50-70% memory savings)
+        # NOTE: 'source' is critical for groupby, make sure it exists before converting
+        categorical_cols = ['namespace', 'node', 'pod', 'resource_id']
+        
+        # Only add 'source' if it exists in the DataFrame
+        if 'source' in df.columns:
+            categorical_cols.append('source')
+        
+        for col in categorical_cols:
+            if col in df.columns and df[col].dtype == 'object':
+                df[col] = df[col].astype('category')
+        
+        # Downcast numeric types (10-20% memory savings)
+        for col in df.select_dtypes(include=['float64']).columns:
+            # Skip columns that might have NaN values or need high precision
+            if 'cpu' not in col and 'memory' not in col:
+                df[col] = pd.to_numeric(df[col], downcast='float')
+        
+        return df
 
     def test_connectivity(self) -> bool:
         """Test S3 connectivity.

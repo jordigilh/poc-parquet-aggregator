@@ -89,25 +89,25 @@ This document explains:
 ```python
 class OCPCloudParquetReportSummaryUpdater:
     """Class to update OCP report summary data."""
-    
-    def update_summary_tables(self, start_date, end_date, ocp_provider_uuid, 
+
+    def update_summary_tables(self, start_date, end_date, ocp_provider_uuid,
                               infra_provider_uuid, infra_provider_type):
         """
         Populate the summary tables for reporting.
-        
+
         This is THE KEY DECISION POINT for provider routing.
         """
         # Decision based on infrastructure provider type
         if infra_provider_type in (Provider.PROVIDER_AWS, Provider.PROVIDER_AWS_LOCAL):
-            self.update_aws_summary_tables(ocp_provider_uuid, infra_provider_uuid, 
+            self.update_aws_summary_tables(ocp_provider_uuid, infra_provider_uuid,
                                           start_date, end_date)
-        
+
         elif infra_provider_type in (Provider.PROVIDER_AZURE, Provider.PROVIDER_AZURE_LOCAL):
-            self.update_azure_summary_tables(ocp_provider_uuid, infra_provider_uuid, 
+            self.update_azure_summary_tables(ocp_provider_uuid, infra_provider_uuid,
                                             start_date, end_date)
-        
+
         elif infra_provider_type in (Provider.PROVIDER_GCP, Provider.PROVIDER_GCP_LOCAL):
-            self.update_gcp_summary_tables(ocp_provider_uuid, infra_provider_uuid, 
+            self.update_gcp_summary_tables(ocp_provider_uuid, infra_provider_uuid,
                                           start_date, end_date)
 ```
 
@@ -124,25 +124,25 @@ class OCPCloudParquetReportSummaryUpdater:
 **Location**: `koku/masu/processor/ocp/ocp_cloud_parquet_summary_updater.py`
 
 ```python
-def update_aws_summary_tables(self, openshift_provider_uuid, aws_provider_uuid, 
+def update_aws_summary_tables(self, openshift_provider_uuid, aws_provider_uuid,
                                start_date, end_date):
     """Update operations specifically for OpenShift on AWS."""
-    
+
     # Get cluster info
     cluster_id = get_cluster_id_from_provider(openshift_provider_uuid)
     cluster_alias = get_cluster_alias_from_cluster_id(cluster_id)
-    
+
     # Get report period and bill IDs
     with OCPReportDBAccessor(self._schema) as accessor:
         report_period = accessor.report_periods_for_provider_uuid(
             openshift_provider_uuid, start_date
         )
         report_period_id = report_period.id
-    
+
     with AWSReportDBAccessor(self._schema) as accessor:
         bills = accessor.get_cost_entry_bills_by_date(aws_provider_uuid)
         bill_id = bills.first().id
-        
+
         # THIS IS WHERE TRINO IS CALLED
         accessor.populate_ocp_on_aws_cost_daily_summary_trino(
             start_date,
@@ -162,7 +162,7 @@ def update_aws_summary_tables(self, openshift_provider_uuid, aws_provider_uuid,
 
 ```python
 class AWSReportDBAccessor:
-    
+
     def populate_ocp_on_aws_cost_daily_summary_trino(
         self,
         start_date,
@@ -174,7 +174,7 @@ class AWSReportDBAccessor:
     ):
         """
         Populate the daily cost aggregated summary for OCP on AWS.
-        
+
         THIS METHOD EXECUTES TRINO SQL QUERIES.
         """
         # Prepare SQL metadata
@@ -188,36 +188,36 @@ class AWSReportDBAccessor:
             bill_id,
             report_period_id,
         )
-        
+
         # Path to Trino SQL files
         managed_path = "trino_sql/aws/openshift/populate_daily_summary"
-        
+
         # Step 1: Prepare tables
         prepare_sql, prepare_params = sql_metadata.prepare_template(
             f"{managed_path}/0_prepare_daily_summary_tables.sql"
         )
         self._execute_trino_multipart_sql_query(prepare_sql, bind_params=prepare_params)
-        
+
         # Step 2: Resource matching
         resource_matching_sql, resource_matching_params = sql_metadata.prepare_template(
             f"{managed_path}/1_resource_matching_by_cluster.sql",
             {"matched_tag_array": self.find_openshift_keys_expected_values(sql_metadata)}
         )
-        self._execute_trino_multipart_sql_query(resource_matching_sql, 
+        self._execute_trino_multipart_sql_query(resource_matching_sql,
                                                bind_params=resource_matching_params)
-        
+
         # Step 3: Summarize data
         summarize_sql, summarize_params = sql_metadata.prepare_template(
             f"{managed_path}/2_summarize_data_by_cluster.sql"
         )
         self._execute_trino_multipart_sql_query(summarize_sql, bind_params=summarize_params)
-        
+
         # Step 4: Finalize
         finalize_sql, finalize_params = sql_metadata.prepare_template(
             f"{managed_path}/3_reporting_ocpawscostlineitem_project_daily_summary_p.sql"
         )
         self._execute_trino_multipart_sql_query(finalize_sql, bind_params=finalize_params)
-        
+
         # Execute 9 aggregation queries
         for sql_file in [
             "reporting_ocpaws_cost_summary_p.sql",
@@ -240,37 +240,37 @@ class AWSReportDBAccessor:
 ```python
 class OCPReportParquetSummaryUpdater:
     """Update OCP report summary tables."""
-    
+
     def update_daily_tables(self, start_date, end_date):
         """Update OCP daily summary tables."""
-        
+
         with OCPReportDBAccessor(self._schema) as accessor:
             # Get report period
             report_period = accessor.report_periods_for_provider_uuid(
                 self._provider.uuid, start_date
             )
             report_period_id = report_period.id
-            
+
             # Populate cluster information
             accessor.populate_openshift_cluster_information_tables(
-                self._provider, self._cluster_id, self._cluster_alias, 
+                self._provider, self._cluster_id, self._cluster_alias,
                 start_date, end_date
             )
-            
+
             # THIS IS WHERE TRINO IS CALLED FOR OCP
-            for start, end in date_range_pair(start_date, end_date, 
+            for start, end in date_range_pair(start_date, end_date,
                                              step=settings.TRINO_DATE_STEP):
                 # Delete existing data
                 accessor.delete_all_except_infrastructure_raw_cost_from_daily_summary(
                     self._provider.uuid, report_period_id, start, end
                 )
-                
+
                 # Aggregate using Trino
                 accessor.populate_line_item_daily_summary_table_trino(
-                    start, end, report_period_id, self._cluster_id, 
+                    start, end, report_period_id, self._cluster_id,
                     self._cluster_alias, self._provider.uuid
                 )
-                
+
                 # Populate UI tables
                 accessor.populate_ui_summary_tables(start, end, self._provider.uuid)
 ```
@@ -279,14 +279,14 @@ class OCPReportParquetSummaryUpdater:
 
 ```python
 class OCPReportDBAccessor:
-    
+
     def populate_line_item_daily_summary_table_trino(
-        self, start_date, end_date, report_period_id, cluster_id, 
+        self, start_date, end_date, report_period_id, cluster_id,
         cluster_alias, source
     ):
         """
         Populate the daily aggregate of line items table.
-        
+
         THIS METHOD EXECUTES TRINO SQL FOR OCP.
         """
         # Prepare parameters
@@ -294,17 +294,17 @@ class OCPReportDBAccessor:
         month = start_date.strftime("%m")
         days = self.date_helper.list_days(start_date, end_date)
         days_tup = tuple(str(day.day) for day in days)
-        
+
         # Delete Hive partitions
         self.delete_ocp_hive_partition_by_day(days_tup, source, year, month)
-        
+
         # Load Trino SQL
         sql = pkgutil.get_data(
-            "masu.database", 
+            "masu.database",
             "trino_sql/reporting_ocpusagelineitem_daily_summary.sql"
         )
         sql = sql.decode("utf-8")
-        
+
         # Execute Trino query
         sql_params = {
             "uuid": source,
@@ -322,7 +322,7 @@ class OCPReportDBAccessor:
                 self.schema, "openshift_storage_usage_line_items_daily"
             ),
         }
-        
+
         self._execute_trino_multipart_sql_query(sql, bind_params=sql_params)
 ```
 
@@ -360,33 +360,33 @@ def populate_ocp_on_aws_cost_daily_summary_trino(self, ...):
 def populate_ocp_on_aws_cost_daily_summary_trino(self, ...):
     """
     Populate OCP on AWS summary tables.
-    
+
     Uses POC aggregator instead of Trino.
     """
     # Check if POC is enabled
     if settings.USE_POC_AGGREGATOR:
         return self._populate_using_poc_aggregator(
-            start_date, end_date, openshift_provider_uuid, 
+            start_date, end_date, openshift_provider_uuid,
             aws_provider_uuid, report_period_id, bill_id
         )
     else:
         # Fallback to Trino (for gradual migration)
         return self._populate_using_trino(
-            start_date, end_date, openshift_provider_uuid, 
+            start_date, end_date, openshift_provider_uuid,
             aws_provider_uuid, report_period_id, bill_id
         )
 
 def _populate_using_poc_aggregator(self, ...):
     """Use POC aggregator to populate summary tables."""
     from poc_aggregator.main_ocpaws import OCPAWSPipeline
-    
+
     # Initialize POC pipeline
     pipeline = OCPAWSPipeline(
         config=self._get_poc_config(),
         logger=LOG,
         postgres_conn=self._get_db_connection()
     )
-    
+
     # Run aggregation
     pipeline.run(
         aws_source_uuid=str(aws_provider_uuid),
@@ -424,30 +424,30 @@ def _populate_using_trino(self, ...):
 
 **Current Code**:
 ```python
-def update_aws_summary_tables(self, openshift_provider_uuid, aws_provider_uuid, 
+def update_aws_summary_tables(self, openshift_provider_uuid, aws_provider_uuid,
                                start_date, end_date):
     """Update operations specifically for OpenShift on AWS."""
     # ... get cluster info, report period, bill ID ...
-    
+
     with AWSReportDBAccessor(self._schema) as accessor:
         accessor.populate_ocp_on_aws_cost_daily_summary_trino(...)
 ```
 
 **New Code**:
 ```python
-def update_aws_summary_tables(self, openshift_provider_uuid, aws_provider_uuid, 
+def update_aws_summary_tables(self, openshift_provider_uuid, aws_provider_uuid,
                                start_date, end_date):
     """Update operations specifically for OpenShift on AWS."""
     # ... get cluster info, report period, bill ID ...
-    
+
     if settings.USE_POC_AGGREGATOR:
-        self._update_using_poc(openshift_provider_uuid, aws_provider_uuid, 
+        self._update_using_poc(openshift_provider_uuid, aws_provider_uuid,
                               start_date, end_date)
     else:
         with AWSReportDBAccessor(self._schema) as accessor:
             accessor.populate_ocp_on_aws_cost_daily_summary_trino(...)
 
-def _update_using_poc(self, openshift_provider_uuid, aws_provider_uuid, 
+def _update_using_poc(self, openshift_provider_uuid, aws_provider_uuid,
                       start_date, end_date):
     """Use POC aggregator."""
     from poc_aggregator.main_ocpaws import OCPAWSPipeline
@@ -484,13 +484,13 @@ def run_poc_aggregation(
 ):
     """
     Run POC aggregation for OCP on Cloud.
-    
+
     This is a new task that runs the POC aggregator.
     """
     from poc_aggregator.main_ocpaws import OCPAWSPipeline
     from poc_aggregator.main_ocpazure import OCPAzurePipeline
     from poc_aggregator.main_ocpgcp import OCPGCPPipeline
-    
+
     # Route to appropriate POC pipeline
     if provider_type in (Provider.PROVIDER_AWS, Provider.PROVIDER_AWS_LOCAL):
         pipeline_class = OCPAWSPipeline
@@ -500,14 +500,14 @@ def run_poc_aggregation(
         pipeline_class = OCPGCPPipeline
     else:
         raise ValueError(f"Unsupported provider type: {provider_type}")
-    
+
     # Initialize and run
     pipeline = pipeline_class(
         config=get_poc_config(),
         logger=LOG,
         postgres_conn=get_db_connection(schema_name)
     )
-    
+
     pipeline.run(
         aws_source_uuid=str(infra_provider_uuid),
         ocp_source_uuid=str(ocp_provider_uuid),
@@ -522,10 +522,10 @@ def run_poc_aggregation(
 **Modify**: `koku/masu/processor/ocp/ocp_cloud_parquet_summary_updater.py`
 
 ```python
-def update_summary_tables(self, start_date, end_date, ocp_provider_uuid, 
+def update_summary_tables(self, start_date, end_date, ocp_provider_uuid,
                           infra_provider_uuid, infra_provider_type):
     """Populate the summary tables for reporting."""
-    
+
     if settings.USE_POC_AGGREGATOR:
         # Use new POC task
         run_poc_aggregation.delay(
@@ -611,21 +611,21 @@ export POC_LOG_LEVEL=INFO
 ```python
 def populate_ocp_on_aws_cost_daily_summary_trino(self, ...):
     """Run both Trino and POC, compare results."""
-    
+
     # Run Trino (existing)
     trino_results = self._populate_using_trino(...)
-    
+
     # Run POC
     if settings.POC_VALIDATION_MODE:
         try:
             poc_results = self._populate_using_poc_aggregator(...)
-            
+
             # Compare results
             self._compare_trino_vs_poc(trino_results, poc_results)
         except Exception as e:
             LOG.error(f"POC aggregation failed: {e}")
             # Continue with Trino results
-    
+
     return trino_results
 ```
 
@@ -641,21 +641,21 @@ def populate_ocp_on_aws_cost_daily_summary_trino(self, ...):
 ```python
 def should_use_poc_aggregator(schema_name):
     """Determine if POC should be used for this customer."""
-    
+
     if not settings.USE_POC_AGGREGATOR:
         return False
-    
+
     # Feature flag per customer
     if schema_name in settings.POC_ENABLED_SCHEMAS:
         return True
-    
+
     # Percentage-based rollout
     if settings.POC_ROLLOUT_PERCENTAGE > 0:
         # Use hash of schema name for consistent routing
         hash_val = int(hashlib.md5(schema_name.encode()).hexdigest(), 16)
         if (hash_val % 100) < settings.POC_ROLLOUT_PERCENTAGE:
             return True
-    
+
     return False
 ```
 
@@ -671,7 +671,7 @@ def should_use_poc_aggregator(schema_name):
 ```python
 def populate_ocp_on_aws_cost_daily_summary_trino(self, ...):
     """Use POC by default, Trino as fallback."""
-    
+
     try:
         return self._populate_using_poc_aggregator(...)
     except Exception as e:
@@ -824,23 +824,23 @@ Here's a side-by-side comparison of where the POC integrates for both use cases:
 
 def populate_line_item_daily_summary_table_trino(self, ...):
     """Populate OCP daily summary using Trino or POC."""
-    
+
     if settings.USE_POC_AGGREGATOR:
         return self._populate_using_poc_ocp(...)
     else:
         return self._populate_using_trino_ocp(...)
 
-def _populate_using_poc_ocp(self, start_date, end_date, report_period_id, 
+def _populate_using_poc_ocp(self, start_date, end_date, report_period_id,
                             cluster_id, cluster_alias, source):
     """Use POC for OCP aggregation."""
     from poc_aggregator.main import OCPPipeline
-    
+
     pipeline = OCPPipeline(
         config=self._get_poc_config(),
         logger=LOG,
         postgres_conn=self._get_db_connection()
     )
-    
+
     pipeline.run(
         source_uuid=str(source),
         cluster_id=cluster_id,
@@ -860,24 +860,24 @@ def _populate_using_poc_ocp(self, start_date, end_date, report_period_id,
 
 def populate_ocp_on_aws_cost_daily_summary_trino(self, ...):
     """Populate OCP on AWS summary using Trino or POC."""
-    
+
     if settings.USE_POC_AGGREGATOR:
         return self._populate_using_poc_ocpaws(...)
     else:
         return self._populate_using_trino_ocpaws(...)
 
-def _populate_using_poc_ocpaws(self, start_date, end_date, 
+def _populate_using_poc_ocpaws(self, start_date, end_date,
                                 openshift_provider_uuid, aws_provider_uuid,
                                 report_period_id, bill_id):
     """Use POC for OCP on AWS aggregation."""
     from poc_aggregator.main_ocpaws import OCPAWSPipeline
-    
+
     pipeline = OCPAWSPipeline(
         config=self._get_poc_config(),
         logger=LOG,
         postgres_conn=self._get_db_connection()
     )
-    
+
     pipeline.run(
         aws_source_uuid=str(aws_provider_uuid),
         ocp_source_uuid=str(openshift_provider_uuid),

@@ -40,3 +40,10 @@ temp/
 *.prof
 *.lprof
 
+# IQE Test Configuration Files (PROPRIETARY - from iqe-cost-management-plugin)
+# These files should NOT be pushed to public repositories
+config/ocp_report_*.yml
+config/today_ocp_report_*.yml
+config/README_PROPRIETARY_FILES.md
+IMMEDIATE_ACTION_REQUIRED.md
+
