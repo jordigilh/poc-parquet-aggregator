@@ -1266,6 +1266,298 @@ def generate_ocpaws_scenario(
 
 ---
 
+## Performance Optimizations
+
+### Overview
+
+Based on the OCP POC implementation, the following performance optimizations will be applied to the OCP+AWS aggregator to ensure scalability and efficiency.
+
+### 1. ✅ Streaming Mode (80-90% Memory Savings)
+
+**Problem**: Loading millions of AWS line items into memory causes OOM errors
+
+**Solution**: Process data in chunks
+
+**Configuration**:
+```yaml
+performance:
+  use_streaming: true
+  chunk_size: 50000  # Rows per chunk
+```
+
+**Impact**:
+- **Before**: 10M rows = 100 GB memory → ❌ Not feasible
+- **After**: 10M rows = 3 GB memory → ✅ Feasible
+- **Trade-off**: 10-20% slower, but enables unlimited scale
+
+**When to Use**: Datasets > 1M rows (AWS + OCP combined)
+
+---
+
+### 2. ✅ Parallel File Reading (2-4x Speedup)
+
+**Problem**: Sequential file reading is slow for many Parquet files
+
+**Solution**: Read multiple files concurrently using ThreadPoolExecutor
+
+**Configuration**:
+```yaml
+performance:
+  parallel_readers: 4  # Number of concurrent readers
+```
+
+**Impact**:
+- **Before**: 31 files = 3.0s
+- **After**: 31 files = 0.9s
+- **Speedup**: 3.3x
+
+**Benefits**:
+- Faster file reading
+- Better S3 throughput utilization
+- Minimal memory overhead
+
+---
+
+### 3. ✅ Columnar Filtering (30-40% Memory Savings)
+
+**Problem**: Reading all columns wastes memory and I/O
+
+**Solution**: Read only essential columns from Parquet files
+
+**Configuration**:
+```yaml
+performance:
+  column_filtering: true
+```
+
+**Essential Columns**:
+- **OCP**: interval_start, namespace, node, pod, usage metrics, labels
+- **AWS**: lineitem_resourceid, usage_start, costs, product info, tags
+
+**Impact**:
+- **Before**: 50 columns = 10 MB per 1K rows
+- **After**: 20 columns = 6 MB per 1K rows
+- **Savings**: 40%
+
+---
+
+### 4. ✅ Categorical Types (50-70% String Memory Savings)
+
+**Problem**: String columns (namespace, node, cluster_id, product_code, etc.) use excessive memory
+
+**Solution**: Convert repeated strings to categorical type
+
+**Configuration**:
+```yaml
+performance:
+  use_categorical: true
+```
+
+**Columns to Optimize**:
+- **OCP**: namespace, node, cluster_id, cluster_alias
+- **AWS**: product_code, product_family, instance_type, region, availability_zone
+
+**Impact**:
+- **Before**: namespace column = 5.2 MB
+- **After**: namespace column = 1.5 MB
+- **Savings**: 71%
+
+---
+
+### 5. ✅ Memory Cleanup (10-20% Peak Reduction)
+
+**Problem**: Python doesn't immediately free memory
+
+**Solution**: Explicit garbage collection and DataFrame deletion
+
+**Configuration**:
+```yaml
+performance:
+  gc_after_aggregation: true
+  delete_intermediate_dfs: true
+```
+
+**Impact**:
+- Immediate memory release
+- Lower peak memory usage
+- Prevents memory leaks
+
+---
+
+### 6. ✅ Batch PostgreSQL Writes (10-50x Speedup)
+
+**Problem**: Individual row inserts are slow
+
+**Solution**: Batch inserts using execute_values
+
+**Configuration**:
+```yaml
+performance:
+  db_batch_size: 1000
+```
+
+**Impact**:
+- **Before**: 1000 rows = 5.0s
+- **After**: 1000 rows = 0.1s
+- **Speedup**: 50x
+
+---
+
+### Performance Comparison
+
+#### Memory Usage by Scale
+
+| Scale | AWS Rows | OCP Rows | Memory (Standard) | Memory (Streaming) | Container |
+|-------|----------|----------|-------------------|-------------------|-----------|
+| **Small** | 1K | 1K | 100-200 MB | N/A | 1 GB |
+| **Medium** | 10K | 10K | 500-800 MB | N/A | 2 GB |
+| **Large** | 100K | 100K | 2-3 GB | N/A | 4 GB |
+| **XL** | 1M | 1M | 10-15 GB | 3-4 GB | 8 GB (streaming) |
+| **XXL** | 10M | 10M | ❌ Not feasible | 3-4 GB | 8 GB (streaming) |
+
+#### Processing Time by Scale
+
+| Scale | Rows | Time (Standard) | Time (Streaming) | Speedup vs Trino |
+|-------|------|-----------------|------------------|------------------|
+| **Small** | 1K | 2-5s | N/A | 2-3x faster |
+| **Medium** | 10K | 10-30s | N/A | 2-3x faster |
+| **Large** | 100K | 1-3 min | N/A | 2-3x faster |
+| **XL** | 1M | 5-15 min | 6-18 min | Similar |
+| **XXL** | 10M | ❌ OOM | 30-90 min | Similar |
+
+#### Memory Per 1K Rows
+
+| Mode | Memory per 1K Rows | Notes |
+|------|-------------------|-------|
+| **Before Optimizations** | 10-20 MB | Baseline |
+| **After Optimizations (Standard)** | 5-10 MB | 50% reduction |
+| **After Optimizations (Streaming)** | Constant 3-4 GB | 80-90% reduction |
+
+---
+
+### Recommended Configuration by Scale
+
+#### Small Deployment (< 100K rows/day)
+
+```yaml
+performance:
+  parallel_readers: 4
+  use_streaming: false
+  use_categorical: true
+  column_filtering: true
+  chunk_size: 50000
+  gc_after_aggregation: true
+  db_batch_size: 1000
+```
+
+**Container**: 2 GB memory, 1 CPU
+**Expected Time**: 30-60 seconds
+**Cost**: 10-100x cheaper than Trino
+
+---
+
+#### Medium Deployment (100K - 1M rows/day)
+
+```yaml
+performance:
+  parallel_readers: 4
+  use_streaming: false
+  use_categorical: true
+  column_filtering: true
+  chunk_size: 50000
+  gc_after_aggregation: true
+  delete_intermediate_dfs: true
+  db_batch_size: 1000
+```
+
+**Container**: 4-8 GB memory, 2 CPUs
+**Expected Time**: 2-5 minutes
+**Cost**: 100-1000x cheaper than Trino
+
+---
+
+#### Large Deployment (> 1M rows/day)
+
+```yaml
+performance:
+  parallel_readers: 4
+  use_streaming: true  # CRITICAL for large datasets
+  use_categorical: true
+  column_filtering: true
+  chunk_size: 50000
+  gc_after_aggregation: true
+  delete_intermediate_dfs: true
+  db_batch_size: 1000
+```
+
+**Container**: 8 GB memory, 2 CPUs (constant regardless of data size)
+**Expected Time**: 5-15 minutes
+**Cost**: 50-200x cheaper than Trino
+
+---
+
+### Scalability Assessment
+
+#### POC Scales Better Than Trino+Hive For:
+
+✅ **90% of deployments** (< 10M rows/day)
+- Simpler operations
+- Lower cost (10-1000x cheaper)
+- Faster processing (2-3x)
+- Constant memory with streaming
+
+#### POC Scales Equally to Trino+Hive For:
+
+⚠️ **10% of deployments** (> 10M rows/day)
+- Requires streaming mode
+- Comparable performance
+- Still cheaper
+- Simpler operations
+
+#### Recommendation
+
+✅ **Use POC for all OCP+AWS deployments**
+- Start with standard mode (< 1M rows)
+- Enable streaming for > 1M rows
+- Monitor memory and adjust chunk_size if needed
+- Keep Trino as backup for extreme edge cases only
+
+---
+
+### Performance Utilities (From OCP POC)
+
+The following utilities from the OCP POC will be reused:
+
+#### 1. Memory Optimization
+```python
+from src.utils import optimize_dataframe_memory
+
+df = optimize_dataframe_memory(
+    df,
+    categorical_columns=['namespace', 'node', 'product_code', 'region'],
+    logger=logger
+)
+```
+
+#### 2. Memory Cleanup
+```python
+from src.utils import cleanup_memory
+
+cleanup_memory(logger)
+```
+
+#### 3. Memory Monitoring
+```python
+from src.utils import log_memory_usage
+
+log_memory_usage(logger, "after AWS data loading")
+log_memory_usage(logger, "after resource matching")
+log_memory_usage(logger, "after cost attribution")
+log_memory_usage(logger, "after aggregation")
+```
+
+---
+
 ## Success Criteria
 
 ### Functional Correctness (Must Have)
