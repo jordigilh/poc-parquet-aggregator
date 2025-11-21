@@ -44,8 +44,12 @@ class ValidationReport:
     def all_passed(self) -> bool:
         return self.failed_count == 0
 
-    def summary(self) -> str:
-        """Generate human-readable summary."""
+    def summary(self, detailed: bool = False) -> str:
+        """Generate human-readable summary.
+
+        Args:
+            detailed: If True, show all checks (passed and failed). If False, only show failed.
+        """
         lines = [
             "=" * 80,
             "IQE Validation Report",
@@ -57,7 +61,29 @@ class ValidationReport:
             "=" * 80,
         ]
 
-        if self.failed_count > 0:
+        if detailed and len(self.results) > 0:
+            lines.append("\n" + "Detailed Comparison:")
+            lines.append("-" * 80)
+            lines.append(f"{'Metric':<40} {'Expected':>15} {'Actual':>15} {'Diff %':>10} {'Status':>8}")
+            lines.append("-" * 80)
+
+            for result in self.results:
+                # Skip info messages in detailed view
+                if result.scope == "info":
+                    continue
+
+                metric_label = f"{result.scope}/{result.scope_name}/{result.metric}"
+                if len(metric_label) > 38:
+                    metric_label = metric_label[:35] + "..."
+
+                status = "✅ PASS" if result.passed else "❌ FAIL"
+
+                lines.append(
+                    f"{metric_label:<40} {result.expected:>15.2f} {result.actual:>15.2f} "
+                    f"{result.diff_percent:>9.4f}% {status:>8}"
+                )
+
+        elif self.failed_count > 0:
             lines.append("\nFailed Checks:")
             lines.append("-" * 80)
             for result in self.results:
@@ -128,7 +154,7 @@ def read_ocp_resources_from_yaml(yaml_file_path: str, hours_in_period: int = 24)
     for gen in yaml_data["generators"]:
         for node_def in gen["OCPGenerator"]["nodes"]:
             node_generator_count[node_def["node_name"]] += 1
-    
+
     has_multi_generator_nodes = any(count > 1 for count in node_generator_count.values())
 
     cluster_resources = defaultdict(
@@ -248,7 +274,7 @@ def read_ocp_resources_from_yaml(yaml_file_path: str, hours_in_period: int = 24)
         "has_multi_generator_nodes": has_multi_generator_nodes,
         "node_generator_count": dict(node_generator_count)
     }
-    
+
     return result
 
 
@@ -302,7 +328,7 @@ def validate_poc_results(
 
     # Check if this is a multi-generator scenario
     has_multi_generator = expected_values.get("_metadata", {}).get("has_multi_generator_nodes", False)
-    
+
     if has_multi_generator:
         # Skip node-level validation for multi-generator scenarios
         # The expected values cannot be accurately calculated without knowing the actual

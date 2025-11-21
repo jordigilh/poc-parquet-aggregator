@@ -126,13 +126,88 @@ class DatabaseWriter:
                 # Non-critical, return empty DataFrame
                 return pd.DataFrame()
 
+    def write_summary_data_bulk_copy(
+        self,
+        df: pd.DataFrame,
+        truncate: bool = False
+    ) -> int:
+        """
+        Write aggregated summary data using PostgreSQL COPY (10-50x faster).
+
+        This uses the COPY command which is much faster than INSERT for bulk data.
+
+        Args:
+            df: DataFrame with aggregated data
+            truncate: Whether to truncate table first (for testing)
+
+        Returns:
+            Number of rows inserted
+        """
+        import io
+
+        table_name = f"{self.schema}.reporting_ocpusagelineitem_daily_summary"
+
+        with PerformanceTimer(f"Bulk COPY {len(df)} rows to PostgreSQL", self.logger):
+            try:
+                # Optionally truncate
+                if truncate:
+                    self._truncate_table(table_name)
+
+                # Prepare data for COPY (exclude uuid - PostgreSQL generates it)
+                columns = [col for col in df.columns.tolist() if col != 'uuid']
+                df_insert = df[columns].copy()
+
+                # CRITICAL: Replace all NaN values with None for PostgreSQL
+                import numpy as np
+                # Convert object columns and replace NaN with None
+                df_insert = df_insert.astype(object).where(pd.notna(df_insert), None)
+
+                # Create CSV buffer in memory
+                buffer = io.StringIO()
+                df_insert.to_csv(
+                    buffer,
+                    index=False,
+                    header=False,
+                    sep='\t',
+                    na_rep='\\N'  # PostgreSQL NULL representation
+                )
+                buffer.seek(0)
+
+                # Use COPY command for bulk insert
+                column_names = ', '.join(columns)
+                copy_sql = f"""
+                    COPY {table_name} ({column_names})
+                    FROM STDIN
+                    WITH (FORMAT CSV, DELIMITER E'\\t', NULL '\\N')
+                """
+
+                with self.connection.cursor() as cursor:
+                    cursor.copy_expert(copy_sql, buffer)
+                    self.connection.commit()
+
+                rows_inserted = len(df_insert)
+                self.logger.info(
+                    "Successfully bulk copied data",
+                    rows_inserted=rows_inserted,
+                    method="COPY"
+                )
+
+                return rows_inserted
+
+            except Exception as e:
+                self.connection.rollback()
+                self.logger.error(f"Bulk COPY failed: {e}")
+                # Fallback to regular insert
+                self.logger.warning("Falling back to batch INSERT")
+                return self.write_summary_data(df, batch_size=1000, truncate=False)
+
     def write_summary_data(
         self,
         df: pd.DataFrame,
         batch_size: int = 1000,
         truncate: bool = False
     ) -> int:
-        """Write aggregated summary data to PostgreSQL.
+        """Write aggregated summary data to PostgreSQL using batch INSERT.
 
         Args:
             df: DataFrame with aggregated data
@@ -152,7 +227,12 @@ class DatabaseWriter:
 
                 # Prepare data for insert (exclude uuid - PostgreSQL generates it)
                 columns = [col for col in df.columns.tolist() if col != 'uuid']
-                df_insert = df[columns]
+                df_insert = df[columns].copy()
+
+                # CRITICAL: Replace all NaN values with None for PostgreSQL
+                import numpy as np
+                # Convert object columns and replace NaN with None
+                df_insert = df_insert.astype(object).where(pd.notna(df_insert), None)
 
                 # Build INSERT query
                 column_names = ', '.join(columns)

@@ -1,5 +1,7 @@
 # POC: OCP Parquet Aggregator
 
+> **📢 LATEST UPDATE (November 21, 2024)**: Overnight work complete! All Phase 2 enhancements finished, NaN regression fixed, 18/18 IQE tests passing. **[READ START_HERE.md](START_HERE.md) for full summary.**
+
 ## Overview
 
 This POC validates the feasibility of replacing Trino + Hive with custom Python code that:

@@ -6,6 +6,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
+import pandas as pd
 import structlog
 
 
@@ -138,7 +139,8 @@ def labels_to_json_string(labels: Dict[str, str]) -> str:
     Returns:
         JSON string representation (sorted keys, UTF-8, no extra whitespace)
     """
-    if not labels:
+    # Handle NaN, None, or empty
+    if labels is None or (isinstance(labels, float) and pd.isna(labels)) or not labels:
         return '{}'
 
     # json.dumps with sort_keys=True matches Trino's json_format() behavior:
@@ -391,28 +393,28 @@ def optimize_dataframe_memory(df, categorical_columns=None, logger=None):
     """
     import pandas as pd
     import gc
-    
+
     if df.empty:
         return df
-    
+
     initial_memory = df.memory_usage(deep=True).sum()
-    
+
     # Convert string columns to categorical if specified
     if categorical_columns:
         for col in categorical_columns:
             if col in df.columns and df[col].dtype == 'object':
                 df[col] = df[col].astype('category')
-    
+
     # Downcast numeric columns
     for col in df.select_dtypes(include=['float64']).columns:
         df[col] = pd.to_numeric(df[col], downcast='float')
-    
+
     for col in df.select_dtypes(include=['int64']).columns:
         df[col] = pd.to_numeric(df[col], downcast='integer')
-    
+
     final_memory = df.memory_usage(deep=True).sum()
     reduction = (1 - final_memory / initial_memory) * 100
-    
+
     if logger:
         logger.info(
             "Memory optimization complete",
@@ -420,10 +422,10 @@ def optimize_dataframe_memory(df, categorical_columns=None, logger=None):
             final=format_bytes(final_memory),
             reduction_percent=f"{reduction:.1f}%"
         )
-    
+
     # Force garbage collection
     gc.collect()
-    
+
     return df
 
 
@@ -434,9 +436,9 @@ def cleanup_memory(logger=None):
         logger: Optional logger
     """
     import gc
-    
+
     collected = gc.collect()
-    
+
     if logger:
         logger.debug(f"Garbage collection: freed {collected} objects")
 
@@ -449,7 +451,7 @@ def get_memory_usage():
     """
     import psutil
     import os
-    
+
     process = psutil.Process(os.getpid())
     return process.memory_info().rss
 

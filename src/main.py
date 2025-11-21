@@ -90,20 +90,37 @@ def run_poc(args):
         year = os.getenv('POC_YEAR', ocp_config['year'])
         month = os.getenv('POC_MONTH', ocp_config['month'])
 
+        # Determine if we should use streaming mode
+        use_streaming = config.get('performance', {}).get('use_streaming', False)
+        chunk_size = config.get('performance', {}).get('chunk_size', 50000)
+
+        if use_streaming:
+            logger.info(f"Streaming mode ENABLED (chunk_size={chunk_size})")
+        else:
+            logger.info("In-memory mode (streaming disabled)")
+
         # Read daily pod usage for aggregation
-        pod_usage_daily_df = parquet_reader.read_pod_usage_line_items(
+        pod_usage_daily = parquet_reader.read_pod_usage_line_items(
             provider_uuid=provider_uuid,
             year=year,
             month=month,
             daily=True,
-            streaming=False  # For POC, load entire file
+            streaming=use_streaming,
+            chunk_size=chunk_size
         )
 
-        if pod_usage_daily_df.empty:
-            logger.error("No daily pod usage data found")
-            return 1
-
-        logger.info(f"✓ Loaded daily pod usage data: {len(pod_usage_daily_df)} rows")
+        # Handle both streaming (iterator) and non-streaming (DataFrame) modes
+        if use_streaming:
+            # pod_usage_daily is an iterator, we'll pass it directly to aggregate_streaming
+            logger.info("✓ Pod usage data ready for streaming processing")
+            pod_usage_daily_df = None  # Will use iterator directly
+        else:
+            # pod_usage_daily is a DataFrame
+            pod_usage_daily_df = pod_usage_daily
+            if pod_usage_daily_df.empty:
+                logger.error("No daily pod usage data found")
+                return 1
+            logger.info(f"✓ Loaded daily pod usage data: {len(pod_usage_daily_df)} rows")
 
         # Read hourly pod usage for capacity calculation (Trino lines 143-171)
         # Try hourly first, fall back to daily if not available
@@ -159,14 +176,25 @@ def run_poc(args):
 
         aggregator = PodAggregator(config, enabled_tag_keys)
 
-        # Use daily aggregated data for pod usage aggregation
-        aggregated_df = aggregator.aggregate(
-            pod_usage_df=pod_usage_daily_df,
-            node_capacity_df=node_capacity_df,
-            node_labels_df=node_labels_df,
-            namespace_labels_df=namespace_labels_df,
-            cost_category_df=cost_category_df
-        )
+        # Use streaming or in-memory aggregation based on config
+        if use_streaming:
+            logger.info("Using streaming aggregation (constant memory)")
+            aggregated_df = aggregator.aggregate_streaming(
+                pod_usage_chunks=pod_usage_daily,  # Iterator
+                node_capacity_df=node_capacity_df,
+                node_labels_df=node_labels_df,
+                namespace_labels_df=namespace_labels_df,
+                cost_category_df=cost_category_df
+            )
+        else:
+            logger.info("Using in-memory aggregation")
+            aggregated_df = aggregator.aggregate(
+                pod_usage_df=pod_usage_daily_df,  # DataFrame
+                node_capacity_df=node_capacity_df,
+                node_labels_df=node_labels_df,
+                namespace_labels_df=namespace_labels_df,
+                cost_category_df=cost_category_df
+            )
 
         logger.info(f"✓ Generated {len(aggregated_df)} summary rows")
 
@@ -176,11 +204,22 @@ def run_poc(args):
         logger.info("Phase 6: Writing to PostgreSQL...")
 
         with db_writer:
-            rows_inserted = db_writer.write_summary_data(
-                df=aggregated_df,
-                batch_size=config.get('performance', {}).get('db_batch_size', 1000),
-                truncate=args.truncate
-            )
+            # Use bulk COPY if enabled (10-50x faster), otherwise batch INSERT
+            use_bulk_copy = config.get('performance', {}).get('use_bulk_copy', True)
+
+            if use_bulk_copy:
+                logger.info("Using bulk COPY for database write (10-50x faster)")
+                rows_inserted = db_writer.write_summary_data_bulk_copy(
+                    df=aggregated_df,
+                    truncate=args.truncate
+                )
+            else:
+                logger.info("Using batch INSERT for database write")
+                rows_inserted = db_writer.write_summary_data(
+                    df=aggregated_df,
+                    batch_size=config.get('performance', {}).get('db_batch_size', 1000),
+                    truncate=args.truncate
+                )
 
         logger.info(f"✓ Inserted {rows_inserted} rows")
 
@@ -245,10 +284,15 @@ def run_poc(args):
         logger.info("POC COMPLETED SUCCESSFULLY")
         logger.info("=" * 80)
         logger.info(f"Total duration: {format_duration(total_duration)}")
-        logger.info(f"Input rows: {len(pod_usage_daily_df):,}")
+
+        if use_streaming:
+            logger.info("Mode: Streaming (constant memory)")
+        else:
+            logger.info(f"Input rows: {len(pod_usage_daily_df):,}")
+            logger.info(f"Compression ratio: {len(pod_usage_daily_df) / rows_inserted:.1f}x")
+            logger.info(f"Processing rate: {len(pod_usage_daily_df) / total_duration:.0f} rows/sec")
+
         logger.info(f"Output rows: {rows_inserted:,}")
-        logger.info(f"Compression ratio: {len(pod_usage_daily_df) / rows_inserted:.1f}x")
-        logger.info(f"Processing rate: {len(pod_usage_daily_df) / total_duration:.0f} rows/sec")
         logger.info("=" * 80)
 
         return 0

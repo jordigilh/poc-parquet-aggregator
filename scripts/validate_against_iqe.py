@@ -70,6 +70,35 @@ def query_poc_results(config: dict) -> pd.DataFrame:
     return df
 
 
+def print_sample_data(actual_df: pd.DataFrame):
+    """Print a sample of the actual data from PostgreSQL."""
+    print("\n" + "=" * 80)
+    print("Sample Data from PostgreSQL (first 5 rows)")
+    print("=" * 80)
+
+    if actual_df.empty:
+        print("No data found in PostgreSQL")
+        return
+
+    # Select key columns to display
+    display_cols = [
+        'usage_start', 'node', 'namespace',
+        'pod_usage_cpu_core_hours', 'pod_request_cpu_core_hours',
+        'pod_usage_memory_gigabyte_hours', 'pod_request_memory_gigabyte_hours'
+    ]
+
+    sample_df = actual_df[display_cols].head(5)
+
+    # Format the output
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.width', None)
+    pd.set_option('display.max_colwidth', 20)
+
+    print(sample_df.to_string(index=False))
+    print(f"\nTotal rows in table: {len(actual_df)}")
+    print("=" * 80)
+
+
 def main():
     """Main validation workflow."""
 
@@ -173,6 +202,9 @@ def main():
         logger.info(f"  Unique Nodes: {actual_df['node'].nunique()}")
         logger.info(f"  Unique Namespaces: {actual_df['namespace'].nunique()}")
 
+        # Print sample of actual data
+        print_sample_data(actual_df)
+
     except Exception as e:
         logger.error(f"Failed to query PostgreSQL: {e}")
         return 1
@@ -189,8 +221,8 @@ def main():
         traceback.print_exc()
         return 1
 
-    # Step 4: Print report
-    print("\n" + report.summary())
+    # Step 4: Print report (detailed view showing all comparisons)
+    print("\n" + report.summary(detailed=True))
 
     # Step 5: Exit with appropriate code
     if report.all_passed:
