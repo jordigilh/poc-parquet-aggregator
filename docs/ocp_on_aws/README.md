@@ -65,7 +65,75 @@ This directory contains the comprehensive triage and planning documentation for 
 
 ---
 
-### 3. Status and Completion
+### 3. Implementation Mapping
+
+#### **TRINO_TO_PYTHON_IMPLEMENTATION.md** (Large)
+**Purpose**: Detailed mapping of Trino SQL to Python/PyArrow implementations
+
+**Contents**:
+- 13 Trino SQL queries mapped to Python
+- 3 main phases (Resource Matching, Cost Attribution, Aggregation)
+- 9 new modules + 3 reused modules
+- Complete Python/PyArrow code snippets
+- Integration strategy with existing POC
+
+**Audience**: Developers, implementers
+
+**Read Time**: 90-120 minutes
+
+---
+
+### 4. Integration and Architecture
+
+#### **KOKU_INTEGRATION_POINTS.md** (Large)
+**Purpose**: Comprehensive guide on where and how the POC integrates into Koku
+
+**Contents**:
+- Current Koku architecture with Trino
+- Decision points for provider routing
+- 3 integration options (with pros/cons)
+- 4-phase migration strategy
+- Configuration and packaging approaches
+- Side-by-side comparison of OCP vs OCP on AWS flows
+
+**Audience**: Architects, technical leads, developers
+
+**Read Time**: 60-90 minutes
+
+---
+
+#### **INTEGRATION_DIAGRAM.md** (Large)
+**Purpose**: Visual representation of Koku → POC integration
+
+**Contents**:
+- Current architecture diagram (with Trino + Hive)
+- Future architecture diagram (with POC)
+- Detailed flow diagrams for OCP and OCP on AWS
+- Infrastructure comparison (resource savings)
+- Migration timeline with phases
+
+**Audience**: All stakeholders (visual learners)
+
+**Read Time**: 30-45 minutes
+
+---
+
+#### **PROVIDER_ROUTING_EXPLAINED.md** (Medium)
+**Purpose**: Explains how the system determines which aggregation pipeline to use
+
+**Contents**:
+- Provider type configuration
+- Routing logic diagram
+- Configuration examples
+- Decision flow
+
+**Audience**: Developers, architects
+
+**Read Time**: 15-20 minutes
+
+---
+
+### 5. Status and Completion
 
 #### **OCP_AWS_TRIAGE_COMPLETE.md** (15K)
 **Purpose**: Triage completion summary and final verdict
@@ -91,16 +159,27 @@ This directory contains the comprehensive triage and planning documentation for 
 ### For Technical Leads
 1. **Start**: OCP_AWS_SUMMARY.md (executive summary)
 2. **Then**: OCP_AWS_TRIAGE_COMPLETE.md (final verdict)
-3. **Optional**: OCP_AWS_TRIAGE.md (detailed analysis)
+3. **Integration**: KOKU_INTEGRATION_POINTS.md (how POC integrates)
+4. **Visual**: INTEGRATION_DIAGRAM.md (architecture diagrams)
+5. **Optional**: OCP_AWS_TRIAGE.md (detailed analysis)
 
 ### For Developers
 1. **Start**: OCP_AWS_QUICK_START.md (quick reference)
-2. **Then**: OCP_AWS_TRIAGE.md (detailed algorithms)
-3. **Reference**: OCP_AWS_SUMMARY.md (context)
+2. **Implementation**: TRINO_TO_PYTHON_IMPLEMENTATION.md (code mapping)
+3. **Then**: OCP_AWS_TRIAGE.md (detailed algorithms)
+4. **Integration**: KOKU_INTEGRATION_POINTS.md (where to plug in)
+5. **Reference**: OCP_AWS_SUMMARY.md (context)
+
+### For Architects
+1. **Start**: INTEGRATION_DIAGRAM.md (visual architecture)
+2. **Then**: KOKU_INTEGRATION_POINTS.md (integration strategy)
+3. **Details**: OCP_AWS_TRIAGE.md (technical analysis)
+4. **Routing**: PROVIDER_ROUTING_EXPLAINED.md (routing logic)
 
 ### For Managers
 1. **Start**: OCP_AWS_TRIAGE_COMPLETE.md (final verdict)
 2. **Then**: OCP_AWS_SUMMARY.md (executive summary)
+3. **Visual**: INTEGRATION_DIAGRAM.md (infrastructure comparison)
 
 ---
 
