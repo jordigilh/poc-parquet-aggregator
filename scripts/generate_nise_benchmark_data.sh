@@ -225,6 +225,8 @@ cat > "${OUTPUT_DIR}/metadata_${SCALE}.json" << EOFMETA
   "description": "${DESCRIPTION}",
   "provider_uuid": "${PROVIDER_UUID}",
   "cluster_id": "${CLUSTER_ID}",
+  "year": "2025",
+  "month": "10",
   "pods": ${PODS},
   "namespaces": ${NAMESPACES},
   "nodes": ${NODES},

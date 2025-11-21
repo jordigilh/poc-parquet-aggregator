@@ -114,6 +114,7 @@ def query_poc_results(cluster_id, year, month):
 
     # Query aggregated results
     # Group by date, namespace, node to match expected calculation
+    # Filter by year/month to avoid comparing against old data from previous runs
     query = f"""
         SELECT
             usage_start,
@@ -128,11 +129,13 @@ def query_poc_results(cluster_id, year, month):
             COUNT(*) as row_count
         FROM {schema}.reporting_ocpusagelineitem_daily_summary
         WHERE cluster_id = %s
+          AND EXTRACT(YEAR FROM usage_start) = %s
+          AND EXTRACT(MONTH FROM usage_start) = %s
         GROUP BY usage_start, namespace, node
         ORDER BY usage_start, namespace, node
     """
 
-    actual = pd.read_sql(query, conn, params=[cluster_id])
+    actual = pd.read_sql(query, conn, params=[cluster_id, int(year), int(month)])
     conn.close()
 
     print(f"   POC aggregated rows: {len(actual)}")
