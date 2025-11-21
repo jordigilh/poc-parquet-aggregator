@@ -58,11 +58,11 @@ def main():
         print(f"❌ Failed to connect to MinIO: {e}")
         sys.exit(1)
 
-    # Find all OCP CSV files (support both naming patterns)
+    # Find all OCP CSV files (support both naming patterns and split files)
     file_types = {
-        'pod_usage': (['*ocp_pod_usage.csv', '**/*openshift_report.*.csv'], 'openshift_pod_usage_line_items'),
-        'node_labels': (['*ocp_node_label.csv', '**/*openshift_node_labels.*.csv'], 'openshift_node_labels_line_items'),
-        'namespace_labels': (['*ocp_namespace_label.csv', '**/*openshift_namespace_labels.*.csv'], 'openshift_namespace_labels_line_items'),
+        'pod_usage': (['*ocp_pod_usage*.csv', '**/*openshift_report.*.csv'], 'openshift_pod_usage_line_items'),
+        'node_labels': (['*ocp_node_label*.csv', '**/*openshift_node_labels.*.csv'], 'openshift_node_labels_line_items'),
+        'namespace_labels': (['*ocp_namespace_label*.csv', '**/*openshift_namespace_labels.*.csv'], 'openshift_namespace_labels_line_items'),
     }
 
     for file_type, (patterns, s3_dir) in file_types.items():
