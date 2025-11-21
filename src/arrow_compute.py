@@ -26,13 +26,23 @@ class ArrowLabelProcessor:
         Parse JSON label strings to dictionaries using vectorized operations.
 
         Args:
-            labels_series: Pandas Series of JSON strings
+            labels_series: Pandas Series of JSON strings or dict objects
 
         Returns:
             List of parsed label dictionaries
 
         Performance: 10-20x faster than pandas .apply()
         """
+        # Check if data is already dict objects (not JSON strings)
+        if len(labels_series) > 0:
+            first_non_null = labels_series.dropna().iloc[0] if not labels_series.dropna().empty else None
+            if isinstance(first_non_null, dict):
+                # Data is already parsed - no need to JSON decode
+                return [
+                    x if isinstance(x, dict) else {}
+                    for x in labels_series
+                ]
+
         try:
             # Convert to Arrow array for zero-copy operation
             arrow_array = pa.array(labels_series, type=pa.string())
@@ -52,12 +62,18 @@ class ArrowLabelProcessor:
             return results
 
         except Exception as e:
-            self.logger.warning(f"Arrow JSON parsing failed, falling back: {e}")
             # Fallback to standard Python
-            return [
-                json.loads(x) if x and x != '' else {}
-                for x in labels_series
-            ]
+            # Check if it's already dict objects
+            try:
+                return [
+                    x if isinstance(x, dict) else (json.loads(x) if x and x != '' else {})
+                    for x in labels_series
+                ]
+            except Exception as fallback_e:
+                self.logger.warning(
+                    f"Arrow JSON parsing failed, and fallback also failed: {e}, fallback: {fallback_e}"
+                )
+                return [{}] * len(labels_series)
 
     def merge_labels_vectorized(
         self,

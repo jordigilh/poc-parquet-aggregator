@@ -157,6 +157,64 @@ class PodAggregator:
 
             return result_df
 
+    def _process_single_chunk(
+        self,
+        chunk_data: tuple
+    ) -> pd.DataFrame:
+        """Process a single chunk of pod usage data.
+
+        This method is used for parallel chunk processing. It's extracted as a separate
+        method so it can be called by worker threads/processes.
+
+        Args:
+            chunk_data: Tuple of (chunk_idx, chunk_df, node_labels_df, namespace_labels_df)
+
+        Returns:
+            Aggregated DataFrame for this chunk
+        """
+        import gc
+
+        chunk_idx, chunk_df, node_labels_df, namespace_labels_df = chunk_data
+
+        try:
+            # Process this chunk using same logic as aggregate()
+            chunk_prepared = self._prepare_pod_usage_data(chunk_df)
+
+            # Join with labels
+            if node_labels_df is not None and not node_labels_df.empty:
+                chunk_prepared = self._join_node_labels(chunk_prepared, node_labels_df)
+            else:
+                # No node labels - use empty JSON object (not None to avoid NaN issues)
+                chunk_prepared['node_labels'] = '{}'
+
+            if namespace_labels_df is not None and not namespace_labels_df.empty:
+                chunk_prepared = self._join_namespace_labels(chunk_prepared, namespace_labels_df)
+            else:
+                # No namespace labels - use empty JSON object (not None to avoid NaN issues)
+                chunk_prepared['namespace_labels'] = '{}'
+
+            # Parse and merge labels using optimized method
+            # (Arrow compute if available, otherwise list comprehension)
+            label_results = self._process_labels_optimized(chunk_prepared)
+            chunk_prepared['node_labels_dict'] = label_results['node_labels_dict']
+            chunk_prepared['namespace_labels_dict'] = label_results['namespace_labels_dict']
+            chunk_prepared['pod_labels_dict'] = label_results['pod_labels_dict']
+            chunk_prepared['merged_labels_dict'] = label_results['merged_labels_dict']
+            chunk_prepared['merged_labels'] = label_results['merged_labels']
+
+            # Aggregate this chunk
+            chunk_aggregated = self._group_and_aggregate(chunk_prepared)
+
+            # Free memory immediately
+            del chunk_df, chunk_prepared
+            gc.collect()
+
+            return chunk_aggregated
+
+        except Exception as e:
+            self.logger.error(f"Failed to process chunk {chunk_idx}: {e}")
+            raise
+
     def aggregate_streaming(
         self,
         pod_usage_chunks,  # Iterator[pd.DataFrame]
@@ -170,6 +228,8 @@ class PodAggregator:
         This processes data in chunks to maintain constant memory usage regardless
         of dataset size. Each chunk is processed independently and then combined.
 
+        Supports both serial and parallel chunk processing based on config.
+
         Args:
             pod_usage_chunks: Iterator of DataFrame chunks
             node_capacity_df: Pre-calculated node capacity by day
@@ -181,60 +241,92 @@ class PodAggregator:
             Aggregated DataFrame ready for PostgreSQL insert
         """
         import gc
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        # Check if parallel processing is enabled
+        parallel_enabled = self.config.get('performance', {}).get('parallel_chunks', False)
+        max_workers = self.config.get('performance', {}).get('max_workers', 4)
 
         with PerformanceTimer("Pod usage aggregation (streaming mode)", self.logger):
             aggregated_chunks = []
             total_input_rows = 0
             chunk_count = 0
 
-            # Process each chunk independently
-            for chunk_idx, chunk_df in enumerate(pod_usage_chunks):
-                chunk_count += 1
-                total_input_rows += len(chunk_df)
+            if parallel_enabled:
+                # PARALLEL PROCESSING: Process multiple chunks simultaneously
+                self.logger.info(
+                    "Using parallel chunk processing",
+                    workers=max_workers
+                )
+
+                # Collect chunks from iterator first (needed for parallel processing)
+                chunk_list = list(pod_usage_chunks)
+                total_input_rows = sum(len(chunk) for chunk in chunk_list)
+                chunk_count = len(chunk_list)
 
                 self.logger.info(
-                    f"Processing chunk {chunk_count}",
-                    rows=len(chunk_df),
-                    cumulative_rows=total_input_rows
+                    f"Collected {chunk_count} chunks for parallel processing",
+                    total_rows=total_input_rows
                 )
 
-                # Process this chunk using same logic as aggregate()
-                chunk_prepared = self._prepare_pod_usage_data(chunk_df)
+                # Prepare chunk data tuples
+                chunk_data_list = [
+                    (idx, chunk, node_labels_df, namespace_labels_df)
+                    for idx, chunk in enumerate(chunk_list)
+                ]
 
-                # Join with labels
-                if node_labels_df is not None and not node_labels_df.empty:
-                    chunk_prepared = self._join_node_labels(chunk_prepared, node_labels_df)
-                else:
-                    # No node labels - use empty JSON object (not None to avoid NaN issues)
-                    chunk_prepared['node_labels'] = '{}'
+                # Process chunks in parallel
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    # Submit all chunks for processing
+                    future_to_chunk = {
+                        executor.submit(self._process_single_chunk, chunk_data): chunk_data[0]
+                        for chunk_data in chunk_data_list
+                    }
 
-                if namespace_labels_df is not None and not namespace_labels_df.empty:
-                    chunk_prepared = self._join_namespace_labels(chunk_prepared, namespace_labels_df)
-                else:
-                    # No namespace labels - use empty JSON object (not None to avoid NaN issues)
-                    chunk_prepared['namespace_labels'] = '{}'
+                    # Collect results as they complete
+                    for future in as_completed(future_to_chunk):
+                        chunk_idx = future_to_chunk[future]
+                        try:
+                            chunk_aggregated = future.result()
+                            aggregated_chunks.append(chunk_aggregated)
 
-                # Parse and merge labels using optimized method
-                # (Arrow compute if available, otherwise list comprehension)
-                label_results = self._process_labels_optimized(chunk_prepared)
-                chunk_prepared['node_labels_dict'] = label_results['node_labels_dict']
-                chunk_prepared['namespace_labels_dict'] = label_results['namespace_labels_dict']
-                chunk_prepared['pod_labels_dict'] = label_results['pod_labels_dict']
-                chunk_prepared['merged_labels_dict'] = label_results['merged_labels_dict']
-                chunk_prepared['merged_labels'] = label_results['merged_labels']
+                            self.logger.info(
+                                f"Chunk {chunk_idx + 1}/{chunk_count} completed",
+                                output_rows=len(chunk_aggregated)
+                            )
+                        except Exception as e:
+                            self.logger.error(
+                                f"Chunk {chunk_idx} failed",
+                                error=str(e)
+                            )
+                            raise
 
-                # Aggregate this chunk
-                chunk_aggregated = self._group_and_aggregate(chunk_prepared)
-                aggregated_chunks.append(chunk_aggregated)
-
-                # Free memory immediately
-                del chunk_df, chunk_prepared
+                del chunk_list, chunk_data_list
                 gc.collect()
 
-                self.logger.debug(
-                    f"Chunk {chunk_count} aggregated",
-                    output_rows=len(chunk_aggregated)
-                )
+            else:
+                # SERIAL PROCESSING: Process one chunk at a time (original logic)
+                self.logger.info("Using serial chunk processing (single-threaded)")
+
+                for chunk_idx, chunk_df in enumerate(pod_usage_chunks):
+                    chunk_count += 1
+                    total_input_rows += len(chunk_df)
+
+                    self.logger.info(
+                        f"Processing chunk {chunk_count}",
+                        rows=len(chunk_df),
+                        cumulative_rows=total_input_rows
+                    )
+
+                    # Process chunk
+                    chunk_data = (chunk_idx, chunk_df, node_labels_df, namespace_labels_df)
+                    chunk_aggregated = self._process_single_chunk(chunk_data)
+                    aggregated_chunks.append(chunk_aggregated)
+
+                    self.logger.debug(
+                        f"Chunk {chunk_count} aggregated",
+                        output_rows=len(chunk_aggregated)
+                    )
 
             self.logger.info(
                 f"All chunks processed",

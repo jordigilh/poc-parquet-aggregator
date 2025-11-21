@@ -23,19 +23,19 @@ ocp:
   year: ${OCP_YEAR:-2025}
 performance:
   cache_enabled_tags: true
-  chunk_size: 50000
+  chunk_size: 100000
   column_filtering: true
   db_batch_size: 1000
   delete_intermediate_dfs: true
   gc_after_aggregation: true
   max_workers: 4
-  parallel_chunks: false
+  parallel_chunks: true
   parallel_readers: 4
   streaming_threshold_rows: 50000
   use_arrow_compute: true
   use_bulk_copy: true
   use_categorical: true
-  use_streaming: false
+  use_streaming: true
 postgresql:
   database: ${POSTGRES_DB:-koku}
   host: ${POSTGRES_HOST:-postgresql.cost-management.svc.cluster.local}
