@@ -22,8 +22,8 @@ def calculate_expected_aggregates(nise_data_dir, cluster_id):
     """
     print(f"📊 Calculating expected aggregates from nise data: {nise_data_dir}")
 
-    # Find pod usage CSV files for this specific cluster only
-    pod_csv_files = list(Path(nise_data_dir).glob('*ocp_pod_usage.csv'))
+    # Find pod usage CSV files for this specific cluster only (including split files)
+    pod_csv_files = list(Path(nise_data_dir).glob('*ocp_pod_usage*.csv'))
 
     if not pod_csv_files:
         print(f"❌ No pod usage CSV files found in {nise_data_dir}")
