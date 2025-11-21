@@ -430,7 +430,7 @@ From OCP POC (proven results):
 
 ---
 
-**Document**: OCP_AWS_QUICK_START.md  
-**Date**: November 21, 2025  
+**Document**: OCP_AWS_QUICK_START.md
+**Date**: November 21, 2025
 **Next Update**: After Phase 1 completion
 

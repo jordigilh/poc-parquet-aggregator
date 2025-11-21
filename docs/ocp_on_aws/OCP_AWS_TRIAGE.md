@@ -203,7 +203,7 @@ Located in: `koku/masu/database/trino_sql/aws/openshift/`
 All these files follow the same pattern:
 ```sql
 INSERT INTO postgres.schema.reporting_ocpaws_<summary_type>_p
-SELECT 
+SELECT
     uuid() as id,
     usage_start,
     <dimension_columns>,
@@ -485,21 +485,21 @@ All 9 PostgreSQL tables follow similar patterns but with different dimensions an
 def match_by_resource_id(aws_resources, ocp_resources):
     """
     Match AWS resources to OCP by resource ID suffix.
-    
+
     Example:
       AWS: i-0123456789abcdef0 (EC2 instance)
       OCP: ip-10-0-1-100.ec2.internal (node with resource_id: i-0123456789abcdef0)
       Match: YES (exact match on resource_id)
-      
+
       AWS: vol-0123456789abcdef (EBS volume)
       OCP: pv-ebs-vol-0123456789abcdef (PV with csi_volume_handle: vol-0123456789abcdef)
       Match: YES (suffix match on csi_volume_handle)
     """
     matched = []
-    
+
     for aws_row in aws_resources:
         aws_resource_id = aws_row['lineitem_resourceid']
-        
+
         # Match against OCP nodes
         for ocp_row in ocp_resources['nodes']:
             ocp_resource_id = ocp_row['resource_id']
@@ -511,7 +511,7 @@ def match_by_resource_id(aws_resources, ocp_resources):
                     'resource_id_matched': True
                 })
                 break
-        
+
         # Match against OCP volumes (CSI handles)
         for ocp_row in ocp_resources['volumes']:
             csi_handle = ocp_row['csi_volume_handle']
@@ -532,7 +532,7 @@ def match_by_resource_id(aws_resources, ocp_resources):
                     'resource_id_matched': True
                 })
                 break
-    
+
     return matched
 ```
 
@@ -555,28 +555,28 @@ OR strpos(aws.lineitem_resourceid, ocp.persistentvolume) != 0
 def match_by_tags(aws_resources, matched_tags, enabled_keys):
     """
     Match AWS resources to OCP by special tags.
-    
+
     Special tags:
       - openshift_cluster: <cluster_id>
       - openshift_node: <node_name>
       - openshift_project: <namespace>
-    
+
     Only match if:
       1. Tag key is in enabled_keys (from reporting_enabledtagkeys)
       2. Tag value matches OCP resource
       3. Resource was NOT already matched by resource_id
     """
     matched = []
-    
+
     for aws_row in aws_resources:
         if aws_row.get('resource_id_matched'):
             continue  # Skip if already matched by resource ID
-        
+
         aws_tags = json.loads(aws_row['resourcetags'])
-        
+
         # Filter to enabled keys only
         filtered_tags = {k: v for k, v in aws_tags.items() if k in enabled_keys}
-        
+
         # Check for special OpenShift tags
         for tag_key, tag_value in filtered_tags.items():
             if tag_key in ['openshift_cluster', 'openshift_node', 'openshift_project']:
@@ -588,7 +588,7 @@ def match_by_tags(aws_resources, matched_tags, enabled_keys):
                         'resource_id_matched': False
                     })
                     break
-    
+
     return matched
 ```
 
@@ -616,7 +616,7 @@ array_join(
 def apply_label_precedence(ocp_usage, aws_costs):
     """
     Apply label precedence: Pod labels > Namespace labels > Node labels
-    
+
     Logic:
       1. Start with AWS cost row
       2. Join with OCP pod usage (by resource_id or tag)
@@ -628,44 +628,44 @@ def apply_label_precedence(ocp_usage, aws_costs):
       5. Calculate cost attribution based on pod's share of node capacity
     """
     results = []
-    
+
     for aws_row in aws_costs:
         # Find matching OCP pods
         matching_pods = find_matching_pods(ocp_usage, aws_row)
-        
+
         for pod in matching_pods:
             # Collect labels with precedence
             merged_labels = {}
             label_sources = {}
-            
+
             # Start with Node labels (lowest precedence)
             node_labels = pod['node_labels']
             for key, value in node_labels.items():
                 merged_labels[key] = value
                 label_sources[key] = ('node', 3)
-            
+
             # Override with Namespace labels (medium precedence)
             namespace_labels = pod['namespace_labels']
             for key, value in namespace_labels.items():
                 merged_labels[key] = value
                 label_sources[key] = ('namespace', 2)
-            
+
             # Override with Pod labels (highest precedence)
             pod_labels = pod['pod_labels']
             for key, value in pod_labels.items():
                 merged_labels[key] = value
                 label_sources[key] = ('pod', 1)
-            
+
             # Calculate cost attribution
             # Cost per pod = AWS cost * (pod CPU usage / node CPU capacity)
             cpu_ratio = pod['pod_usage_cpu_core_hours'] / pod['node_capacity_cpu_core_hours']
             memory_ratio = pod['pod_usage_memory_gigabyte_hours'] / pod['node_capacity_memory_gigabyte_hours']
-            
+
             # Use the higher ratio (more conservative attribution)
             attribution_ratio = max(cpu_ratio, memory_ratio)
-            
+
             pod_cost = aws_row['unblended_cost'] * attribution_ratio
-            
+
             results.append({
                 'cluster_id': pod['cluster_id'],
                 'namespace': pod['namespace'],
@@ -678,7 +678,7 @@ def apply_label_precedence(ocp_usage, aws_costs):
                 'project_rank': min([rank for _, rank in label_sources.values()]),
                 **aws_row  # Include all AWS dimensions
             })
-    
+
     return results
 ```
 
@@ -704,10 +704,10 @@ JOIN hive.schema.managed_aws_openshift_daily_temp as aws
 def calculate_disk_capacity(aws_line_items, ocp_volumes, hours_in_month):
     """
     Calculate disk capacity from AWS billing data.
-    
+
     Formula:
       Capacity (GB) = Total Cost / (Hourly Rate / Hours in Month)
-    
+
     Example:
       - EBS volume costs $10/month
       - Hourly rate: $0.0134/GB-hour
@@ -715,35 +715,35 @@ def calculate_disk_capacity(aws_line_items, ocp_volumes, hours_in_month):
       - Capacity = $10 / ($0.0134 / 744) = 10 / 0.000018 = 556 GB
     """
     capacities = []
-    
+
     # Group by resource_id and usage_start
     grouped = group_by(aws_line_items, ['lineitem_resourceid', 'usage_start'])
-    
+
     for (resource_id, usage_start), rows in grouped.items():
         # Only process resources matched to OCP volumes
         if resource_id not in ocp_volumes:
             continue
-        
+
         total_cost = sum(row['lineitem_unblendedcost'] for row in rows)
         max_rate = max(row['lineitem_unblendedrate'] for row in rows)
-        
+
         if max_rate > 0:
             capacity = round(total_cost / (max_rate / hours_in_month))
-            
+
             if capacity > 0:
                 capacities.append({
                     'resource_id': resource_id,
                     'capacity': capacity,
                     'usage_start': usage_start
                 })
-    
+
     return capacities
 ```
 
 **Trino SQL**:
 ```sql
 ROUND(
-    MAX(aws.lineitem_unblendedcost) / 
+    MAX(aws.lineitem_unblendedcost) /
     (MAX(aws.lineitem_unblendedrate) / MAX(hours.in_month))
 ) AS capacity
 ```
@@ -757,7 +757,7 @@ ROUND(
 def attribute_network_costs(aws_costs, ocp_nodes):
     """
     Network costs are node-level and cannot be attributed to specific pods/namespaces.
-    
+
     Logic:
       1. Identify network costs (product_family = 'Data Transfer')
       2. Match to OCP nodes by resource_id
@@ -765,14 +765,14 @@ def attribute_network_costs(aws_costs, ocp_nodes):
       4. Calculate direction (IN/OUT) from usage_type
     """
     network_costs = []
-    
+
     for aws_row in aws_costs:
         if aws_row['product_family'] != 'Data Transfer':
             continue
-        
+
         if aws_row['product_code'] != 'AmazonEC2':
             continue
-        
+
         # Determine direction
         usage_type = aws_row['lineitem_usagetype'].lower()
         if 'in-bytes' in usage_type or ('regional-bytes' in usage_type and '-in' in aws_row['lineitem_operation'].lower()):
@@ -781,7 +781,7 @@ def attribute_network_costs(aws_costs, ocp_nodes):
             direction = 'OUT'
         else:
             direction = None
-        
+
         # Match to OCP node
         for node in ocp_nodes:
             if aws_row['resource_id'] in node['resource_id']:
@@ -793,21 +793,21 @@ def attribute_network_costs(aws_costs, ocp_nodes):
                     **aws_row
                 })
                 break
-    
+
     return network_costs
 ```
 
 **Trino SQL**:
 ```sql
 CASE
-    WHEN aws.lineitem_productcode = 'AmazonEC2' 
+    WHEN aws.lineitem_productcode = 'AmazonEC2'
      AND aws.product_productfamily = 'Data Transfer' THEN
         CASE
             WHEN strpos(lower(aws.lineitem_usagetype), 'in-bytes') > 0 THEN 'IN'
             WHEN strpos(lower(aws.lineitem_usagetype), 'out-bytes') > 0 THEN 'OUT'
-            WHEN (strpos(lower(aws.lineitem_usagetype), 'regional-bytes') > 0 
+            WHEN (strpos(lower(aws.lineitem_usagetype), 'regional-bytes') > 0
               AND strpos(lower(lineitem_operation), '-in') > 0) THEN 'IN'
-            WHEN (strpos(lower(aws.lineitem_usagetype), 'regional-bytes') > 0 
+            WHEN (strpos(lower(aws.lineitem_usagetype), 'regional-bytes') > 0
               AND strpos(lower(lineitem_operation), '-out') > 0) THEN 'OUT'
             ELSE NULL
         END
@@ -823,7 +823,7 @@ END AS data_transfer_direction
 def apply_markup(costs, markup_percent):
     """
     Apply markup to all cost types.
-    
+
     Markup is stored as decimal (e.g., 0.10 for 10%)
     """
     for row in costs:
@@ -831,7 +831,7 @@ def apply_markup(costs, markup_percent):
         row['markup_cost_blended'] = row['blended_cost'] * markup_percent
         row['markup_cost_savingsplan'] = row['savingsplan_effective_cost'] * markup_percent
         row['markup_cost_amortized'] = row['calculated_amortized_cost'] * markup_percent
-    
+
     return costs
 ```
 
@@ -1245,7 +1245,7 @@ def generate_ocpaws_scenario(
 ):
     """
     Generate synthetic OCP+AWS data.
-    
+
     Creates:
       1. OCP pod usage (reuse from OCP POC)
       2. OCP storage usage
@@ -1254,13 +1254,13 @@ def generate_ocpaws_scenario(
     """
     # Generate OCP data (reuse OCP POC generator)
     ocp_data = generate_ocp_data(num_clusters, num_nodes_per_cluster, num_pods_per_node, days)
-    
+
     # Generate AWS data
     aws_data = generate_aws_data(num_aws_resources, days)
-    
+
     # Create matching relationships
     matched_data = create_matches(ocp_data, aws_data, match_rate, tag_match_rate)
-    
+
     return ocp_data, aws_data, matched_data
 ```
 

@@ -254,7 +254,7 @@ Based on successful OCP POC implementation:
 #### 1. Disk Capacity Calculation Accuracy
 - **Risk**: Formula may not match Trino exactly
 - **Impact**: Storage cost attribution errors
-- **Mitigation**: 
+- **Mitigation**:
   - Extensive validation with real data
   - Compare intermediate results with Trino
   - Document any differences
