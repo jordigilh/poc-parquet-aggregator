@@ -51,18 +51,18 @@ The POC can process **666K output rows using only 6.2 GB of memory**, well withi
 
 What does each scale represent in a production environment?
 
-| Scale | OCP Cluster | AWS Resources | Use Case Example |
-|-------|-------------|---------------|------------------|
-| **scale-20k** | 10 nodes, ~420 pods | 10 EC2 + EBS | Small OCP-on-AWS deployment |
-| **scale-50k** | 25 nodes, ~1,050 pods | 25 EC2 + EBS | Growing hybrid workload |
-| **scale-100k** | 50 nodes, ~2,085 pods | 50 EC2 + EBS | Medium enterprise |
-| **scale-250k** | 125 nodes, ~5,225 pods | 125 EC2 + EBS | Large enterprise |
-| **scale-500k** | 250 nodes, ~10,417 pods | 250 EC2 + EBS | Multi-cluster deployment |
-| **scale-1m** | 500 nodes, ~20,833 pods | 500 EC2 + EBS | Enterprise platform |
-| **scale-1.5m** | 750 nodes, ~31,250 pods | 750 EC2 + EBS | Large-scale platform |
-| **scale-2m** | 1,000 nodes, ~41,667 pods | 1,000 EC2 + EBS | Cloud-scale operations |
+| Scale | Output Rows | OCP Cluster | AWS Resources | Use Case Example |
+|-------|-------------|-------------|---------------|------------------|
+| **scale-20k** | 6,720 | 10 nodes, ~420 pods | 10 EC2 + EBS | Small OCP-on-AWS |
+| **scale-50k** | 16,800 | 25 nodes, ~1,050 pods | 25 EC2 + EBS | Growing hybrid |
+| **scale-100k** | 33,600 | 50 nodes, ~2,085 pods | 50 EC2 + EBS | Medium enterprise |
+| **scale-250k** | 83,328 | 125 nodes, ~5,225 pods | 125 EC2 + EBS | Large enterprise |
+| **scale-500k** | 166,656 | 250 nodes, ~10,417 pods | 250 EC2 + EBS | Multi-cluster |
+| **scale-1m** | 333,312 | 500 nodes, ~20,833 pods | 500 EC2 + EBS | Enterprise platform |
+| **scale-1.5m** | 499,968 | 750 nodes, ~31,250 pods | 750 EC2 + EBS | Large-scale platform |
+| **scale-2m** | 666,624 | 1,000 nodes, ~41,667 pods | 1,000 EC2 + EBS | Cloud-scale |
 
-> **Note**: OCP-on-AWS output rows = OCP pods × matched AWS resources × 24 hours × cost methods
+> **Note**: Output Rows = OCP pods × matched AWS resources × 24 hours × cost attribution methods. Scale names (20k, 50k, etc.) are targets; actual output varies based on matching.
 
 ---
 
