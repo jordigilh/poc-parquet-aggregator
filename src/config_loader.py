@@ -174,8 +174,6 @@ def get_value(key_path: str, default: Any = None) -> Any:
     Returns:
         Configuration value
     """
-    global _default_loader
-
     if _default_loader is None:
         get_config()
 
