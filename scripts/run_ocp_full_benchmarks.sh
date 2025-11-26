@@ -63,8 +63,8 @@ check_dependencies() {
 
     local missing=()
 
-    # Required
-    command -v nise >/dev/null 2>&1 || missing+=("nise")
+    # Required - nise can be run via `python3 -m nise` if not in PATH
+    (command -v nise >/dev/null 2>&1 || python3 -m nise --version >/dev/null 2>&1) || missing+=("nise")
     command -v podman-compose >/dev/null 2>&1 || missing+=("podman-compose")
     command -v python3 >/dev/null 2>&1 || missing+=("python3")
 
@@ -177,8 +177,10 @@ import subprocess
 import psutil
 import time
 
+import shutil
+nise_cmd = ['nise'] if shutil.which('nise') else ['python3', '-m', 'nise']
 proc = subprocess.Popen(
-    ['nise', 'report', 'ocp',
+    nise_cmd + ['report', 'ocp',
      '--static-report-file', '$manifest',
      '--ocp-cluster-id', '$OCP_CLUSTER_ID',
      '--start-date', '$start_date', '--end-date', '$end_date',
@@ -227,7 +229,7 @@ transform_and_upload() {
     log_info "Stage 2: Transforming to Parquet and uploading for $scale..."
 
     cd "$data_dir"
-    source "$PROJECT_ROOT/venv/bin/activate"
+    [[ -f "$PROJECT_ROOT/venv/bin/activate" ]] && source "$PROJECT_ROOT/venv/bin/activate"
 
     # Clear MinIO first
     python3 << EOFCLEAR
@@ -310,7 +312,7 @@ run_single_aggregation() {
     echo -e "${BLUE}  Run $run_num/$RUNS_PER_SCALE...${NC}" >&2
 
     cd "$PROJECT_ROOT"
-    source venv/bin/activate
+    [[ -f venv/bin/activate ]] && source venv/bin/activate
 
     # Clear PostgreSQL table (using Python since psql may not be available)
     python3 -c "
@@ -647,9 +649,9 @@ echo ""
     if [[ "$DO_WARMUP" == "true" ]]; then
         log_info "Running warmup (will be discarded)..."
         cd "$PROJECT_ROOT"
-        source venv/bin/activate
+        [[ -f venv/bin/activate ]] && source venv/bin/activate
         export USE_STREAMING="false"
-        python -c "from src.main import main; main()" > /dev/null 2>&1 || true
+        python3 -c "from src.main import main; main()" > /dev/null 2>&1 || true
         log_success "Warmup complete"
     fi
 

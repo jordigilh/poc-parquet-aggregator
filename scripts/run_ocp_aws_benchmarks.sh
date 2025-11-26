@@ -65,8 +65,8 @@ check_dependencies() {
     local missing=()
     local optional_missing=()
 
-    # Required
-    command -v nise >/dev/null 2>&1 || missing+=("nise")
+    # Required - nise can be run via `python3 -m nise` if not in PATH
+    (command -v nise >/dev/null 2>&1 || python3 -m nise --version >/dev/null 2>&1) || missing+=("nise")
     command -v podman-compose >/dev/null 2>&1 || missing+=("podman-compose")
     command -v python3 >/dev/null 2>&1 || missing+=("python3")
 
@@ -191,8 +191,10 @@ import psutil
 import time
 import sys
 
+import shutil
+nise_cmd = ['nise'] if shutil.which('nise') else ['python3', '-m', 'nise']
 proc = subprocess.Popen(
-    ['nise', 'report', 'ocp',
+    nise_cmd + ['report', 'ocp',
      '--static-report-file', '$ocp_manifest',
      '--ocp-cluster-id', 'benchmark-cluster',
      '--start-date', '2025-10-01', '--end-date', '2025-10-02',
@@ -244,8 +246,10 @@ import subprocess
 import psutil
 import time
 
+import shutil
+nise_cmd = ['nise'] if shutil.which('nise') else ['python3', '-m', 'nise']
 proc = subprocess.Popen(
-    ['nise', 'report', 'aws',
+    nise_cmd + ['report', 'aws',
      '--static-report-file', '$aws_manifest',
      '--start-date', '2025-10-01', '--end-date', '2025-10-02',
      '--write-monthly'],
@@ -296,7 +300,7 @@ transform_and_upload() {
     log_info "Phase 2: Transforming to Parquet and uploading for $scale..."
 
     cd "$data_dir"
-    source "$PROJECT_ROOT/venv/bin/activate"
+    [[ -f "$PROJECT_ROOT/venv/bin/activate" ]] && source "$PROJECT_ROOT/venv/bin/activate"
 
     # Run parquet transform with memory tracking
     python3 << WRAPPER_PARQUET > "$mem_log"
@@ -352,7 +356,7 @@ run_single_aggregation() {
     echo -e "${BLUE}  Run $run_num/$RUNS_PER_SCALE...${NC}" >&2
 
     cd "$PROJECT_ROOT"
-    source venv/bin/activate
+    [[ -f venv/bin/activate ]] && source venv/bin/activate
 
     # Clear table
     python3 << EOF 2>/dev/null || true
@@ -664,9 +668,9 @@ main() {
     if [[ "$DO_WARMUP" == "true" ]]; then
         log_info "Running warmup (will be discarded)..."
         cd "$PROJECT_ROOT"
-        source venv/bin/activate
+        [[ -f venv/bin/activate ]] && source venv/bin/activate
         export USE_STREAMING="false"
-        python -m src.main > /dev/null 2>&1 || true
+        python3 -m src.main > /dev/null 2>&1 || true
         log_success "Warmup complete"
     fi
 
