@@ -7,19 +7,19 @@ Implements Trino SQL lines 491-581 from reporting_ocpusagelineitem_daily_summary
 - Creates "Worker unallocated" namespace for worker nodes
 """
 
-import pandas as pd
-import numpy as np
 from typing import Dict, Optional
+
+import numpy as np
+import pandas as pd
 
 from .utils import get_logger
 
-
 # Namespaces to exclude from unallocated calculation (Trino SQL lines 541-544)
 EXCLUDED_NAMESPACES = [
-    'Platform unallocated',
-    'Worker unallocated',
-    'Network unattributed',
-    'Storage unattributed'
+    "Platform unallocated",
+    "Worker unallocated",
+    "Network unattributed",
+    "Storage unattributed",
 ]
 
 
@@ -43,15 +43,14 @@ class UnallocatedCapacityAggregator:
         self.logger = logger or get_logger("aggregator_unallocated")
 
         # OCP configuration
-        ocp_config = config.get('ocp', {})
-        self.cluster_id = ocp_config.get('cluster_id', '')
-        self.cluster_alias = ocp_config.get('cluster_alias', '')
-        self.report_period_id = ocp_config.get('report_period_id', 0)
-        self.provider_uuid = ocp_config.get('provider_uuid', '')
+        ocp_config = config.get("ocp", {})
+        self.cluster_id = ocp_config.get("cluster_id", "")
+        self.cluster_alias = ocp_config.get("cluster_alias", "")
+        self.report_period_id = ocp_config.get("report_period_id", 0)
+        self.provider_uuid = ocp_config.get("provider_uuid", "")
 
         self.logger.info(
-            "Initialized UnallocatedCapacityAggregator",
-            cluster_id=self.cluster_id
+            "Initialized UnallocatedCapacityAggregator", cluster_id=self.cluster_id
         )
 
     def get_node_roles(self) -> pd.DataFrame:
@@ -87,21 +86,18 @@ class UnallocatedCapacityAggregator:
             DataFrame with one role per node (MAX aggregation)
         """
         if node_roles_df.empty:
-            return pd.DataFrame(columns=['node', 'resource_id', 'node_role'])
+            return pd.DataFrame(columns=["node", "resource_id", "node_role"])
 
         # Group by node + resource_id and take MAX of node_role
         # This matches Trino: SELECT max(node_role) AS node_role
-        aggregated = node_roles_df.groupby(
-            ['node', 'resource_id'],
-            as_index=False
-        ).agg({'node_role': 'max'})
+        aggregated = node_roles_df.groupby(["node", "resource_id"], as_index=False).agg(
+            {"node_role": "max"}
+        )
 
         return aggregated
 
     def calculate_unallocated(
-        self,
-        daily_summary_df: pd.DataFrame,
-        node_roles_df: pd.DataFrame
+        self, daily_summary_df: pd.DataFrame, node_roles_df: pd.DataFrame
     ) -> pd.DataFrame:
         """Calculate unallocated capacity per node.
 
@@ -156,8 +152,10 @@ class UnallocatedCapacityAggregator:
         self.logger.info(
             "Unallocated capacity calculated",
             nodes_processed=len(result),
-            platform_unallocated=len(result[result['namespace'] == 'Platform unallocated']),
-            worker_unallocated=len(result[result['namespace'] == 'Worker unallocated'])
+            platform_unallocated=len(
+                result[result["namespace"] == "Platform unallocated"]
+            ),
+            worker_unallocated=len(result[result["namespace"] == "Worker unallocated"]),
         )
 
         return result
@@ -174,14 +172,14 @@ class UnallocatedCapacityAggregator:
         filtered = df.copy()
 
         # Exclude special namespaces
-        filtered = filtered[~filtered['namespace'].isin(EXCLUDED_NAMESPACES)]
+        filtered = filtered[~filtered["namespace"].isin(EXCLUDED_NAMESPACES)]
 
         # Only Pod data source
-        if 'data_source' in filtered.columns:
-            filtered = filtered[filtered['data_source'] == 'Pod']
+        if "data_source" in filtered.columns:
+            filtered = filtered[filtered["data_source"] == "Pod"]
 
         # Exclude NULL nodes
-        filtered = filtered[filtered['node'].notna() & (filtered['node'] != '')]
+        filtered = filtered[filtered["node"].notna() & (filtered["node"] != "")]
 
         return filtered
 
@@ -193,26 +191,26 @@ class UnallocatedCapacityAggregator:
         - SUM for usage values
         """
         # Group by node, usage_start, source_uuid (Trino line 547)
-        groupby_cols = ['node', 'usage_start', 'source_uuid']
+        groupby_cols = ["node", "usage_start", "source_uuid"]
 
         # Aggregations matching Trino SQL
         agg_dict = {
             # Usage: SUM
-            'pod_usage_cpu_core_hours': 'sum',
-            'pod_request_cpu_core_hours': 'sum',
-            'pod_effective_usage_cpu_core_hours': 'sum',
-            'pod_usage_memory_gigabyte_hours': 'sum',
-            'pod_request_memory_gigabyte_hours': 'sum',
-            'pod_effective_usage_memory_gigabyte_hours': 'sum',
+            "pod_usage_cpu_core_hours": "sum",
+            "pod_request_cpu_core_hours": "sum",
+            "pod_effective_usage_cpu_core_hours": "sum",
+            "pod_usage_memory_gigabyte_hours": "sum",
+            "pod_request_memory_gigabyte_hours": "sum",
+            "pod_effective_usage_memory_gigabyte_hours": "sum",
             # Capacity: MAX
-            'node_capacity_cpu_cores': 'max',
-            'node_capacity_cpu_core_hours': 'max',
-            'node_capacity_memory_gigabytes': 'max',
-            'node_capacity_memory_gigabyte_hours': 'max',
-            'cluster_capacity_cpu_core_hours': 'max',
-            'cluster_capacity_memory_gigabyte_hours': 'max',
+            "node_capacity_cpu_cores": "max",
+            "node_capacity_cpu_core_hours": "max",
+            "node_capacity_memory_gigabytes": "max",
+            "node_capacity_memory_gigabyte_hours": "max",
+            "cluster_capacity_cpu_core_hours": "max",
+            "cluster_capacity_memory_gigabyte_hours": "max",
             # Resource ID: MAX (for joining with roles)
-            'resource_id': 'max',
+            "resource_id": "max",
         }
 
         # Only include columns that exist
@@ -223,9 +221,7 @@ class UnallocatedCapacityAggregator:
         return totals
 
     def _join_node_roles(
-        self,
-        node_totals: pd.DataFrame,
-        node_roles_df: pd.DataFrame
+        self, node_totals: pd.DataFrame, node_roles_df: pd.DataFrame
     ) -> pd.DataFrame:
         """Join node totals with node roles.
 
@@ -244,8 +240,8 @@ class UnallocatedCapacityAggregator:
         merged = pd.merge(
             node_totals,
             roles,
-            on=['node', 'resource_id'],
-            how='inner'  # Only nodes with known roles
+            on=["node", "resource_id"],
+            how="inner",  # Only nodes with known roles
         )
 
         return merged
@@ -259,25 +255,30 @@ class UnallocatedCapacityAggregator:
         result = df.copy()
 
         # CPU calculations
-        result['unallocated_pod_usage_cpu_core_hours'] = (
-            result['node_capacity_cpu_core_hours'] - result['pod_usage_cpu_core_hours']
+        result["unallocated_pod_usage_cpu_core_hours"] = (
+            result["node_capacity_cpu_core_hours"] - result["pod_usage_cpu_core_hours"]
         )
-        result['unallocated_pod_request_cpu_core_hours'] = (
-            result['node_capacity_cpu_core_hours'] - result['pod_request_cpu_core_hours']
+        result["unallocated_pod_request_cpu_core_hours"] = (
+            result["node_capacity_cpu_core_hours"]
+            - result["pod_request_cpu_core_hours"]
         )
-        result['unallocated_pod_effective_usage_cpu_core_hours'] = (
-            result['node_capacity_cpu_core_hours'] - result['pod_effective_usage_cpu_core_hours']
+        result["unallocated_pod_effective_usage_cpu_core_hours"] = (
+            result["node_capacity_cpu_core_hours"]
+            - result["pod_effective_usage_cpu_core_hours"]
         )
 
         # Memory calculations
-        result['unallocated_pod_usage_memory_gigabyte_hours'] = (
-            result['node_capacity_memory_gigabyte_hours'] - result['pod_usage_memory_gigabyte_hours']
+        result["unallocated_pod_usage_memory_gigabyte_hours"] = (
+            result["node_capacity_memory_gigabyte_hours"]
+            - result["pod_usage_memory_gigabyte_hours"]
         )
-        result['unallocated_pod_request_memory_gigabyte_hours'] = (
-            result['node_capacity_memory_gigabyte_hours'] - result['pod_request_memory_gigabyte_hours']
+        result["unallocated_pod_request_memory_gigabyte_hours"] = (
+            result["node_capacity_memory_gigabyte_hours"]
+            - result["pod_request_memory_gigabyte_hours"]
         )
-        result['unallocated_pod_effective_usage_memory_gigabyte_hours'] = (
-            result['node_capacity_memory_gigabyte_hours'] - result['pod_effective_usage_memory_gigabyte_hours']
+        result["unallocated_pod_effective_usage_memory_gigabyte_hours"] = (
+            result["node_capacity_memory_gigabyte_hours"]
+            - result["pod_effective_usage_memory_gigabyte_hours"]
         )
 
         return result
@@ -295,15 +296,15 @@ class UnallocatedCapacityAggregator:
         result = df.copy()
 
         def get_namespace(role):
-            if role in ['master', 'infra']:
-                return 'Platform unallocated'
-            elif role == 'worker':
-                return 'Worker unallocated'
+            if role in ["master", "infra"]:
+                return "Platform unallocated"
+            elif role == "worker":
+                return "Worker unallocated"
             else:
                 # Unknown roles default to Worker unallocated
-                return 'Worker unallocated'
+                return "Worker unallocated"
 
-        result['namespace'] = result['node_role'].apply(get_namespace)
+        result["namespace"] = result["node_role"].apply(get_namespace)
 
         return result
 
@@ -315,40 +316,56 @@ class UnallocatedCapacityAggregator:
         result = pd.DataFrame(index=df.index)
 
         # Metadata columns
-        result['report_period_id'] = self.report_period_id
-        result['cluster_id'] = self.cluster_id
-        result['cluster_alias'] = self.cluster_alias
-        result['data_source'] = 'Pod'  # Trino SQL line 526
-        result['source_uuid'] = df['source_uuid'].values
+        result["report_period_id"] = self.report_period_id
+        result["cluster_id"] = self.cluster_id
+        result["cluster_alias"] = self.cluster_alias
+        result["data_source"] = "Pod"  # Trino SQL line 526
+        result["source_uuid"] = df["source_uuid"].values
 
         # Time columns
-        result['usage_start'] = df['usage_start']
-        result['usage_end'] = df['usage_start']  # Same as usage_start
+        result["usage_start"] = df["usage_start"]
+        result["usage_end"] = df["usage_start"]  # Same as usage_start
 
         # Identity columns
-        result['namespace'] = df['namespace']
-        result['node'] = df['node']
-        result['resource_id'] = df['resource_id']
+        result["namespace"] = df["namespace"]
+        result["node"] = df["node"]
+        result["resource_id"] = df["resource_id"]
 
         # Unallocated values (renamed from "unallocated_*" to standard column names)
-        result['pod_usage_cpu_core_hours'] = df['unallocated_pod_usage_cpu_core_hours']
-        result['pod_request_cpu_core_hours'] = df['unallocated_pod_request_cpu_core_hours']
-        result['pod_effective_usage_cpu_core_hours'] = df['unallocated_pod_effective_usage_cpu_core_hours']
-        result['pod_usage_memory_gigabyte_hours'] = df['unallocated_pod_usage_memory_gigabyte_hours']
-        result['pod_request_memory_gigabyte_hours'] = df['unallocated_pod_request_memory_gigabyte_hours']
-        result['pod_effective_usage_memory_gigabyte_hours'] = df['unallocated_pod_effective_usage_memory_gigabyte_hours']
+        result["pod_usage_cpu_core_hours"] = df["unallocated_pod_usage_cpu_core_hours"]
+        result["pod_request_cpu_core_hours"] = df[
+            "unallocated_pod_request_cpu_core_hours"
+        ]
+        result["pod_effective_usage_cpu_core_hours"] = df[
+            "unallocated_pod_effective_usage_cpu_core_hours"
+        ]
+        result["pod_usage_memory_gigabyte_hours"] = df[
+            "unallocated_pod_usage_memory_gigabyte_hours"
+        ]
+        result["pod_request_memory_gigabyte_hours"] = df[
+            "unallocated_pod_request_memory_gigabyte_hours"
+        ]
+        result["pod_effective_usage_memory_gigabyte_hours"] = df[
+            "unallocated_pod_effective_usage_memory_gigabyte_hours"
+        ]
 
         # Capacity columns (unchanged)
-        result['node_capacity_cpu_cores'] = df['node_capacity_cpu_cores']
-        result['node_capacity_cpu_core_hours'] = df['node_capacity_cpu_core_hours']
-        result['node_capacity_memory_gigabytes'] = df['node_capacity_memory_gigabytes']
-        result['node_capacity_memory_gigabyte_hours'] = df['node_capacity_memory_gigabyte_hours']
-        result['cluster_capacity_cpu_core_hours'] = df['cluster_capacity_cpu_core_hours']
-        result['cluster_capacity_memory_gigabyte_hours'] = df['cluster_capacity_memory_gigabyte_hours']
+        result["node_capacity_cpu_cores"] = df["node_capacity_cpu_cores"]
+        result["node_capacity_cpu_core_hours"] = df["node_capacity_cpu_core_hours"]
+        result["node_capacity_memory_gigabytes"] = df["node_capacity_memory_gigabytes"]
+        result["node_capacity_memory_gigabyte_hours"] = df[
+            "node_capacity_memory_gigabyte_hours"
+        ]
+        result["cluster_capacity_cpu_core_hours"] = df[
+            "cluster_capacity_cpu_core_hours"
+        ]
+        result["cluster_capacity_memory_gigabyte_hours"] = df[
+            "cluster_capacity_memory_gigabyte_hours"
+        ]
 
         # Labels (empty for unallocated capacity - no pods/volumes)
-        result['pod_labels'] = '{}'
-        result['volume_labels'] = None
-        result['all_labels'] = '{}'  # Trino SQL lines 651-654: empty for unallocated
+        result["pod_labels"] = "{}"
+        result["volume_labels"] = None
+        result["all_labels"] = "{}"  # Trino SQL lines 651-654: empty for unallocated
 
         return result

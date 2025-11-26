@@ -23,12 +23,14 @@ Key Logic:
 Complexity: VERY HIGH (9/10) - MOST COMPLEX ALGORITHM
 """
 
-import pandas as pd
-import numpy as np
 import calendar
 from datetime import datetime
 from typing import Dict, Set
-from .utils import get_logger, PerformanceTimer
+
+import numpy as np
+import pandas as pd
+
+from .utils import PerformanceTimer, get_logger
 
 
 class DiskCapacityCalculator:
@@ -71,15 +73,12 @@ class DiskCapacityCalculator:
             year=year,
             month=month,
             days=days_in_month,
-            hours=hours
+            hours=hours,
         )
 
         return hours
 
-    def extract_matched_volumes(
-        self,
-        ocp_storage_usage_df: pd.DataFrame
-    ) -> Set[str]:
+    def extract_matched_volumes(self, ocp_storage_usage_df: pd.DataFrame) -> Set[str]:
         """
         Extract CSI volume handles AND PV names from OCP storage usage.
 
@@ -104,19 +103,19 @@ class DiskCapacityCalculator:
         volume_set = set()
 
         # Extract CSI volume handles
-        if 'csi_volume_handle' in ocp_storage_usage_df.columns:
+        if "csi_volume_handle" in ocp_storage_usage_df.columns:
             csi_handles = ocp_storage_usage_df[
-                ocp_storage_usage_df['csi_volume_handle'].notna() &
-                (ocp_storage_usage_df['csi_volume_handle'] != '')
-            ]['csi_volume_handle'].unique()
+                ocp_storage_usage_df["csi_volume_handle"].notna()
+                & (ocp_storage_usage_df["csi_volume_handle"] != "")
+            ]["csi_volume_handle"].unique()
             volume_set.update(csi_handles)
 
         # Extract PV names (for non-CSI storage)
-        if 'persistentvolume' in ocp_storage_usage_df.columns:
+        if "persistentvolume" in ocp_storage_usage_df.columns:
             pv_names = ocp_storage_usage_df[
-                ocp_storage_usage_df['persistentvolume'].notna() &
-                (ocp_storage_usage_df['persistentvolume'] != '')
-            ]['persistentvolume'].unique()
+                ocp_storage_usage_df["persistentvolume"].notna()
+                & (ocp_storage_usage_df["persistentvolume"] != "")
+            ]["persistentvolume"].unique()
             volume_set.update(pv_names)
 
         self.logger.info(
@@ -130,7 +129,7 @@ class DiskCapacityCalculator:
         aws_line_items_df: pd.DataFrame,
         ocp_storage_usage_df: pd.DataFrame,
         year: int,
-        month: int
+        month: int,
     ) -> pd.DataFrame:
         """
         Calculate disk capacities for matched EBS volumes.
@@ -166,18 +165,20 @@ class DiskCapacityCalculator:
         with PerformanceTimer("Calculate disk capacities", self.logger):
             if aws_line_items_df.empty:
                 self.logger.warning("AWS line items DataFrame is empty")
-                return pd.DataFrame(columns=['resource_id', 'capacity', 'usage_start'])
+                return pd.DataFrame(columns=["resource_id", "capacity", "usage_start"])
 
             if ocp_storage_usage_df.empty:
                 self.logger.warning("OCP storage usage DataFrame is empty")
-                return pd.DataFrame(columns=['resource_id', 'capacity', 'usage_start'])
+                return pd.DataFrame(columns=["resource_id", "capacity", "usage_start"])
 
             # Step 1: Extract matched volumes (CSI handles)
             matched_volumes = self.extract_matched_volumes(ocp_storage_usage_df)
 
             if not matched_volumes:
-                self.logger.warning("No matched volumes found, returning empty DataFrame")
-                return pd.DataFrame(columns=['resource_id', 'capacity', 'usage_start'])
+                self.logger.warning(
+                    "No matched volumes found, returning empty DataFrame"
+                )
+                return pd.DataFrame(columns=["resource_id", "capacity", "usage_start"])
 
             # Step 2: Filter AWS to matched EBS volumes only
             # Use matched_resource_id (set by resource matcher) for filtering
@@ -185,9 +186,9 @@ class DiskCapacityCalculator:
             # Koku uses suffix matching: substr(resourceid, -length(csi_handle)) = csi_handle
 
             # Check if 'lineitem_resourceid' exists (required for fallback)
-            if 'lineitem_resourceid' not in aws_line_items_df.columns:
+            if "lineitem_resourceid" not in aws_line_items_df.columns:
                 self.logger.error("Missing 'lineitem_resourceid' column in AWS data")
-                return pd.DataFrame(columns=['resource_id', 'capacity', 'usage_start'])
+                return pd.DataFrame(columns=["resource_id", "capacity", "usage_start"])
 
             # Define suffix matching function (used as fallback)
             def matches_volume_suffix(resource_id):
@@ -202,26 +203,34 @@ class DiskCapacityCalculator:
 
             # Try matched_resource_id first (for EC2-attached EBS volumes matched by resource matcher)
             # Fall back to suffix matching for EBS volumes not matched by resource matcher
-            if 'matched_resource_id' in aws_line_items_df.columns:
+            if "matched_resource_id" in aws_line_items_df.columns:
                 # Filter by matched_resource_id (for resource matcher matched volumes)
-                matched_by_id = aws_line_items_df['matched_resource_id'].isin(matched_volumes)
+                matched_by_id = aws_line_items_df["matched_resource_id"].isin(
+                    matched_volumes
+                )
 
                 # Also try suffix matching on lineitem_resourceid (for non-matched EBS volumes)
-                matched_by_suffix = aws_line_items_df['lineitem_resourceid'].apply(matches_volume_suffix)
+                matched_by_suffix = aws_line_items_df["lineitem_resourceid"].apply(
+                    matches_volume_suffix
+                )
 
                 # Combine both filters with OR
-                aws_filtered = aws_line_items_df[matched_by_id | matched_by_suffix].copy()
+                aws_filtered = aws_line_items_df[
+                    matched_by_id | matched_by_suffix
+                ].copy()
 
                 self.logger.debug(
                     f"Filtering by matched_resource_id OR suffix matching",
                     matched_by_id=matched_by_id.sum(),
                     matched_by_suffix=matched_by_suffix.sum(),
-                    total_filtered=len(aws_filtered)
+                    total_filtered=len(aws_filtered),
                 )
             else:
                 # No matched_resource_id column - use suffix matching only
                 aws_filtered = aws_line_items_df[
-                    aws_line_items_df['lineitem_resourceid'].apply(matches_volume_suffix)
+                    aws_line_items_df["lineitem_resourceid"].apply(
+                        matches_volume_suffix
+                    )
                 ].copy()
                 self.logger.debug(
                     f"Filtering by suffix matching on lineitem_resourceid only"
@@ -231,36 +240,35 @@ class DiskCapacityCalculator:
                 self.logger.warning(
                     f"No AWS line items found for {len(matched_volumes)} matched volumes"
                 )
-                return pd.DataFrame(columns=['resource_id', 'capacity', 'usage_start'])
+                return pd.DataFrame(columns=["resource_id", "capacity", "usage_start"])
 
             self.logger.info(
                 f"Filtered to {len(aws_filtered)} AWS line items for {len(matched_volumes)} volumes"
             )
 
             # Step 3: Prepare usage_date for grouping
-            if 'lineitem_usagestartdate' in aws_filtered.columns:
-                aws_filtered['usage_date'] = pd.to_datetime(
-                    aws_filtered['lineitem_usagestartdate']
+            if "lineitem_usagestartdate" in aws_filtered.columns:
+                aws_filtered["usage_date"] = pd.to_datetime(
+                    aws_filtered["lineitem_usagestartdate"]
                 ).dt.date
             else:
                 self.logger.error("Missing 'lineitem_usagestartdate' column")
-                return pd.DataFrame(columns=['resource_id', 'capacity', 'usage_start'])
+                return pd.DataFrame(columns=["resource_id", "capacity", "usage_start"])
 
             # Step 4: Group by resource_id and usage_date, calculate MAX(cost) and MAX(rate)
-            if 'lineitem_unblendedcost' not in aws_filtered.columns:
+            if "lineitem_unblendedcost" not in aws_filtered.columns:
                 self.logger.error("Missing 'lineitem_unblendedcost' column")
-                return pd.DataFrame(columns=['resource_id', 'capacity', 'usage_start'])
+                return pd.DataFrame(columns=["resource_id", "capacity", "usage_start"])
 
-            if 'lineitem_unblendedrate' not in aws_filtered.columns:
+            if "lineitem_unblendedrate" not in aws_filtered.columns:
                 self.logger.error("Missing 'lineitem_unblendedrate' column")
-                return pd.DataFrame(columns=['resource_id', 'capacity', 'usage_start'])
+                return pd.DataFrame(columns=["resource_id", "capacity", "usage_start"])
 
-            capacity_df = aws_filtered.groupby(
-                ['lineitem_resourceid', 'usage_date']
-            ).agg({
-                'lineitem_unblendedcost': 'max',
-                'lineitem_unblendedrate': 'max'
-            }).reset_index()
+            capacity_df = (
+                aws_filtered.groupby(["lineitem_resourceid", "usage_date"])
+                .agg({"lineitem_unblendedcost": "max", "lineitem_unblendedrate": "max"})
+                .reset_index()
+            )
 
             self.logger.debug(
                 f"Grouped to {len(capacity_df)} resource-date combinations"
@@ -272,49 +280,51 @@ class DiskCapacityCalculator:
             # Step 6: Apply capacity formula
             # Capacity = Cost / (Rate / Hours)
             # Handle division by zero gracefully
-            capacity_df['rate_per_hour'] = (
-                capacity_df['lineitem_unblendedrate'] / hours_in_month
+            capacity_df["rate_per_hour"] = (
+                capacity_df["lineitem_unblendedrate"] / hours_in_month
             )
 
             # Only calculate capacity where rate > 0
-            mask = capacity_df['lineitem_unblendedrate'] > 0
-            capacity_df['capacity'] = 0.0  # Use float to avoid dtype warning
+            mask = capacity_df["lineitem_unblendedrate"] > 0
+            capacity_df["capacity"] = 0.0  # Use float to avoid dtype warning
 
-            capacity_df.loc[mask, 'capacity'] = (
-                capacity_df.loc[mask, 'lineitem_unblendedcost'] /
-                capacity_df.loc[mask, 'rate_per_hour']
+            capacity_df.loc[mask, "capacity"] = (
+                capacity_df.loc[mask, "lineitem_unblendedcost"]
+                / capacity_df.loc[mask, "rate_per_hour"]
             )
 
             # Round to nearest integer
             # First drop any NaN/inf values before converting to int
-            capacity_df = capacity_df[capacity_df['capacity'].notna()]
-            capacity_df = capacity_df[np.isfinite(capacity_df['capacity'])]
-            capacity_df['capacity'] = np.round(capacity_df['capacity']).astype(int)
+            capacity_df = capacity_df[capacity_df["capacity"].notna()]
+            capacity_df = capacity_df[np.isfinite(capacity_df["capacity"])]
+            capacity_df["capacity"] = np.round(capacity_df["capacity"]).astype(int)
 
             # Step 7: Filter to positive capacities
-            capacity_df = capacity_df[capacity_df['capacity'] > 0]
+            capacity_df = capacity_df[capacity_df["capacity"] > 0]
 
             if capacity_df.empty:
                 self.logger.warning("No positive capacities calculated")
-                return pd.DataFrame(columns=['resource_id', 'capacity', 'usage_start'])
+                return pd.DataFrame(columns=["resource_id", "capacity", "usage_start"])
 
             # Step 8: Rename columns to match expected output
-            capacity_df = capacity_df.rename(columns={
-                'lineitem_resourceid': 'resource_id',
-                'usage_date': 'usage_start'
-            })[['resource_id', 'capacity', 'usage_start']]
+            capacity_df = capacity_df.rename(
+                columns={
+                    "lineitem_resourceid": "resource_id",
+                    "usage_date": "usage_start",
+                }
+            )[["resource_id", "capacity", "usage_start"]]
 
             # Log statistics
-            total_capacity = capacity_df['capacity'].sum()
-            avg_capacity = capacity_df['capacity'].mean()
-            unique_volumes = capacity_df['resource_id'].nunique()
+            total_capacity = capacity_df["capacity"].sum()
+            avg_capacity = capacity_df["capacity"].mean()
+            unique_volumes = capacity_df["resource_id"].nunique()
 
             self.logger.info(
                 "✓ Disk capacities calculated",
                 volumes=unique_volumes,
                 rows=len(capacity_df),
                 total_capacity_gb=f"{total_capacity:,.0f}",
-                avg_capacity_gb=f"{avg_capacity:,.1f}"
+                avg_capacity_gb=f"{avg_capacity:,.1f}",
             )
 
             return capacity_df
@@ -333,21 +343,29 @@ class DiskCapacityCalculator:
             return {"status": "empty"}
 
         summary = {
-            "total_volumes": capacity_df['resource_id'].nunique(),
+            "total_volumes": capacity_df["resource_id"].nunique(),
             "total_rows": len(capacity_df),
-            "total_capacity_gb": int(capacity_df['capacity'].sum()),
-            "avg_capacity_gb": float(capacity_df['capacity'].mean()),
-            "min_capacity_gb": int(capacity_df['capacity'].min()),
-            "max_capacity_gb": int(capacity_df['capacity'].max()),
-            "median_capacity_gb": float(capacity_df['capacity'].median())
+            "total_capacity_gb": int(capacity_df["capacity"].sum()),
+            "avg_capacity_gb": float(capacity_df["capacity"].mean()),
+            "min_capacity_gb": int(capacity_df["capacity"].min()),
+            "max_capacity_gb": int(capacity_df["capacity"].max()),
+            "median_capacity_gb": float(capacity_df["capacity"].median()),
         }
 
         # Capacity distribution
         summary["capacity_distribution"] = {
-            "< 100 GB": int((capacity_df['capacity'] < 100).sum()),
-            "100-500 GB": int(((capacity_df['capacity'] >= 100) & (capacity_df['capacity'] < 500)).sum()),
-            "500-1000 GB": int(((capacity_df['capacity'] >= 500) & (capacity_df['capacity'] < 1000)).sum()),
-            "> 1000 GB": int((capacity_df['capacity'] >= 1000).sum())
+            "< 100 GB": int((capacity_df["capacity"] < 100).sum()),
+            "100-500 GB": int(
+                (
+                    (capacity_df["capacity"] >= 100) & (capacity_df["capacity"] < 500)
+                ).sum()
+            ),
+            "500-1000 GB": int(
+                (
+                    (capacity_df["capacity"] >= 500) & (capacity_df["capacity"] < 1000)
+                ).sum()
+            ),
+            "> 1000 GB": int((capacity_df["capacity"] >= 1000).sum()),
         }
 
         self.logger.info("Capacity summary", **summary)
@@ -357,7 +375,7 @@ class DiskCapacityCalculator:
         self,
         capacity_df: pd.DataFrame,
         min_capacity_gb: int = 1,
-        max_capacity_gb: int = 100000
+        max_capacity_gb: int = 100000,
     ) -> bool:
         """
         Validate that calculated capacities are reasonable.
@@ -375,8 +393,10 @@ class DiskCapacityCalculator:
             return True  # Empty is valid (no volumes to process)
 
         # Check for required columns
-        required_columns = ['resource_id', 'capacity', 'usage_start']
-        missing_columns = [col for col in required_columns if col not in capacity_df.columns]
+        required_columns = ["resource_id", "capacity", "usage_start"]
+        missing_columns = [
+            col for col in required_columns if col not in capacity_df.columns
+        ]
 
         if missing_columns:
             error_msg = f"Missing required columns: {missing_columns}"
@@ -384,21 +404,21 @@ class DiskCapacityCalculator:
             raise ValueError(error_msg)
 
         # Check for negative or zero capacities
-        invalid_capacity_count = (capacity_df['capacity'] <= 0).sum()
+        invalid_capacity_count = (capacity_df["capacity"] <= 0).sum()
         if invalid_capacity_count > 0:
             error_msg = f"Found {invalid_capacity_count} invalid (≤0) capacities"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
 
         # Check for unreasonably large capacities
-        too_large = (capacity_df['capacity'] > max_capacity_gb).sum()
+        too_large = (capacity_df["capacity"] > max_capacity_gb).sum()
         if too_large > 0:
             self.logger.warning(
                 f"Found {too_large} capacities > {max_capacity_gb} GB (may be valid for large volumes)"
             )
 
         # Check for unreasonably small capacities
-        too_small = (capacity_df['capacity'] < min_capacity_gb).sum()
+        too_small = (capacity_df["capacity"] < min_capacity_gb).sum()
         if too_small > 0:
             self.logger.warning(
                 f"Found {too_small} capacities < {min_capacity_gb} GB (may be valid for small volumes)"
@@ -406,4 +426,3 @@ class DiskCapacityCalculator:
 
         self.logger.debug("✓ Capacity validation passed")
         return True
-

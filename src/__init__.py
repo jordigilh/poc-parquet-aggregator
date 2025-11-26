@@ -5,4 +5,3 @@ OCP usage data directly from Parquet files, replacing Trino + Hive.
 """
 
 __version__ = "0.1.0"
-

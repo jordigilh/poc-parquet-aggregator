@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS org1234567.reporting_ocpusagelineitem_daily_summary (
     persistentvolume VARCHAR(253),
     storageclass VARCHAR(50),
     volume_labels JSONB,
+    all_labels JSONB,
     persistentvolumeclaim_capacity_gigabyte NUMERIC(24,6),
     persistentvolumeclaim_capacity_gigabyte_months NUMERIC(24,6),
     volume_request_storage_gigabyte_months NUMERIC(24,6),

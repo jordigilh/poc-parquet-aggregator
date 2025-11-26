@@ -2,23 +2,33 @@
 
 import argparse
 import os
+import resource
 import sys
 import tracemalloc
-import resource
 from datetime import datetime
 
-from .config_loader import get_config
-from .utils import setup_logging, get_logger, PerformanceTimer, format_duration
-from .parquet_reader import ParquetReader
+from .aggregator_ocp_aws import OCPAWSAggregator
 from .aggregator_pod import PodAggregator, calculate_node_capacity
 from .aggregator_storage import StorageAggregator
 from .aggregator_unallocated import UnallocatedCapacityAggregator
-from .aggregator_ocp_aws import OCPAWSAggregator
+from .config_loader import get_config
 from .db_writer import DatabaseWriter
+from .parquet_reader import ParquetReader
+from .utils import PerformanceTimer, format_duration, get_logger, setup_logging
 
 
-def run_ocp_aws_aggregation(config, ocp_provider_uuid, aws_provider_uuid, year, month,
-                             parquet_reader, db_writer, enabled_tag_keys, pipeline_start, logger):
+def run_ocp_aws_aggregation(
+    config,
+    ocp_provider_uuid,
+    aws_provider_uuid,
+    year,
+    month,
+    parquet_reader,
+    db_writer,
+    enabled_tag_keys,
+    pipeline_start,
+    logger,
+):
     """Run OCP-on-AWS aggregation pipeline.
 
     Args:
@@ -45,14 +55,14 @@ def run_ocp_aws_aggregation(config, ocp_provider_uuid, aws_provider_uuid, year, 
         ocp_aws_aggregator = OCPAWSAggregator(config, enabled_tag_keys)
 
         # Get cluster ID
-        cluster_id = config['ocp']['cluster_id']
+        cluster_id = config["ocp"]["cluster_id"]
 
         # Check for incremental DB writes (streaming only)
-        perf_config = config.get('performance', {})
+        perf_config = config.get("performance", {})
         use_streaming = ocp_aws_aggregator.use_streaming
-        incremental_raw = perf_config.get('incremental_db_writes', False)
+        incremental_raw = perf_config.get("incremental_db_writes", False)
         if isinstance(incremental_raw, str):
-            incremental_db_writes = incremental_raw.lower() == 'true'
+            incremental_db_writes = incremental_raw.lower() == "true"
         else:
             incremental_db_writes = bool(incremental_raw)
 
@@ -74,15 +84,19 @@ def run_ocp_aws_aggregation(config, ocp_provider_uuid, aws_provider_uuid, year, 
                     cluster_id=cluster_id,
                     aws_provider_uuid=aws_provider_uuid,
                     db_writer=db_writer,
-                    incremental_db_writes=True
+                    incremental_db_writes=True,
                 )
-                rows_written = db_writer.create_streaming_writer("ocp_aws").total_rows if hasattr(db_writer, '_last_streaming_writer') else 0
+                rows_written = (
+                    db_writer.create_streaming_writer("ocp_aws").total_rows
+                    if hasattr(db_writer, "_last_streaming_writer")
+                    else 0
+                )
             else:
                 summary_df = ocp_aws_aggregator.aggregate(
                     year=str(year),
                     month=str(month),
                     cluster_id=cluster_id,
-                    aws_provider_uuid=aws_provider_uuid
+                    aws_provider_uuid=aws_provider_uuid,
                 )
 
         if summary_df.empty and not incremental_db_writes:
@@ -107,7 +121,7 @@ def run_ocp_aws_aggregation(config, ocp_provider_uuid, aws_provider_uuid, year, 
         # Memory statistics
         current_mem, peak_mem = tracemalloc.get_traced_memory()
         max_rss_bytes = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-        if sys.platform == 'darwin':
+        if sys.platform == "darwin":
             max_rss_mb = max_rss_bytes / (1024 * 1024)
         else:
             max_rss_mb = max_rss_bytes / 1024
@@ -118,12 +132,14 @@ def run_ocp_aws_aggregation(config, ocp_provider_uuid, aws_provider_uuid, year, 
         # Pipeline summary
         pipeline_duration = (datetime.now() - pipeline_start).total_seconds()
         logger.info("=" * 80)
-        logger.info(f"✓ OCP-AWS aggregation complete in {format_duration(pipeline_duration)}")
+        logger.info(
+            f"✓ OCP-AWS aggregation complete in {format_duration(pipeline_duration)}"
+        )
         logger.info(f"✓ Output: {output_rows} OCP-AWS summary rows")
         logger.info(
             "Memory usage",
             peak_python_mb=f"{peak_mem / (1024 * 1024):.2f} MB",
-            peak_rss_mb=f"{max_rss_mb:.2f} MB"
+            peak_rss_mb=f"{max_rss_mb:.2f} MB",
         )
         logger.info("=" * 80)
 
@@ -145,8 +161,8 @@ def run_poc(args):
 
     # Setup logging
     setup_logging(
-        level=config.get('logging', {}).get('level', 'INFO'),
-        log_format=config.get('logging', {}).get('format', 'console')
+        level=config.get("logging", {}).get("level", "INFO"),
+        log_format=config.get("logging", {}).get("format", "console"),
     )
 
     logger = get_logger("main")
@@ -159,15 +175,15 @@ def run_poc(args):
     tracemalloc.start()
 
     # Print configuration
-    ocp_config = config['ocp']
+    ocp_config = config["ocp"]
     logger.info(
         "Configuration",
-        provider_uuid=ocp_config['provider_uuid'],
-        cluster_id=ocp_config['cluster_id'],
-        year=ocp_config['year'],
-        month=ocp_config['month'],
-        start_date=ocp_config['start_date'],
-        end_date=ocp_config['end_date']
+        provider_uuid=ocp_config["provider_uuid"],
+        cluster_id=ocp_config["cluster_id"],
+        year=ocp_config["year"],
+        month=ocp_config["month"],
+        start_date=ocp_config["start_date"],
+        end_date=ocp_config["end_date"],
     )
 
     # Total pipeline timer
@@ -192,7 +208,9 @@ def run_poc(args):
         # The actual S3 operations (reads/writes) work fine
         try:
             if not parquet_reader.test_connectivity():
-                logger.warning("S3 connectivity test failed (time sync issue), but continuing...")
+                logger.warning(
+                    "S3 connectivity test failed (time sync issue), but continuing..."
+                )
         except Exception as e:
             logger.warning(f"S3 connectivity test error: {e}, but continuing...")
 
@@ -212,17 +230,19 @@ def run_poc(args):
         # ====================================================================
         # Phase 2.5: Detect AWS data and determine aggregation mode
         # ====================================================================
-        provider_uuid = ocp_config['provider_uuid']
+        provider_uuid = ocp_config["provider_uuid"]
         # Allow override from environment (for Core validation)
-        year = os.getenv('POC_YEAR', ocp_config['year'])
-        month = os.getenv('POC_MONTH', ocp_config['month'])
+        year = os.getenv("POC_YEAR", ocp_config["year"])
+        month = os.getenv("POC_MONTH", ocp_config["month"])
 
         # Check for AWS data to determine if we should run OCP-AWS aggregation
-        aws_provider_uuid = os.getenv('AWS_PROVIDER_UUID')
+        aws_provider_uuid = os.getenv("AWS_PROVIDER_UUID")
         run_ocp_aws = False
 
         if aws_provider_uuid:
-            logger.info(f"AWS_PROVIDER_UUID detected - will attempt OCP-on-AWS aggregation")
+            logger.info(
+                f"AWS_PROVIDER_UUID detected - will attempt OCP-on-AWS aggregation"
+            )
             run_ocp_aws = True
         else:
             logger.info("AWS_PROVIDER_UUID not set - will run OCP-only aggregation")
@@ -241,7 +261,7 @@ def run_poc(args):
                 db_writer=db_writer,
                 enabled_tag_keys=enabled_tag_keys,
                 pipeline_start=pipeline_start,
-                logger=logger
+                logger=logger,
             )
 
         # ====================================================================
@@ -250,14 +270,16 @@ def run_poc(args):
         logger.info("Phase 3: Reading Parquet files from S3 (OCP-only mode)...")
 
         # Determine if we should use streaming mode
-        use_streaming_raw = config.get('performance', {}).get('use_streaming', False)
+        use_streaming_raw = config.get("performance", {}).get("use_streaming", False)
         # Handle string 'false'/'true' from env vars
         if isinstance(use_streaming_raw, str):
-            use_streaming = use_streaming_raw.lower() in ('true', '1', 'yes')
+            use_streaming = use_streaming_raw.lower() in ("true", "1", "yes")
         else:
             use_streaming = bool(use_streaming_raw)
-        chunk_size_raw = config.get('performance', {}).get('chunk_size', 50000)
-        chunk_size = int(chunk_size_raw) if isinstance(chunk_size_raw, str) else chunk_size_raw
+        chunk_size_raw = config.get("performance", {}).get("chunk_size", 50000)
+        chunk_size = (
+            int(chunk_size_raw) if isinstance(chunk_size_raw, str) else chunk_size_raw
+        )
 
         if use_streaming:
             logger.info(f"Streaming mode ENABLED (chunk_size={chunk_size})")
@@ -271,7 +293,7 @@ def run_poc(args):
             month=month,
             daily=True,
             streaming=use_streaming,
-            chunk_size=chunk_size
+            chunk_size=chunk_size,
         )
 
         # Handle both streaming (iterator) and non-streaming (DataFrame) modes
@@ -285,7 +307,9 @@ def run_poc(args):
             if pod_usage_daily_df.empty:
                 logger.error("No daily pod usage data found")
                 return 1
-            logger.info(f"✓ Loaded daily pod usage data: {len(pod_usage_daily_df)} rows")
+            logger.info(
+                f"✓ Loaded daily pod usage data: {len(pod_usage_daily_df)} rows"
+            )
 
         # Read hourly pod usage for capacity calculation (Trino lines 143-171)
         # Try hourly first, fall back to daily if not available
@@ -294,40 +318,42 @@ def run_poc(args):
             year=year,
             month=month,
             daily=False,  # Hourly intervals
-            streaming=False
+            streaming=False,
         )
 
         if pod_usage_hourly_df.empty:
-            logger.warning("No hourly pod usage data found, using daily for capacity calculation")
+            logger.warning(
+                "No hourly pod usage data found, using daily for capacity calculation"
+            )
             # If streaming mode, we need to re-read daily data non-streaming for capacity
             if use_streaming:
-                logger.info("Reading daily data (non-streaming) for capacity calculation...")
+                logger.info(
+                    "Reading daily data (non-streaming) for capacity calculation..."
+                )
                 pod_usage_for_capacity = parquet_reader.read_pod_usage_line_items(
                     provider_uuid=provider_uuid,
                     year=year,
                     month=month,
                     daily=True,
-                    streaming=False
+                    streaming=False,
                 )
             else:
                 pod_usage_for_capacity = pod_usage_daily_df
         else:
-            logger.info(f"✓ Loaded hourly pod usage data: {len(pod_usage_hourly_df)} rows")
+            logger.info(
+                f"✓ Loaded hourly pod usage data: {len(pod_usage_hourly_df)} rows"
+            )
             pod_usage_for_capacity = pod_usage_hourly_df
 
         # Read node labels (optional)
         node_labels_df = parquet_reader.read_node_labels_line_items(
-            provider_uuid=provider_uuid,
-            year=year,
-            month=month
+            provider_uuid=provider_uuid, year=year, month=month
         )
         logger.info(f"✓ Loaded node labels: {len(node_labels_df)} rows")
 
         # Read namespace labels (optional)
         namespace_labels_df = parquet_reader.read_namespace_labels_line_items(
-            provider_uuid=provider_uuid,
-            year=year,
-            month=month
+            provider_uuid=provider_uuid, year=year, month=month
         )
         logger.info(f"✓ Loaded namespace labels: {len(namespace_labels_df)} rows")
 
@@ -338,7 +364,9 @@ def run_poc(args):
 
         # CRITICAL: Use hourly data for proper two-level aggregation
         # Trino SQL lines 143-171: max(interval) then sum(day)
-        node_capacity_df, cluster_capacity_df = calculate_node_capacity(pod_usage_for_capacity)
+        node_capacity_df, cluster_capacity_df = calculate_node_capacity(
+            pod_usage_for_capacity
+        )
 
         logger.info(
             f"✓ Calculated capacity for {len(node_capacity_df)} node-days, "
@@ -360,7 +388,7 @@ def run_poc(args):
                 node_capacity_df=node_capacity_df,
                 node_labels_df=node_labels_df,
                 namespace_labels_df=namespace_labels_df,
-                cost_category_df=cost_category_df
+                cost_category_df=cost_category_df,
             )
             # For storage join, we need a DataFrame (not an iterator)
             # Re-read pod data for storage join if storage is enabled
@@ -372,7 +400,7 @@ def run_poc(args):
                 node_capacity_df=node_capacity_df,
                 node_labels_df=node_labels_df,
                 namespace_labels_df=namespace_labels_df,
-                cost_category_df=cost_category_df
+                cost_category_df=cost_category_df,
             )
             pod_df_for_storage = pod_usage_daily_df
 
@@ -391,9 +419,11 @@ def run_poc(args):
                 year=year,
                 month=month,
                 daily=True,
-                streaming=False  # Need DataFrame for join
+                streaming=False,  # Need DataFrame for join
             )
-            logger.info(f"✓ Re-loaded pod data for storage join: {len(pod_df_for_storage)} rows")
+            logger.info(
+                f"✓ Re-loaded pod data for storage join: {len(pod_df_for_storage)} rows"
+            )
 
         # Read storage data
         storage_usage_daily = parquet_reader.read_storage_usage_line_items(
@@ -401,7 +431,7 @@ def run_poc(args):
             year=year,
             month=month,
             daily=True,
-            streaming=False  # Always use in-memory for storage (typically smaller dataset)
+            streaming=False,  # Always use in-memory for storage (typically smaller dataset)
         )
 
         if storage_usage_daily.empty:
@@ -415,14 +445,19 @@ def run_poc(args):
                 storage_df=storage_usage_daily,
                 pod_df=pod_df_for_storage,
                 node_labels_df=node_labels_df,
-                namespace_labels_df=namespace_labels_df
+                namespace_labels_df=namespace_labels_df,
             )
 
-            logger.info(f"✓ Generated {len(storage_aggregated_df)} storage summary rows")
+            logger.info(
+                f"✓ Generated {len(storage_aggregated_df)} storage summary rows"
+            )
 
             # Combine pod + storage results
             import pandas as pd
-            aggregated_df = pd.concat([aggregated_df, storage_aggregated_df], ignore_index=True)
+
+            aggregated_df = pd.concat(
+                [aggregated_df, storage_aggregated_df], ignore_index=True
+            )
 
             logger.info(
                 f"✓ Combined results: {len(aggregated_df)} total rows "
@@ -452,22 +487,27 @@ def run_poc(args):
             # Calculate unallocated
             unallocated_aggregator = UnallocatedCapacityAggregator(config)
             unallocated_df = unallocated_aggregator.calculate_unallocated(
-                daily_summary_df=aggregated_df,
-                node_roles_df=node_roles_df
+                daily_summary_df=aggregated_df, node_roles_df=node_roles_df
             )
 
             if not unallocated_df.empty:
-                logger.info(f"✓ Generated {len(unallocated_df)} unallocated capacity rows")
+                logger.info(
+                    f"✓ Generated {len(unallocated_df)} unallocated capacity rows"
+                )
 
                 # Add to combined results
-                aggregated_df = pd.concat([aggregated_df, unallocated_df], ignore_index=True)
+                aggregated_df = pd.concat(
+                    [aggregated_df, unallocated_df], ignore_index=True
+                )
 
                 logger.info(
                     f"✓ Combined results: {len(aggregated_df)} total rows "
                     f"(including unallocated capacity)"
                 )
             else:
-                logger.info("No unallocated capacity rows generated (all capacity used)")
+                logger.info(
+                    "No unallocated capacity rows generated (all capacity used)"
+                )
 
         # ====================================================================
         # Phase 6: Write to PostgreSQL
@@ -476,20 +516,19 @@ def run_poc(args):
 
         with db_writer:
             # Use bulk COPY if enabled (10-50x faster), otherwise batch INSERT
-            use_bulk_copy = config.get('performance', {}).get('use_bulk_copy', True)
+            use_bulk_copy = config.get("performance", {}).get("use_bulk_copy", True)
 
             if use_bulk_copy:
                 logger.info("Using bulk COPY for database write (10-50x faster)")
                 rows_inserted = db_writer.write_summary_data_bulk_copy(
-                    df=aggregated_df,
-                    truncate=args.truncate
+                    df=aggregated_df, truncate=args.truncate
                 )
             else:
                 logger.info("Using batch INSERT for database write")
                 rows_inserted = db_writer.write_summary_data(
                     df=aggregated_df,
-                    batch_size=config.get('performance', {}).get('db_batch_size', 1000),
-                    truncate=args.truncate
+                    batch_size=config.get("performance", {}).get("db_batch_size", 1000),
+                    truncate=args.truncate,
                 )
 
         logger.info(f"✓ Inserted {rows_inserted} rows")
@@ -501,9 +540,7 @@ def run_poc(args):
 
         with db_writer:
             validation_result = db_writer.validate_summary_data(
-                provider_uuid=provider_uuid,
-                year=year,
-                month=month
+                provider_uuid=provider_uuid, year=year, month=month
             )
 
         logger.info("✓ Validation complete")
@@ -517,7 +554,8 @@ def run_poc(args):
         if args.validate_expected:
             logger.info("Phase 8: Validating against expected results...")
 
-            from .expected_results import ExpectedResultsCalculator, compare_results
+            from .expected_results import (ExpectedResultsCalculator,
+                                           compare_results)
 
             calculator = ExpectedResultsCalculator(args.validate_expected)
             expected_df = calculator.calculate_expected_aggregations()
@@ -528,18 +566,26 @@ def run_poc(args):
             # Compare with aggregated results
             comparison_result = compare_results(expected_df, aggregated_df)
 
-            if comparison_result['all_match']:
+            if comparison_result["all_match"]:
                 logger.info("=" * 80)
                 logger.info("✅ VALIDATION SUCCESS: ALL RESULTS MATCH EXPECTED VALUES!")
                 logger.info("=" * 80)
-                logger.info(f"Matched {comparison_result['match_count']}/{comparison_result['total_comparisons']} comparisons")
+                logger.info(
+                    f"Matched {comparison_result['match_count']}/{comparison_result['total_comparisons']} comparisons"
+                )
             else:
                 logger.error("=" * 80)
                 logger.error("❌ VALIDATION FAILED: DISCREPANCIES FOUND")
                 logger.error("=" * 80)
-                logger.error(f"Matched {comparison_result['match_count']}/{comparison_result['total_comparisons']} comparisons")
-                logger.error(f"Missing in actual: {comparison_result['missing_in_actual_count']}")
-                logger.error(f"Extra in actual: {comparison_result['extra_in_actual_count']}")
+                logger.error(
+                    f"Matched {comparison_result['match_count']}/{comparison_result['total_comparisons']} comparisons"
+                )
+                logger.error(
+                    f"Missing in actual: {comparison_result['missing_in_actual_count']}"
+                )
+                logger.error(
+                    f"Extra in actual: {comparison_result['extra_in_actual_count']}"
+                )
                 logger.error(f"Issues found: {len(comparison_result['issues'])}")
 
                 # Exit with error if validation fails
@@ -560,8 +606,12 @@ def run_poc(args):
             logger.info("Mode: Streaming (constant memory)")
         else:
             logger.info(f"Input rows: {len(pod_usage_daily_df):,}")
-            logger.info(f"Compression ratio: {len(pod_usage_daily_df) / rows_inserted:.1f}x")
-            logger.info(f"Processing rate: {len(pod_usage_daily_df) / total_duration:.0f} rows/sec")
+            logger.info(
+                f"Compression ratio: {len(pod_usage_daily_df) / rows_inserted:.1f}x"
+            )
+            logger.info(
+                f"Processing rate: {len(pod_usage_daily_df) / total_duration:.0f} rows/sec"
+            )
 
         logger.info(f"Output rows: {rows_inserted:,}")
 
@@ -572,7 +622,7 @@ def run_poc(args):
         # Get RSS (Resident Set Size) - actual memory used
         max_rss_bytes = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         # macOS reports in bytes, Linux in KB
-        if sys.platform == 'darwin':
+        if sys.platform == "darwin":
             max_rss_mb = max_rss_bytes / (1024 * 1024)
         else:
             max_rss_mb = max_rss_bytes / 1024
@@ -580,7 +630,7 @@ def run_poc(args):
         logger.info(
             "Memory usage",
             peak_python_mb=f"{peak_mem / (1024 * 1024):.2f} MB",
-            peak_rss_mb=f"{max_rss_mb:.2f} MB"
+            peak_rss_mb=f"{max_rss_mb:.2f} MB",
         )
         logger.info("=" * 80)
 
@@ -598,29 +648,29 @@ def main():
     )
 
     parser.add_argument(
-        '--config',
+        "--config",
         type=str,
         default=None,
-        help='Path to config.yaml (default: poc-parquet-aggregator/config/config.yaml)'
+        help="Path to config.yaml (default: poc-parquet-aggregator/config/config.yaml)",
     )
 
     parser.add_argument(
-        '--truncate',
-        action='store_true',
-        help='Truncate summary table before inserting (for testing)'
+        "--truncate",
+        action="store_true",
+        help="Truncate summary table before inserting (for testing)",
     )
 
     parser.add_argument(
-        '--validate',
-        action='store_true',
-        help='Run validation against Trino results (not implemented yet)'
+        "--validate",
+        action="store_true",
+        help="Run validation against Trino results (not implemented yet)",
     )
 
     parser.add_argument(
-        '--validate-expected',
+        "--validate-expected",
         type=str,
-        metavar='YAML_FILE',
-        help='Validate against expected results from nise static YAML'
+        metavar="YAML_FILE",
+        help="Validate against expected results from nise static YAML",
     )
 
     args = parser.parse_args()
@@ -635,6 +685,5 @@ def main():
     sys.exit(exit_code)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-

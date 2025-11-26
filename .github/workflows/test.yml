@@ -61,21 +61,21 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      minio:
-        image: minio/minio:latest
-        command: server /data --console-address ":9001"
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-        ports:
-          - 9000:9000
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio \
+            -p 9000:9000 -p 9001:9001 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data --console-address ":9001"
+          # Wait for MinIO to be ready
+          for i in {1..30}; do
+            curl -sf http://localhost:9000/minio/health/live && break
+            echo "Waiting for MinIO..."
+            sleep 2
+          done
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -112,6 +112,7 @@ jobs:
             usage_end DATE,
             pod_labels JSONB,
             volume_labels JSONB,
+            all_labels JSONB,
             pod_usage_cpu_core_hours NUMERIC(24,6),
             pod_request_cpu_core_hours NUMERIC(24,6),
             pod_effective_usage_cpu_core_hours NUMERIC(24,6),
@@ -198,21 +199,21 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      minio:
-        image: minio/minio:latest
-        command: server /data --console-address ":9001"
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-        ports:
-          - 9000:9000
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio \
+            -p 9000:9000 -p 9001:9001 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data --console-address ":9001"
+          # Wait for MinIO to be ready
+          for i in {1..30}; do
+            curl -sf http://localhost:9000/minio/health/live && break
+            echo "Waiting for MinIO..."
+            sleep 2
+          done
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -252,6 +253,7 @@ jobs:
             usage_end DATE,
             pod_labels JSONB,
             volume_labels JSONB,
+            all_labels JSONB,
             pod_usage_cpu_core_hours NUMERIC(24,6),
             pod_request_cpu_core_hours NUMERIC(24,6),
             pod_effective_usage_cpu_core_hours NUMERIC(24,6),
@@ -276,131 +278,101 @@ jobs:
             infrastructure_usage_cost JSONB,
             cost_category_id INTEGER
           );"
-          psql -h localhost -U koku -d koku -c "CREATE TABLE IF NOT EXISTS org1234567.reporting_enabledtagkeys (
+          psql -h localhost -U koku -d koku -c "CREATE TABLE IF NOT EXISTS org1234567.reporting_ocpenabledtagkeys (
             id SERIAL PRIMARY KEY,
             key VARCHAR(255),
             enabled BOOLEAN DEFAULT TRUE,
             provider_type VARCHAR(50)
           );"
-          psql -h localhost -U koku -d koku -c "INSERT INTO org1234567.reporting_enabledtagkeys (key, enabled, provider_type) VALUES
+          psql -h localhost -U koku -d koku -c "INSERT INTO org1234567.reporting_ocpenabledtagkeys (key, enabled, provider_type) VALUES
             ('app', TRUE, 'OCP'),
             ('environment', TRUE, 'OCP'),
-            ('version', TRUE, 'OCP')
+            ('version', TRUE, 'OCP'),
+            ('tier', TRUE, 'OCP'),
+            ('storage', TRUE, 'OCP')
             ON CONFLICT DO NOTHING;"
+
+      - name: Configure MinIO bucket
+        run: |
+          wget -q https://dl.min.io/client/mc/release/linux-amd64/mc
+          chmod +x mc
+          ./mc alias set local http://localhost:9000 minioadmin minioadmin
+          ./mc mb local/cost-management --ignore-existing
 
       - name: Generate test data with nise
         run: |
           mkdir -p e2e_test_data
 
-          # Create nise configuration
-          cat > e2e_test_data/nise_config.yml << 'EOF'
-          ---
-          generators:
-            - OCPGenerator:
-                start_date: last_month
-                end_date: last_month
-                nodes:
-                  - node:
-                      node_name: e2e-node-1
-                      node_labels: label_environment:production|label_app:web
-                      cpu_cores: 4
-                      memory_gig: 16
-                      resource_id: i-e2e001
-                      namespaces:
-                        frontend:
-                          pods:
-                            - pod:
-                                pod_name: web-1
-                                cpu_request: 2
-                                mem_request_gig: 4
-                                cpu_limit: 4
-                                mem_limit_gig: 8
-                                pod_seconds: 86400
-                                cpu_usage:
-                                  full_period: 2
-                                mem_usage_gig:
-                                  full_period: 4
-                                labels: label_app:web|label_tier:frontend
-                          volumes:
-                            - volume:
-                                volume_name: web-pvc
-                                storage_class: gp2
-                                volume_request_gig: 10
-                                labels: label_storage:web-data
-                                volume_claims:
-                                  - volume_claim:
-                                      volume_claim_name: web-pvc-claim
-                                      pod_name: web-1
-                                      labels: label_storage:web-data
-                                      capacity_gig: 10
-                                      volume_claim_usage_gig:
-                                        full_period: 7
-                  - node:
-                      node_name: e2e-node-2
-                      node_labels: label_environment:production|label_app:api
-                      cpu_cores: 8
-                      memory_gig: 32
-                      resource_id: i-e2e002
-                      namespaces:
-                        backend:
-                          pods:
-                            - pod:
-                                pod_name: api-1
-                                cpu_request: 4
-                                mem_request_gig: 8
-                                cpu_limit: 8
-                                mem_limit_gig: 16
-                                pod_seconds: 86400
-                                cpu_usage:
-                                  full_period: 4
-                                mem_usage_gig:
-                                  full_period: 8
-                                labels: label_app:api|label_tier:backend
-                          volumes:
-                            - volume:
-                                volume_name: api-pvc
-                                storage_class: io1
-                                volume_request_gig: 50
-                                labels: label_storage:api-cache
-                                volume_claims:
-                                  - volume_claim:
-                                      volume_claim_name: api-pvc-claim
-                                      pod_name: api-1
-                                      labels: label_storage:api-cache
-                                      capacity_gig: 50
-                                      volume_claim_usage_gig:
-                                        full_period: 35
-          EOF
+          # Calculate dates (last month)
+          START_DATE=$(date -d "last month" +%Y-%m-01)
+          END_DATE=$(date -d "$(date +%Y-%m-01) -1 day" +%Y-%m-%d)
+
+          # Use an existing working test manifest and update dates
+          cp test-manifests/ocp-only/ocp_scenario_01_basic_pod.yml e2e_test_data/nise_config.yml
+
+          # Update dates in the config
+          sed -i "s/start_date: .*/start_date: $START_DATE/" e2e_test_data/nise_config.yml
+          sed -i "s/end_date: .*/end_date: $END_DATE/" e2e_test_data/nise_config.yml
+
+          echo "Generating data for: $START_DATE to $END_DATE"
+          echo "Nise config:"
+          cat e2e_test_data/nise_config.yml
 
           # Generate nise data
           nise report ocp \
             --static-report-file e2e_test_data/nise_config.yml \
             --ocp-cluster-id e2e-test-cluster \
+            --start-date "$START_DATE" \
+            --end-date "$END_DATE" \
             --insights-upload e2e_test_data
 
-          # List generated files
-          echo "Generated files:"
-          ls -lh e2e_test_data/*.csv
+          # Find generated CSV directory (nise creates subdirectories)
+          echo "Looking for generated files..."
+          find e2e_test_data -name "*.csv" -type f 2>/dev/null | head -5
+          CSV_DIR=$(find e2e_test_data -type f -name "*.csv" 2>/dev/null | head -1 | xargs dirname 2>/dev/null || echo "")
+
+          if [ -z "$CSV_DIR" ]; then
+            echo "❌ No CSV files generated"
+            exit 1
+          fi
+
+          echo "Generated files in: $CSV_DIR"
+          ls -lh "$CSV_DIR"/*.csv
 
       - name: Convert CSV to Parquet and upload to MinIO
         env:
           PYTHONPATH: ${{ github.workspace }}
+          S3_ENDPOINT: http://localhost:9000
+          S3_ACCESS_KEY: minioadmin
+          S3_SECRET_KEY: minioadmin
+          S3_BUCKET: cost-management
+          ORG_ID: org1234567
+          OCP_PROVIDER_UUID: 00000000-0000-0000-0000-000000000001
+          OCP_CLUSTER_ID: e2e-test-cluster
         run: |
-          # Get cluster info from nise output
+          # Find the CSV directory
+          CSV_DIR=$(find e2e_test_data -type f -name "*.csv" 2>/dev/null | head -1 | xargs dirname 2>/dev/null)
           CLUSTER_ID="e2e-test-cluster"
-          PROVIDER_UUID=$(ls e2e_test_data/*.csv | head -1 | grep -oP '(?<=-)[0-9a-f-]+(?=-ocp)' || echo "00000000-0000-0000-0000-000000000001")
 
-          # Get current year and last month
+          # Get year and month from the generated files
           YEAR=$(date -d "last month" +%Y)
           MONTH=$(date -d "last month" +%m)
 
+          echo "CSV Directory: $CSV_DIR"
           echo "Cluster ID: $CLUSTER_ID"
-          echo "Provider UUID: $PROVIDER_UUID"
           echo "Year: $YEAR"
           echo "Month: $MONTH"
+          echo "S3 Bucket: $S3_BUCKET"
 
           # Convert and upload
-          python3 scripts/csv_to_parquet_minio.py e2e_test_data $CLUSTER_ID $YEAR $MONTH
+          python3 scripts/csv_to_parquet_minio.py "$CSV_DIR" $CLUSTER_ID $YEAR $MONTH
+
+          # List what was uploaded to MinIO
+          wget -q https://dl.min.io/client/mc/release/linux-amd64/mc -O /tmp/mc
+          chmod +x /tmp/mc
+          /tmp/mc alias set local http://localhost:9000 minioadmin minioadmin
+          echo "Files in MinIO:"
+          /tmp/mc ls --recursive local/cost-management/ | head -20
 
       - name: Run POC aggregation
         env:

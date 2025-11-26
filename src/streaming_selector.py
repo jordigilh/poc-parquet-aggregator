@@ -1,7 +1,9 @@
 """Automatic streaming mode selection based on data size and available memory."""
 
+from typing import Any, Dict, Optional
+
 import psutil
-from typing import Optional, Dict, Any
+
 from .logger import get_logger
 
 logger = get_logger("streaming_selector")
@@ -10,7 +12,7 @@ logger = get_logger("streaming_selector")
 def determine_streaming_mode(
     config: Dict[str, Any],
     estimated_rows: Optional[int] = None,
-    force_mode: Optional[bool] = None
+    force_mode: Optional[bool] = None,
 ) -> bool:
     """
     Automatically determine if streaming should be used based on data size and available memory.
@@ -31,7 +33,7 @@ def determine_streaming_mode(
     Returns:
         True if streaming should be used, False for in-memory
     """
-    perf_config = config.get('performance', {})
+    perf_config = config.get("performance", {})
 
     # 1. Check for force override (highest priority)
     if force_mode is not None:
@@ -40,30 +42,32 @@ def determine_streaming_mode(
         return force_mode
 
     # 2. Check for explicit manual configuration
-    use_streaming_config = perf_config.get('use_streaming', 'auto')
+    use_streaming_config = perf_config.get("use_streaming", "auto")
 
     # Handle string "true"/"false" from environment variables
     if isinstance(use_streaming_config, str):
-        if use_streaming_config.lower() == 'true':
+        if use_streaming_config.lower() == "true":
             use_streaming_config = True
-        elif use_streaming_config.lower() == 'false':
+        elif use_streaming_config.lower() == "false":
             use_streaming_config = False
         # else keep as string (e.g., 'auto')
 
     if isinstance(use_streaming_config, bool):
         # Explicit True or False
         mode_str = "streaming" if use_streaming_config else "in-memory"
-        logger.info(f"🎯 Streaming mode SET manually: {mode_str}",
-                   use_streaming=use_streaming_config)
+        logger.info(
+            f"🎯 Streaming mode SET manually: {mode_str}",
+            use_streaming=use_streaming_config,
+        )
         return use_streaming_config
 
     # 3. Auto-detection mode
-    if use_streaming_config == 'auto' or use_streaming_config not in [True, False]:
+    if use_streaming_config == "auto" or use_streaming_config not in [True, False]:
         logger.info("🤖 Auto-detecting optimal streaming mode...")
 
         # Get thresholds from config
-        row_threshold = perf_config.get('streaming_threshold_rows', 500000)
-        memory_threshold_gb = perf_config.get('streaming_memory_threshold_gb', 2.0)
+        row_threshold = perf_config.get("streaming_threshold_rows", 500000)
+        memory_threshold_gb = perf_config.get("streaming_memory_threshold_gb", 2.0)
 
         reasons = []
         should_stream = False
@@ -78,7 +82,7 @@ def determine_streaming_mode(
                 logger.info(
                     "📊 Row count exceeds threshold",
                     estimated_rows=estimated_rows,
-                    threshold=row_threshold
+                    threshold=row_threshold,
                 )
             else:
                 reasons.append(
@@ -87,7 +91,7 @@ def determine_streaming_mode(
                 logger.debug(
                     "📊 Row count within threshold",
                     estimated_rows=estimated_rows,
-                    threshold=row_threshold
+                    threshold=row_threshold,
                 )
         else:
             logger.debug("📊 Row count unknown, checking memory only")
@@ -103,7 +107,7 @@ def determine_streaming_mode(
                 "💾 System memory status",
                 available_gb=f"{available_memory_gb:.2f}",
                 total_gb=f"{total_memory_gb:.2f}",
-                used_percent=f"{memory_percent:.1f}%"
+                used_percent=f"{memory_percent:.1f}%",
             )
 
             if available_memory_gb < memory_threshold_gb:
@@ -114,7 +118,7 @@ def determine_streaming_mode(
                 logger.warning(
                     "⚠️  Low memory detected, enabling streaming",
                     available_gb=f"{available_memory_gb:.2f}",
-                    threshold_gb=memory_threshold_gb
+                    threshold_gb=memory_threshold_gb,
                 )
             else:
                 reasons.append(
@@ -123,7 +127,7 @@ def determine_streaming_mode(
                 logger.debug(
                     "✅ Sufficient memory available",
                     available_gb=f"{available_memory_gb:.2f}",
-                    threshold_gb=memory_threshold_gb
+                    threshold_gb=memory_threshold_gb,
                 )
         except Exception as e:
             logger.warning(
@@ -151,10 +155,7 @@ def determine_streaming_mode(
 
 
 def estimate_parquet_rows(
-    s3_filesystem,
-    bucket: str,
-    prefix: str,
-    sample_files: int = 5
+    s3_filesystem, bucket: str, prefix: str, sample_files: int = 5
 ) -> Optional[int]:
     """
     Estimate total row count by sampling Parquet files.
@@ -180,7 +181,9 @@ def estimate_parquet_rows(
             return None
 
         total_files = len(files)
-        logger.debug(f"Found {total_files} Parquet files, sampling {min(sample_files, total_files)}")
+        logger.debug(
+            f"Found {total_files} Parquet files, sampling {min(sample_files, total_files)}"
+        )
 
         # Sample a few files to estimate average rows per file
         sample_count = min(sample_files, total_files)
@@ -189,7 +192,7 @@ def estimate_parquet_rows(
         total_rows_sampled = 0
         for file_path in sampled_files:
             try:
-                with s3_filesystem.open(file_path, 'rb') as f:
+                with s3_filesystem.open(file_path, "rb") as f:
                     parquet_file = pq.ParquetFile(f)
                     rows = parquet_file.metadata.num_rows
                     total_rows_sampled += rows
@@ -219,7 +222,7 @@ def estimate_parquet_rows(
 def log_streaming_decision(
     use_streaming: bool,
     estimated_rows: Optional[int] = None,
-    chunk_size: Optional[int] = None
+    chunk_size: Optional[int] = None,
 ) -> None:
     """
     Log the final streaming mode decision with context.
@@ -235,7 +238,7 @@ def log_streaming_decision(
             "mode": "streaming",
             "memory_usage": "constant (~20-50 MB)",
             "performance": "10-20% slower than in-memory",
-            "chunk_size": chunk_size
+            "chunk_size": chunk_size,
         }
         if estimated_rows:
             details["estimated_rows"] = f"{estimated_rows:,}"
@@ -246,7 +249,7 @@ def log_streaming_decision(
         details = {
             "mode": "in-memory",
             "memory_usage": "proportional to data size",
-            "performance": "fastest for small/medium data"
+            "performance": "fastest for small/medium data",
         }
         if estimated_rows:
             details["estimated_rows"] = f"{estimated_rows:,}"
@@ -255,4 +258,3 @@ def log_streaming_decision(
             details["estimated_memory_mb"] = f"~{estimated_mb:.0f}"
 
         logger.info(msg, **details)
-

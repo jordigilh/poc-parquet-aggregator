@@ -19,9 +19,11 @@ Complexity: MEDIUM-HIGH (7/10)
 """
 
 import json
+from typing import Dict, List, Set
+
 import pandas as pd
-from typing import Dict, Set, List
-from .utils import get_logger, PerformanceTimer
+
+from .utils import PerformanceTimer, get_logger
 
 
 class TagMatcher:
@@ -34,9 +36,9 @@ class TagMatcher:
     """
 
     # Special OpenShift tag keys
-    TAG_OPENSHIFT_CLUSTER = 'openshift_cluster'
-    TAG_OPENSHIFT_NODE = 'openshift_node'
-    TAG_OPENSHIFT_PROJECT = 'openshift_project'
+    TAG_OPENSHIFT_CLUSTER = "openshift_cluster"
+    TAG_OPENSHIFT_NODE = "openshift_node"
+    TAG_OPENSHIFT_PROJECT = "openshift_project"
 
     SPECIAL_TAGS = [TAG_OPENSHIFT_CLUSTER, TAG_OPENSHIFT_NODE, TAG_OPENSHIFT_PROJECT]
 
@@ -57,7 +59,7 @@ class TagMatcher:
         cluster_id: str,
         pod_usage_df: pd.DataFrame,
         storage_usage_df: pd.DataFrame = None,
-        cluster_alias: str = None
+        cluster_alias: str = None,
     ) -> Dict[str, Set[str]]:
         """
         Extract all unique OCP values for tag matching.
@@ -79,56 +81,56 @@ class TagMatcher:
         """
         with PerformanceTimer("Extract OCP tag values", self.logger):
             tag_values = {
-                'cluster_ids': set(),
-                'cluster_aliases': set(),
-                'node_names': set(),
-                'namespaces': set(),
-                'pod_labels': set(),
-                'volume_labels': set()
+                "cluster_ids": set(),
+                "cluster_aliases": set(),
+                "node_names": set(),
+                "namespaces": set(),
+                "pod_labels": set(),
+                "volume_labels": set(),
             }
 
             # Extract cluster IDs from data (multi-cluster support)
-            if not pod_usage_df.empty and 'cluster_id' in pod_usage_df.columns:
-                cluster_ids = pod_usage_df['cluster_id'].dropna().unique()
-                tag_values['cluster_ids'] = set(cluster_ids)
+            if not pod_usage_df.empty and "cluster_id" in pod_usage_df.columns:
+                cluster_ids = pod_usage_df["cluster_id"].dropna().unique()
+                tag_values["cluster_ids"] = set(cluster_ids)
                 self.logger.info(
                     f"Extracted {len(tag_values['cluster_ids'])} unique cluster IDs from data: {sorted(tag_values['cluster_ids'])}"
                 )
             else:
                 # Fallback to parameter if cluster_id column doesn't exist
-                tag_values['cluster_ids'] = {cluster_id}
+                tag_values["cluster_ids"] = {cluster_id}
                 self.logger.info(
                     f"Using cluster_id parameter (no cluster_id column in data): {cluster_id}"
                 )
 
             # Extract node names
-            if not pod_usage_df.empty and 'node' in pod_usage_df.columns:
-                node_names = pod_usage_df['node'].dropna().unique()
-                tag_values['node_names'] = set(node_names)
+            if not pod_usage_df.empty and "node" in pod_usage_df.columns:
+                node_names = pod_usage_df["node"].dropna().unique()
+                tag_values["node_names"] = set(node_names)
                 self.logger.info(
                     f"Extracted {len(tag_values['node_names'])} unique node names"
                 )
 
             # Extract namespaces
-            if not pod_usage_df.empty and 'namespace' in pod_usage_df.columns:
-                namespaces = pod_usage_df['namespace'].dropna().unique()
-                tag_values['namespaces'] = set(namespaces)
+            if not pod_usage_df.empty and "namespace" in pod_usage_df.columns:
+                namespaces = pod_usage_df["namespace"].dropna().unique()
+                tag_values["namespaces"] = set(namespaces)
                 self.logger.info(
                     f"Extracted {len(tag_values['namespaces'])} unique namespaces"
                 )
 
             # Extract cluster_aliases (Gap #1 fix)
             if cluster_alias:
-                tag_values['cluster_aliases'] = {cluster_alias}
+                tag_values["cluster_aliases"] = {cluster_alias}
                 self.logger.info(f"Added cluster_alias: {cluster_alias}")
 
             # Extract pod_labels (Gap #2 - part 1)
-            if not pod_usage_df.empty and 'pod_labels' in pod_usage_df.columns:
+            if not pod_usage_df.empty and "pod_labels" in pod_usage_df.columns:
                 pod_label_count = 0
-                for labels_json in pod_usage_df['pod_labels'].dropna().unique():
+                for labels_json in pod_usage_df["pod_labels"].dropna().unique():
                     labels_dict = self.parse_ocp_labels(labels_json)
                     for key, value in labels_dict.items():
-                        tag_values['pod_labels'].add(f'{key}={value}')
+                        tag_values["pod_labels"].add(f"{key}={value}")
                         pod_label_count += 1
 
                 self.logger.info(
@@ -140,19 +142,25 @@ class TagMatcher:
                 volume_label_count = 0
 
                 # Extract from persistentvolume_labels
-                if 'persistentvolume_labels' in storage_usage_df.columns:
-                    for labels_json in storage_usage_df['persistentvolume_labels'].dropna().unique():
+                if "persistentvolume_labels" in storage_usage_df.columns:
+                    for labels_json in (
+                        storage_usage_df["persistentvolume_labels"].dropna().unique()
+                    ):
                         labels_dict = self.parse_ocp_labels(labels_json)
                         for key, value in labels_dict.items():
-                            tag_values['volume_labels'].add(f'{key}={value}')
+                            tag_values["volume_labels"].add(f"{key}={value}")
                             volume_label_count += 1
 
                 # Extract from persistentvolumeclaim_labels
-                if 'persistentvolumeclaim_labels' in storage_usage_df.columns:
-                    for labels_json in storage_usage_df['persistentvolumeclaim_labels'].dropna().unique():
+                if "persistentvolumeclaim_labels" in storage_usage_df.columns:
+                    for labels_json in (
+                        storage_usage_df["persistentvolumeclaim_labels"]
+                        .dropna()
+                        .unique()
+                    ):
                         labels_dict = self.parse_ocp_labels(labels_json)
                         for key, value in labels_dict.items():
-                            tag_values['volume_labels'].add(f'{key}={value}')
+                            tag_values["volume_labels"].add(f"{key}={value}")
                             volume_label_count += 1
 
                 self.logger.info(
@@ -160,23 +168,23 @@ class TagMatcher:
                 )
 
             total_values = (
-                len(tag_values['cluster_ids']) +
-                len(tag_values['cluster_aliases']) +
-                len(tag_values['node_names']) +
-                len(tag_values['namespaces']) +
-                len(tag_values['pod_labels']) +
-                len(tag_values['volume_labels'])
+                len(tag_values["cluster_ids"])
+                + len(tag_values["cluster_aliases"])
+                + len(tag_values["node_names"])
+                + len(tag_values["namespaces"])
+                + len(tag_values["pod_labels"])
+                + len(tag_values["volume_labels"])
             )
 
             self.logger.info(
                 "✓ Extracted OCP tag values",
-                clusters=len(tag_values['cluster_ids']),
-                cluster_aliases=len(tag_values['cluster_aliases']),
-                nodes=len(tag_values['node_names']),
-                namespaces=len(tag_values['namespaces']),
-                pod_labels=len(tag_values['pod_labels']),
-                volume_labels=len(tag_values['volume_labels']),
-                total=total_values
+                clusters=len(tag_values["cluster_ids"]),
+                cluster_aliases=len(tag_values["cluster_aliases"]),
+                nodes=len(tag_values["node_names"]),
+                namespaces=len(tag_values["namespaces"]),
+                pod_labels=len(tag_values["pod_labels"]),
+                volume_labels=len(tag_values["volume_labels"]),
+                total=total_values,
             )
 
             return tag_values
@@ -200,15 +208,15 @@ class TagMatcher:
 
         try:
             # Handle both JSON dict and pipe-separated format
-            if labels_json.startswith('{'):
+            if labels_json.startswith("{"):
                 # JSON format: {"app": "frontend"}
                 return json.loads(labels_json)
-            elif '|' in labels_json:
+            elif "|" in labels_json:
                 # Pipe format: app:frontend|tier:web
                 labels = {}
-                for pair in labels_json.split('|'):
-                    if ':' in pair:
-                        key, value = pair.split(':', 1)
+                for pair in labels_json.split("|"):
+                    if ":" in pair:
+                        key, value = pair.split(":", 1)
                         labels[key.strip()] = value.strip()
                 return labels
             else:
@@ -227,7 +235,7 @@ class TagMatcher:
         Returns:
             Dictionary of tags, or empty dict if parsing fails
         """
-        if pd.isna(tags_json) or tags_json == '' or tags_json == '{}':
+        if pd.isna(tags_json) or tags_json == "" or tags_json == "{}":
             return {}
 
         try:
@@ -240,9 +248,7 @@ class TagMatcher:
             return {}
 
     def filter_by_enabled_keys(
-        self,
-        aws_tags: Dict[str, str],
-        enabled_keys: Set[str]
+        self, aws_tags: Dict[str, str], enabled_keys: Set[str]
     ) -> Dict[str, str]:
         """
         Filter AWS tags to only include enabled keys.
@@ -270,7 +276,7 @@ class TagMatcher:
         self,
         aws_df: pd.DataFrame,
         ocp_tag_values: Dict[str, Set[str]],
-        enabled_keys: Set[str] = None
+        enabled_keys: Set[str] = None,
     ) -> pd.DataFrame:
         """
         Match AWS resources to OCP by tags.
@@ -307,66 +313,64 @@ class TagMatcher:
             aws_df = aws_df.copy()
 
             # Initialize tag matching columns (required even for empty DataFrames)
-            aws_df['tag_matched'] = False
-            aws_df['matched_tag'] = None
-            aws_df['matched_ocp_cluster'] = None
-            aws_df['matched_ocp_node'] = None
-            aws_df['matched_ocp_namespace'] = None
+            aws_df["tag_matched"] = False
+            aws_df["matched_tag"] = None
+            aws_df["matched_ocp_cluster"] = None
+            aws_df["matched_ocp_node"] = None
+            aws_df["matched_ocp_namespace"] = None
 
             if aws_df.empty:
                 self.logger.warning("AWS DataFrame is empty, no matching possible")
                 return aws_df
 
             # Validate AWS DataFrame has required column
-            if 'resourcetags' not in aws_df.columns:
+            if "resourcetags" not in aws_df.columns:
                 raise ValueError("AWS DataFrame missing 'resourcetags' column")
 
             # Track matching statistics
             stats = {
-                'total_aws_resources': len(aws_df),
-                'already_matched_by_resource_id': 0,
-                'matched_by_cluster_tag': 0,
-                'matched_by_cluster_alias': 0,
-                'matched_by_node_tag': 0,
-                'matched_by_namespace_tag': 0,
-                'matched_by_pod_labels': 0,
-                'matched_by_volume_labels': 0,
-                'total_tag_matched': 0,
-                'tags_parsed': 0,
-                'tags_failed_to_parse': 0
+                "total_aws_resources": len(aws_df),
+                "already_matched_by_resource_id": 0,
+                "matched_by_cluster_tag": 0,
+                "matched_by_cluster_alias": 0,
+                "matched_by_node_tag": 0,
+                "matched_by_namespace_tag": 0,
+                "matched_by_pod_labels": 0,
+                "matched_by_volume_labels": 0,
+                "total_tag_matched": 0,
+                "tags_parsed": 0,
+                "tags_failed_to_parse": 0,
             }
 
             # Skip resources already matched by resource ID
-            if 'resource_id_matched' in aws_df.columns:
-                already_matched = aws_df['resource_id_matched'].sum()
-                stats['already_matched_by_resource_id'] = already_matched
+            if "resource_id_matched" in aws_df.columns:
+                already_matched = aws_df["resource_id_matched"].sum()
+                stats["already_matched_by_resource_id"] = already_matched
                 self.logger.info(
                     f"Skipping {already_matched} resources already matched by resource ID"
                 )
 
-            self.logger.info(
-                f"Starting tag matching for {len(aws_df)} AWS resources"
-            )
+            self.logger.info(f"Starting tag matching for {len(aws_df)} AWS resources")
 
             # Iterate through AWS resources
             for idx, row in aws_df.iterrows():
                 # Skip if already matched by resource ID
-                if 'resource_id_matched' in row and row['resource_id_matched']:
+                if "resource_id_matched" in row and row["resource_id_matched"]:
                     continue
 
                 # Skip if already matched by tag (in case of duplicate processing)
-                if row['tag_matched']:
+                if row["tag_matched"]:
                     continue
 
                 # Parse AWS tags
-                tags_json = row['resourcetags']
+                tags_json = row["resourcetags"]
                 aws_tags = self.parse_aws_tags(tags_json)
 
                 if not aws_tags:
-                    stats['tags_failed_to_parse'] += 1
+                    stats["tags_failed_to_parse"] += 1
                     continue
 
-                stats['tags_parsed'] += 1
+                stats["tags_parsed"] += 1
 
                 # Filter by enabled keys
                 if enabled_keys:
@@ -384,62 +388,80 @@ class TagMatcher:
                     cluster_value = aws_tags[self.TAG_OPENSHIFT_CLUSTER]
 
                     # Check against cluster_id
-                    if cluster_value in ocp_tag_values['cluster_ids']:
-                        aws_df.at[idx, 'tag_matched'] = True
-                        aws_df.at[idx, 'matched_tag'] = f'{self.TAG_OPENSHIFT_CLUSTER}={cluster_value}'
-                        aws_df.at[idx, 'matched_ocp_cluster'] = cluster_value
-                        stats['matched_by_cluster_tag'] += 1
+                    if cluster_value in ocp_tag_values["cluster_ids"]:
+                        aws_df.at[idx, "tag_matched"] = True
+                        aws_df.at[
+                            idx, "matched_tag"
+                        ] = f"{self.TAG_OPENSHIFT_CLUSTER}={cluster_value}"
+                        aws_df.at[idx, "matched_ocp_cluster"] = cluster_value
+                        stats["matched_by_cluster_tag"] += 1
                         matched = True
-                        matched_tag_str = f'{self.TAG_OPENSHIFT_CLUSTER}={cluster_value}'
+                        matched_tag_str = (
+                            f"{self.TAG_OPENSHIFT_CLUSTER}={cluster_value}"
+                        )
 
                     # Also check against cluster_alias (Gap #1 fix)
-                    elif cluster_value in ocp_tag_values.get('cluster_aliases', set()):
-                        aws_df.at[idx, 'tag_matched'] = True
-                        aws_df.at[idx, 'matched_tag'] = f'{self.TAG_OPENSHIFT_CLUSTER}={cluster_value} (alias)'
-                        aws_df.at[idx, 'matched_ocp_cluster'] = cluster_value
-                        stats['matched_by_cluster_alias'] += 1
+                    elif cluster_value in ocp_tag_values.get("cluster_aliases", set()):
+                        aws_df.at[idx, "tag_matched"] = True
+                        aws_df.at[
+                            idx, "matched_tag"
+                        ] = f"{self.TAG_OPENSHIFT_CLUSTER}={cluster_value} (alias)"
+                        aws_df.at[idx, "matched_ocp_cluster"] = cluster_value
+                        stats["matched_by_cluster_alias"] += 1
                         matched = True
-                        matched_tag_str = f'{self.TAG_OPENSHIFT_CLUSTER}={cluster_value} (alias)'
+                        matched_tag_str = (
+                            f"{self.TAG_OPENSHIFT_CLUSTER}={cluster_value} (alias)"
+                        )
 
                 # Priority 2: Node tag
                 if not matched and self.TAG_OPENSHIFT_NODE in aws_tags:
                     node_value = aws_tags[self.TAG_OPENSHIFT_NODE]
-                    if node_value in ocp_tag_values['node_names']:
-                        aws_df.at[idx, 'tag_matched'] = True
-                        aws_df.at[idx, 'matched_tag'] = f'{self.TAG_OPENSHIFT_NODE}={node_value}'
-                        aws_df.at[idx, 'matched_ocp_node'] = node_value
-                        stats['matched_by_node_tag'] += 1
+                    if node_value in ocp_tag_values["node_names"]:
+                        aws_df.at[idx, "tag_matched"] = True
+                        aws_df.at[
+                            idx, "matched_tag"
+                        ] = f"{self.TAG_OPENSHIFT_NODE}={node_value}"
+                        aws_df.at[idx, "matched_ocp_node"] = node_value
+                        stats["matched_by_node_tag"] += 1
                         matched = True
-                        matched_tag_str = f'{self.TAG_OPENSHIFT_NODE}={node_value}'
+                        matched_tag_str = f"{self.TAG_OPENSHIFT_NODE}={node_value}"
 
                 # Priority 3: Project/Namespace tag
                 if not matched and self.TAG_OPENSHIFT_PROJECT in aws_tags:
                     namespace_value = aws_tags[self.TAG_OPENSHIFT_PROJECT]
-                    if namespace_value in ocp_tag_values['namespaces']:
-                        aws_df.at[idx, 'tag_matched'] = True
-                        aws_df.at[idx, 'matched_tag'] = f'{self.TAG_OPENSHIFT_PROJECT}={namespace_value}'
-                        aws_df.at[idx, 'matched_ocp_namespace'] = namespace_value
-                        stats['matched_by_namespace_tag'] += 1
+                    if namespace_value in ocp_tag_values["namespaces"]:
+                        aws_df.at[idx, "tag_matched"] = True
+                        aws_df.at[
+                            idx, "matched_tag"
+                        ] = f"{self.TAG_OPENSHIFT_PROJECT}={namespace_value}"
+                        aws_df.at[idx, "matched_ocp_namespace"] = namespace_value
+                        stats["matched_by_namespace_tag"] += 1
                         matched = True
-                        matched_tag_str = f'{self.TAG_OPENSHIFT_PROJECT}={namespace_value}'
+                        matched_tag_str = (
+                            f"{self.TAG_OPENSHIFT_PROJECT}={namespace_value}"
+                        )
 
                 # Priority 4: Generic tags matched against pod_labels (Gap #2 - part 1)
                 # Trino SQL line 9: any_match(..., x->strpos(ocp.pod_labels, ...) != 0)
                 if not matched:
                     for tag_key, tag_value in aws_tags.items():
                         # Skip special OpenShift tags (already checked above)
-                        if tag_key in [self.TAG_OPENSHIFT_CLUSTER, self.TAG_OPENSHIFT_NODE, self.TAG_OPENSHIFT_PROJECT]:
+                        if tag_key in [
+                            self.TAG_OPENSHIFT_CLUSTER,
+                            self.TAG_OPENSHIFT_NODE,
+                            self.TAG_OPENSHIFT_PROJECT,
+                        ]:
                             continue
 
                         # Check if this tag appears in pod_labels
-                        tag_str = f'{tag_key}={tag_value}'
-                        if tag_str in ocp_tag_values.get('pod_labels', set()):
-                            aws_df.at[idx, 'tag_matched'] = True
-                            aws_df.at[idx, 'matched_tag'] = f'{tag_str} (pod_labels)'
-                            aws_df.at[idx, 'match_type'] = 'pod_labels'
-                            stats['matched_by_pod_labels'] += 1
+                        tag_str = f"{tag_key}={tag_value}"
+                        if tag_str in ocp_tag_values.get("pod_labels", set()):
+                            aws_df.at[idx, "tag_matched"] = True
+                            aws_df.at[idx, "matched_tag"] = f"{tag_str} (pod_labels)"
+                            aws_df.at[idx, "match_type"] = "pod_labels"
+                            stats["matched_by_pod_labels"] += 1
                             matched = True
-                            matched_tag_str = f'{tag_str} (pod_labels)'
+                            matched_tag_str = f"{tag_str} (pod_labels)"
                             break
 
                 # Priority 5: Generic tags matched against volume_labels (Gap #2 - part 2)
@@ -447,58 +469,62 @@ class TagMatcher:
                 if not matched:
                     for tag_key, tag_value in aws_tags.items():
                         # Skip special OpenShift tags
-                        if tag_key in [self.TAG_OPENSHIFT_CLUSTER, self.TAG_OPENSHIFT_NODE, self.TAG_OPENSHIFT_PROJECT]:
+                        if tag_key in [
+                            self.TAG_OPENSHIFT_CLUSTER,
+                            self.TAG_OPENSHIFT_NODE,
+                            self.TAG_OPENSHIFT_PROJECT,
+                        ]:
                             continue
 
                         # Check if this tag appears in volume_labels
-                        tag_str = f'{tag_key}={tag_value}'
-                        if tag_str in ocp_tag_values.get('volume_labels', set()):
-                            aws_df.at[idx, 'tag_matched'] = True
-                            aws_df.at[idx, 'matched_tag'] = f'{tag_str} (volume_labels)'
-                            aws_df.at[idx, 'match_type'] = 'volume_labels'
-                            stats['matched_by_volume_labels'] += 1
+                        tag_str = f"{tag_key}={tag_value}"
+                        if tag_str in ocp_tag_values.get("volume_labels", set()):
+                            aws_df.at[idx, "tag_matched"] = True
+                            aws_df.at[idx, "matched_tag"] = f"{tag_str} (volume_labels)"
+                            aws_df.at[idx, "match_type"] = "volume_labels"
+                            stats["matched_by_volume_labels"] += 1
                             matched = True
-                            matched_tag_str = f'{tag_str} (volume_labels)'
+                            matched_tag_str = f"{tag_str} (volume_labels)"
                             break
 
                 if matched:
-                    self.logger.debug(
-                        f"Matched AWS resource by tag: {matched_tag_str}"
-                    )
+                    self.logger.debug(f"Matched AWS resource by tag: {matched_tag_str}")
 
             # Calculate total matched
-            stats['total_tag_matched'] = aws_df['tag_matched'].sum()
+            stats["total_tag_matched"] = aws_df["tag_matched"].sum()
 
             # Calculate combined match rate (resource ID + tags)
-            if 'resource_id_matched' in aws_df.columns:
+            if "resource_id_matched" in aws_df.columns:
                 total_matched = (
-                    aws_df['resource_id_matched'] | aws_df['tag_matched']
+                    aws_df["resource_id_matched"] | aws_df["tag_matched"]
                 ).sum()
-                stats['combined_match_rate'] = (
-                    total_matched / stats['total_aws_resources'] * 100
-                    if stats['total_aws_resources'] > 0 else 0
+                stats["combined_match_rate"] = (
+                    total_matched / stats["total_aws_resources"] * 100
+                    if stats["total_aws_resources"] > 0
+                    else 0
                 )
             else:
-                stats['combined_match_rate'] = (
-                    stats['total_tag_matched'] / stats['total_aws_resources'] * 100
-                    if stats['total_aws_resources'] > 0 else 0
+                stats["combined_match_rate"] = (
+                    stats["total_tag_matched"] / stats["total_aws_resources"] * 100
+                    if stats["total_aws_resources"] > 0
+                    else 0
                 )
 
             self.logger.info(
                 "✓ Tag matching complete",
-                total_aws=stats['total_aws_resources'],
-                tag_matched=stats['total_tag_matched'],
-                by_cluster=stats['matched_by_cluster_tag'],
-                by_cluster_alias=stats['matched_by_cluster_alias'],
-                by_node=stats['matched_by_node_tag'],
-                by_namespace=stats['matched_by_namespace_tag'],
-                by_pod_labels=stats['matched_by_pod_labels'],
-                by_volume_labels=stats['matched_by_volume_labels'],
-                combined_match_rate=f"{stats['combined_match_rate']:.2f}%"
+                total_aws=stats["total_aws_resources"],
+                tag_matched=stats["total_tag_matched"],
+                by_cluster=stats["matched_by_cluster_tag"],
+                by_cluster_alias=stats["matched_by_cluster_alias"],
+                by_node=stats["matched_by_node_tag"],
+                by_namespace=stats["matched_by_namespace_tag"],
+                by_pod_labels=stats["matched_by_pod_labels"],
+                by_volume_labels=stats["matched_by_volume_labels"],
+                combined_match_rate=f"{stats['combined_match_rate']:.2f}%",
             )
 
             # Log warning if still low match rate
-            if stats['combined_match_rate'] < 70:
+            if stats["combined_match_rate"] < 70:
                 self.logger.warning(
                     f"Low combined match rate: {stats['combined_match_rate']:.2f}% "
                     "(Some AWS resources may not have OpenShift tags)"
@@ -516,40 +542,44 @@ class TagMatcher:
         Returns:
             Dictionary with summary statistics
         """
-        if 'tag_matched' not in aws_df.columns:
+        if "tag_matched" not in aws_df.columns:
             return {"status": "not_matched"}
 
         summary = {
             "total_resources": len(aws_df),
-            "tag_matched": aws_df['tag_matched'].sum(),
+            "tag_matched": aws_df["tag_matched"].sum(),
             "matched_by_cluster": (
-                (aws_df['matched_ocp_cluster'].notna()).sum()
-                if 'matched_ocp_cluster' in aws_df.columns else 0
+                (aws_df["matched_ocp_cluster"].notna()).sum()
+                if "matched_ocp_cluster" in aws_df.columns
+                else 0
             ),
             "matched_by_node": (
-                (aws_df['matched_ocp_node'].notna()).sum()
-                if 'matched_ocp_node' in aws_df.columns else 0
+                (aws_df["matched_ocp_node"].notna()).sum()
+                if "matched_ocp_node" in aws_df.columns
+                else 0
             ),
             "matched_by_namespace": (
-                (aws_df['matched_ocp_namespace'].notna()).sum()
-                if 'matched_ocp_namespace' in aws_df.columns else 0
-            )
+                (aws_df["matched_ocp_namespace"].notna()).sum()
+                if "matched_ocp_namespace" in aws_df.columns
+                else 0
+            ),
         }
 
         # Combined matching statistics
-        if 'resource_id_matched' in aws_df.columns:
-            summary["resource_id_matched"] = aws_df['resource_id_matched'].sum()
+        if "resource_id_matched" in aws_df.columns:
+            summary["resource_id_matched"] = aws_df["resource_id_matched"].sum()
             summary["combined_matched"] = (
-                aws_df['resource_id_matched'] | aws_df['tag_matched']
+                aws_df["resource_id_matched"] | aws_df["tag_matched"]
             ).sum()
             summary["combined_match_rate"] = (
                 summary["combined_matched"] / summary["total_resources"] * 100
-                if summary["total_resources"] > 0 else 0
+                if summary["total_resources"] > 0
+                else 0
             )
 
-        if 'lineitem_productcode' in aws_df.columns:
+        if "lineitem_productcode" in aws_df.columns:
             summary["tag_matched_by_product"] = (
-                aws_df[aws_df['tag_matched']]['lineitem_productcode']
+                aws_df[aws_df["tag_matched"]]["lineitem_productcode"]
                 .value_counts()
                 .to_dict()
             )
@@ -558,9 +588,7 @@ class TagMatcher:
         return summary
 
     def validate_tag_matching_results(
-        self,
-        aws_df: pd.DataFrame,
-        expected_match_rate_min: float = 0.0
+        self, aws_df: pd.DataFrame, expected_match_rate_min: float = 0.0
     ) -> bool:
         """
         Validate that tag matching results are reasonable.
@@ -572,16 +600,16 @@ class TagMatcher:
         Returns:
             True if validation passes, raises exception otherwise
         """
-        if 'tag_matched' not in aws_df.columns:
+        if "tag_matched" not in aws_df.columns:
             raise ValueError("AWS DataFrame missing 'tag_matched' column")
 
         # Calculate combined match rate
-        if 'resource_id_matched' in aws_df.columns:
+        if "resource_id_matched" in aws_df.columns:
             matched_count = (
-                aws_df['resource_id_matched'] | aws_df['tag_matched']
+                aws_df["resource_id_matched"] | aws_df["tag_matched"]
             ).sum()
         else:
-            matched_count = aws_df['tag_matched'].sum()
+            matched_count = aws_df["tag_matched"].sum()
 
         total_count = len(aws_df)
         match_rate = matched_count / total_count if total_count > 0 else 0
@@ -596,4 +624,3 @@ class TagMatcher:
 
         self.logger.debug("✓ Tag matching validation passed")
         return True
-

@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import datetime, date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -23,12 +23,12 @@ def setup_logging(level: str = "INFO", log_format: str = "console"):
         processors = [
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.stdlib.add_log_level,
-            structlog.processors.JSONRenderer()
+            structlog.processors.JSONRenderer(),
         ]
     else:
         processors = [
             structlog.stdlib.add_log_level,
-            structlog.dev.ConsoleRenderer(colors=True)
+            structlog.dev.ConsoleRenderer(colors=True),
         ]
 
     structlog.configure(
@@ -69,21 +69,21 @@ def parse_json_labels(labels_str: Optional[str]) -> Dict[str, str]:
     Returns:
         Dictionary of labels
     """
-    if not labels_str or labels_str == 'null' or labels_str == '':
+    if not labels_str or labels_str == "null" or labels_str == "":
         return {}
 
     labels_str = str(labels_str).strip()
 
     # Handle pipe-delimited format (from nise CSV)
-    if '|' in labels_str or (':' in labels_str and '{' not in labels_str):
+    if "|" in labels_str or (":" in labels_str and "{" not in labels_str):
         result = {}
-        pairs = labels_str.split('|') if '|' in labels_str else [labels_str]
+        pairs = labels_str.split("|") if "|" in labels_str else [labels_str]
         for pair in pairs:
             pair = pair.strip()
-            if ':' in pair:
-                key, value = pair.split(':', 1)
+            if ":" in pair:
+                key, value = pair.split(":", 1)
                 # Remove 'label_' prefix if present
-                key = key.replace('label_', '').strip()
+                key = key.replace("label_", "").strip()
                 result[key] = value.strip()
         return result
 
@@ -94,7 +94,9 @@ def parse_json_labels(labels_str: Optional[str]) -> Dict[str, str]:
         return {}
 
 
-def filter_labels_by_enabled_keys(labels: Dict[str, str], enabled_keys: List[str]) -> Dict[str, str]:
+def filter_labels_by_enabled_keys(
+    labels: Dict[str, str], enabled_keys: List[str]
+) -> Dict[str, str]:
     """Filter labels to only include enabled keys.
 
     Args:
@@ -141,14 +143,16 @@ def labels_to_json_string(labels: Dict[str, str]) -> str:
     """
     # Handle NaN, None, or empty
     if labels is None or (isinstance(labels, float) and pd.isna(labels)) or not labels:
-        return '{}'
+        return "{}"
 
     # json.dumps with sort_keys=True matches Trino's json_format() behavior:
     # - Sorted keys for deterministic output
     # - UTF-8 encoding
     # - Compact format (no extra whitespace) - use separators=(',', ':')
     # - Proper escaping of special characters
-    result = json.dumps(labels, sort_keys=True, ensure_ascii=False, separators=(',', ':'))
+    result = json.dumps(
+        labels, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+    )
 
     # Validate it's valid JSON
     try:
@@ -156,7 +160,7 @@ def labels_to_json_string(labels: Dict[str, str]) -> str:
     except json.JSONDecodeError as e:
         logger = get_logger("json_validation")
         logger.error(f"Generated invalid JSON: {result}, error: {e}")
-        return '{}'
+        return "{}"
 
     return result
 
@@ -262,7 +266,9 @@ def parse_date(date_str: str) -> date:
     return datetime.strptime(date_str, "%Y-%m-%d").date()
 
 
-def calculate_effective_usage(usage: Optional[float], request: Optional[float]) -> Optional[float]:
+def calculate_effective_usage(
+    usage: Optional[float], request: Optional[float]
+) -> Optional[float]:
     """Calculate effective usage (max of usage and request).
 
     This replicates Trino's GREATEST(usage, request) logic.
@@ -288,7 +294,7 @@ def round_decimal(value: float, precision: int = 9) -> Decimal:
         Decimal value
     """
     if value is None:
-        return Decimal('0')
+        return Decimal("0")
     return Decimal(str(round(value, precision)))
 
 
@@ -320,14 +326,13 @@ class PerformanceTimer:
 
         if exc_type is None:
             self.logger.info(
-                f"Completed: {self.name}",
-                duration_seconds=round(duration, 3)
+                f"Completed: {self.name}", duration_seconds=round(duration, 3)
             )
         else:
             self.logger.error(
                 f"Failed: {self.name}",
                 duration_seconds=round(duration, 3),
-                error=str(exc_val)
+                error=str(exc_val),
             )
 
     @property
@@ -351,7 +356,7 @@ def format_bytes(bytes_value: int) -> str:
     Returns:
         Formatted string (e.g., "1.5 MB", "2.3 GB")
     """
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
         if abs(bytes_value) < 1024.0:
             return f"{bytes_value:.1f} {unit}"
         bytes_value /= 1024.0
@@ -379,7 +384,6 @@ def format_duration(seconds: float) -> str:
         return f"{hours}h {minutes}m"
 
 
-
 def optimize_dataframe_memory(df, categorical_columns=None, logger=None):
     """Optimize DataFrame memory usage.
 
@@ -391,8 +395,9 @@ def optimize_dataframe_memory(df, categorical_columns=None, logger=None):
     Returns:
         Optimized DataFrame
     """
-    import pandas as pd
     import gc
+
+    import pandas as pd
 
     if df.empty:
         return df
@@ -402,15 +407,15 @@ def optimize_dataframe_memory(df, categorical_columns=None, logger=None):
     # Convert string columns to categorical if specified
     if categorical_columns:
         for col in categorical_columns:
-            if col in df.columns and df[col].dtype == 'object':
-                df[col] = df[col].astype('category')
+            if col in df.columns and df[col].dtype == "object":
+                df[col] = df[col].astype("category")
 
     # Downcast numeric columns
-    for col in df.select_dtypes(include=['float64']).columns:
-        df[col] = pd.to_numeric(df[col], downcast='float')
+    for col in df.select_dtypes(include=["float64"]).columns:
+        df[col] = pd.to_numeric(df[col], downcast="float")
 
-    for col in df.select_dtypes(include=['int64']).columns:
-        df[col] = pd.to_numeric(df[col], downcast='integer')
+    for col in df.select_dtypes(include=["int64"]).columns:
+        df[col] = pd.to_numeric(df[col], downcast="integer")
 
     final_memory = df.memory_usage(deep=True).sum()
     reduction = (1 - final_memory / initial_memory) * 100
@@ -420,7 +425,7 @@ def optimize_dataframe_memory(df, categorical_columns=None, logger=None):
             "Memory optimization complete",
             initial=format_bytes(initial_memory),
             final=format_bytes(final_memory),
-            reduction_percent=f"{reduction:.1f}%"
+            reduction_percent=f"{reduction:.1f}%",
         )
 
     # Force garbage collection
@@ -449,8 +454,9 @@ def get_memory_usage():
     Returns:
         Memory usage in bytes
     """
-    import psutil
     import os
+
+    import psutil
 
     process = psutil.Process(os.getpid())
     return process.memory_info().rss
@@ -467,7 +473,7 @@ def log_memory_usage(logger, context=""):
         memory_bytes = get_memory_usage()
         logger.info(
             f"Memory usage{': ' + context if context else ''}",
-            memory=format_bytes(memory_bytes)
+            memory=format_bytes(memory_bytes),
         )
     except ImportError:
         # psutil not available

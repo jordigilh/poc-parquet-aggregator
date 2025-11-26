@@ -1,9 +1,10 @@
 """Storage aggregator for OCP storage usage data."""
 
-import pandas as pd
-import numpy as np
-from typing import Dict
 import gc
+from typing import Dict
+
+import numpy as np
+import pandas as pd
 
 from .utils import get_logger
 
@@ -31,7 +32,9 @@ class StorageAggregator:
         self.logger = logger or get_logger("aggregator_storage")
 
         # Performance settings
-        self.use_arrow_compute = config.get('performance', {}).get('use_arrow_compute', False)
+        self.use_arrow_compute = config.get("performance", {}).get(
+            "use_arrow_compute", False
+        )
 
         self.logger.info("Initialized StorageAggregator")
 
@@ -55,7 +58,7 @@ class StorageAggregator:
 
         def parse_labels(label_str):
             """Parse label string (JSON or empty) into dict."""
-            if pd.isna(label_str) or label_str == '' or label_str is None:
+            if pd.isna(label_str) or label_str == "" or label_str is None:
                 return {}
             if isinstance(label_str, dict):
                 return label_str
@@ -67,25 +70,33 @@ class StorageAggregator:
             except (json.JSONDecodeError, TypeError):
                 return {}
 
-        if 'volume_labels' not in df.columns:
+        if "volume_labels" not in df.columns:
             # Merge PV and PVC labels (PVC labels take precedence)
-            if 'persistentvolume_labels' in df.columns and 'persistentvolumeclaim_labels' in df.columns:
-                def merge_labels(row):
-                    pv_labels = parse_labels(row.get('persistentvolume_labels'))
-                    pvc_labels = parse_labels(row.get('persistentvolumeclaim_labels'))
-                    merged = {**pv_labels, **pvc_labels}  # PVC overrides PV
-                    return json.dumps(merged) if merged else '{}'
+            if (
+                "persistentvolume_labels" in df.columns
+                and "persistentvolumeclaim_labels" in df.columns
+            ):
 
-                df['volume_labels'] = df.apply(merge_labels, axis=1)
-                self.logger.info("✓ Merged persistentvolume_labels + persistentvolumeclaim_labels into volume_labels")
-            elif 'persistentvolume_labels' in df.columns:
-                df['volume_labels'] = df['persistentvolume_labels']
+                def merge_labels(row):
+                    pv_labels = parse_labels(row.get("persistentvolume_labels"))
+                    pvc_labels = parse_labels(row.get("persistentvolumeclaim_labels"))
+                    merged = {**pv_labels, **pvc_labels}  # PVC overrides PV
+                    return json.dumps(merged) if merged else "{}"
+
+                df["volume_labels"] = df.apply(merge_labels, axis=1)
+                self.logger.info(
+                    "✓ Merged persistentvolume_labels + persistentvolumeclaim_labels into volume_labels"
+                )
+            elif "persistentvolume_labels" in df.columns:
+                df["volume_labels"] = df["persistentvolume_labels"]
                 self.logger.info("✓ Using persistentvolume_labels as volume_labels")
-            elif 'persistentvolumeclaim_labels' in df.columns:
-                df['volume_labels'] = df['persistentvolumeclaim_labels']
-                self.logger.info("✓ Using persistentvolumeclaim_labels as volume_labels")
+            elif "persistentvolumeclaim_labels" in df.columns:
+                df["volume_labels"] = df["persistentvolumeclaim_labels"]
+                self.logger.info(
+                    "✓ Using persistentvolumeclaim_labels as volume_labels"
+                )
             else:
-                df['volume_labels'] = '{}'
+                df["volume_labels"] = "{}"
                 self.logger.warning("No label columns found, using empty volume_labels")
         else:
             self.logger.debug("volume_labels column already exists")
@@ -98,7 +109,7 @@ class StorageAggregator:
         pod_df: pd.DataFrame,
         node_labels_df: pd.DataFrame,
         namespace_labels_df: pd.DataFrame,
-        cost_category_df: pd.DataFrame = None
+        cost_category_df: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """
         Aggregate storage usage to daily summary.
@@ -113,10 +124,7 @@ class StorageAggregator:
         Returns:
             Aggregated storage summary DataFrame with data_source='Storage'
         """
-        self.logger.info(
-            "Starting storage aggregation",
-            input_rows=len(storage_df)
-        )
+        self.logger.info("Starting storage aggregation", input_rows=len(storage_df))
 
         if storage_df.empty:
             self.logger.warning("No storage data to aggregate")
@@ -137,10 +145,7 @@ class StorageAggregator:
         # Step 2: Group and aggregate by day + PVC
         aggregated = self._group_and_aggregate(storage_with_nodes)
 
-        self.logger.info(
-            "Grouped storage data",
-            output_rows=len(aggregated)
-        )
+        self.logger.info("Grouped storage data", output_rows=len(aggregated))
 
         # Step 3: Join with node labels
         aggregated = self._join_node_labels(aggregated, node_labels_df)
@@ -155,25 +160,24 @@ class StorageAggregator:
         if cost_category_df is not None and not cost_category_df.empty:
             aggregated = self._join_cost_category(aggregated, cost_category_df)
         else:
-            aggregated['cost_category_id'] = None
+            aggregated["cost_category_id"] = None
 
         # Step 7: Format output
         result = self._format_output(aggregated)
 
-        self.logger.info(
-            "Storage aggregation complete",
-            output_rows=len(result)
-        )
+        self.logger.info("Storage aggregation complete", output_rows=len(result))
 
         # Cleanup
-        if self.config.get('performance', {}).get('delete_intermediate_dfs', True):
+        if self.config.get("performance", {}).get("delete_intermediate_dfs", True):
             del storage_with_nodes, aggregated
-            if self.config.get('performance', {}).get('gc_after_aggregation', True):
+            if self.config.get("performance", {}).get("gc_after_aggregation", True):
                 gc.collect()
 
         return result
 
-    def _join_with_pods(self, storage_df: pd.DataFrame, pod_df: pd.DataFrame) -> pd.DataFrame:
+    def _join_with_pods(
+        self, storage_df: pd.DataFrame, pod_df: pd.DataFrame
+    ) -> pd.DataFrame:
         """
         Join storage data with pod data to get node/resource_id.
 
@@ -195,42 +199,56 @@ class StorageAggregator:
 
         # Create date columns for joining
         storage_df = storage_df.copy()
-        if pd.api.types.is_string_dtype(storage_df['interval_start']):
+        if pd.api.types.is_string_dtype(storage_df["interval_start"]):
             # Handle nise string format: "2025-11-01 00:00:00 +0000 UTC"
-            storage_df['interval_start_clean'] = storage_df['interval_start'].str.replace(r' \+\d{4} UTC$', '', regex=True)
-            storage_df['usage_date'] = pd.to_datetime(storage_df['interval_start_clean']).dt.date
-            storage_df.drop('interval_start_clean', axis=1, inplace=True)
+            storage_df["interval_start_clean"] = storage_df[
+                "interval_start"
+            ].str.replace(r" \+\d{4} UTC$", "", regex=True)
+            storage_df["usage_date"] = pd.to_datetime(
+                storage_df["interval_start_clean"]
+            ).dt.date
+            storage_df.drop("interval_start_clean", axis=1, inplace=True)
         else:
-            storage_df['usage_date'] = pd.to_datetime(storage_df['interval_start']).dt.date
+            storage_df["usage_date"] = pd.to_datetime(
+                storage_df["interval_start"]
+            ).dt.date
 
         pod_subset = pod_df.copy()
-        if pd.api.types.is_string_dtype(pod_subset['interval_start']):
+        if pd.api.types.is_string_dtype(pod_subset["interval_start"]):
             # Handle nise string format
-            pod_subset['interval_start_clean'] = pod_subset['interval_start'].str.replace(r' \+\d{4} UTC$', '', regex=True)
-            pod_subset['usage_date'] = pd.to_datetime(pod_subset['interval_start_clean']).dt.date
-            pod_subset.drop('interval_start_clean', axis=1, inplace=True)
+            pod_subset["interval_start_clean"] = pod_subset[
+                "interval_start"
+            ].str.replace(r" \+\d{4} UTC$", "", regex=True)
+            pod_subset["usage_date"] = pd.to_datetime(
+                pod_subset["interval_start_clean"]
+            ).dt.date
+            pod_subset.drop("interval_start_clean", axis=1, inplace=True)
         else:
-            pod_subset['usage_date'] = pd.to_datetime(pod_subset['interval_start']).dt.date
+            pod_subset["usage_date"] = pd.to_datetime(
+                pod_subset["interval_start"]
+            ).dt.date
 
         # Select only needed columns from pod_df to reduce memory
-        pod_subset = pod_subset[['usage_date', 'namespace', 'pod', 'node', 'resource_id']].drop_duplicates()
+        pod_subset = pod_subset[
+            ["usage_date", "namespace", "pod", "node", "resource_id"]
+        ].drop_duplicates()
 
         self.logger.debug(
             "Pod subset for join",
             rows=len(pod_subset),
-            unique_dates=pod_subset['usage_date'].nunique()
+            unique_dates=pod_subset["usage_date"].nunique(),
         )
 
         # Join
         result = pd.merge(
             storage_df,
             pod_subset,
-            on=['usage_date', 'namespace', 'pod'],
-            how='left'  # Keep storage rows even if no pod match
+            on=["usage_date", "namespace", "pod"],
+            how="left",  # Keep storage rows even if no pod match
         )
 
         # Log matching stats
-        matched = result['node'].notna().sum()
+        matched = result["node"].notna().sum()
         total = len(result)
         match_pct = (matched / total * 100) if total > 0 else 0
 
@@ -238,7 +256,7 @@ class StorageAggregator:
             "Storage-Pod join complete",
             matched=matched,
             total=total,
-            match_pct=f"{match_pct:.1f}%"
+            match_pct=f"{match_pct:.1f}%",
         )
 
         if matched < total:
@@ -248,12 +266,12 @@ class StorageAggregator:
 
         # Ensure node and resource_id are string type (not float) even if NaN
         # Convert to object type first if categorical to avoid fillna issues
-        if hasattr(result['node'].dtype, 'categories'):
-            result['node'] = result['node'].astype(object)
-        result['node'] = result['node'].fillna('').astype(str)
-        if hasattr(result['resource_id'].dtype, 'categories'):
-            result['resource_id'] = result['resource_id'].astype(object)
-        result['resource_id'] = result['resource_id'].fillna('').astype(str)
+        if hasattr(result["node"].dtype, "categories"):
+            result["node"] = result["node"].astype(object)
+        result["node"] = result["node"].fillna("").astype(str)
+        if hasattr(result["resource_id"].dtype, "categories"):
+            result["resource_id"] = result["resource_id"].astype(object)
+        result["resource_id"] = result["resource_id"].fillna("").astype(str)
 
         return result
 
@@ -279,28 +297,38 @@ class StorageAggregator:
         self.logger.info("Grouping and aggregating storage data")
 
         # Handle both string and datetime formats for interval_start
-        if pd.api.types.is_string_dtype(df['interval_start']):
-            df['interval_start_clean'] = df['interval_start'].str.replace(r' \+\d{4} UTC$', '', regex=True)
-            df['usage_start'] = pd.to_datetime(df['interval_start_clean']).dt.date
-            df.drop('interval_start_clean', axis=1, inplace=True)
+        if pd.api.types.is_string_dtype(df["interval_start"]):
+            df["interval_start_clean"] = df["interval_start"].str.replace(
+                r" \+\d{4} UTC$", "", regex=True
+            )
+            df["usage_start"] = pd.to_datetime(df["interval_start_clean"]).dt.date
+            df.drop("interval_start_clean", axis=1, inplace=True)
         else:
-            df['usage_start'] = pd.to_datetime(df['interval_start']).dt.date
+            df["usage_start"] = pd.to_datetime(df["interval_start"]).dt.date
 
         # ====================================================================
         # Step 1: Calculate shared volume node count (Trino lines 205-212)
         # ====================================================================
         # Count distinct nodes per PV per day
-        node_counts = df.groupby(['usage_start', 'persistentvolume'])['node'].nunique().reset_index()
-        node_counts.columns = ['usage_start', 'persistentvolume', 'node_count']
+        node_counts = (
+            df.groupby(["usage_start", "persistentvolume"])["node"]
+            .nunique()
+            .reset_index()
+        )
+        node_counts.columns = ["usage_start", "persistentvolume", "node_count"]
 
         # Join node count back to data
-        df = pd.merge(df, node_counts, on=['usage_start', 'persistentvolume'], how='left')
-        df['node_count'] = df['node_count'].fillna(1)  # Default to 1 if no match
+        df = pd.merge(
+            df, node_counts, on=["usage_start", "persistentvolume"], how="left"
+        )
+        df["node_count"] = df["node_count"].fillna(1)  # Default to 1 if no match
 
         self.logger.debug(
             "Calculated shared volume node counts",
             unique_pvs=len(node_counts),
-            max_nodes_shared=int(node_counts['node_count'].max()) if not node_counts.empty else 0
+            max_nodes_shared=int(node_counts["node_count"].max())
+            if not node_counts.empty
+            else 0,
         )
 
         # ====================================================================
@@ -308,47 +336,45 @@ class StorageAggregator:
         # ====================================================================
         # sum(sli.volume_request_storage_byte_seconds) / max(nc.node_count)
         # sum(sli.persistentvolumeclaim_usage_byte_seconds) / max(nc.node_count)
-        df['volume_request_storage_byte_seconds'] = (
-            df['volume_request_storage_byte_seconds'] / df['node_count']
+        df["volume_request_storage_byte_seconds"] = (
+            df["volume_request_storage_byte_seconds"] / df["node_count"]
         )
-        df['persistentvolumeclaim_usage_byte_seconds'] = (
-            df['persistentvolumeclaim_usage_byte_seconds'] / df['node_count']
+        df["persistentvolumeclaim_usage_byte_seconds"] = (
+            df["persistentvolumeclaim_usage_byte_seconds"] / df["node_count"]
         )
         # Note: capacity is NOT divided (Trino line 408 uses sum without division)
 
         # Group keys
         group_keys = [
-            'usage_start',
-            'namespace',
-            'persistentvolumeclaim',
-            'persistentvolume',
-            'storageclass',
-            'node',
-            'resource_id'
+            "usage_start",
+            "namespace",
+            "persistentvolumeclaim",
+            "persistentvolume",
+            "storageclass",
+            "node",
+            "resource_id",
         ]
 
         # Aggregations
         agg_dict = {
             # Storage metrics (byte-seconds) - already divided by node_count
-            'persistentvolumeclaim_capacity_byte_seconds': 'sum',
-            'volume_request_storage_byte_seconds': 'sum',
-            'persistentvolumeclaim_usage_byte_seconds': 'sum',
+            "persistentvolumeclaim_capacity_byte_seconds": "sum",
+            "volume_request_storage_byte_seconds": "sum",
+            "persistentvolumeclaim_usage_byte_seconds": "sum",
             # Labels (will process with precedence later)
-            'volume_labels': 'first',
+            "volume_labels": "first",
             # CSI handle (for AWS matching)
-            'csi_volume_handle': 'max'
+            "csi_volume_handle": "max",
         }
 
         # Add capacity_bytes if present (Trino line 357: max(capacity_bytes) * 2^-30)
-        if 'persistentvolumeclaim_capacity_bytes' in df.columns:
-            agg_dict['persistentvolumeclaim_capacity_bytes'] = 'max'
+        if "persistentvolumeclaim_capacity_bytes" in df.columns:
+            agg_dict["persistentvolumeclaim_capacity_bytes"] = "max"
 
         aggregated = df.groupby(group_keys, dropna=False).agg(agg_dict).reset_index()
 
         self.logger.info(
-            "Grouped storage data",
-            input_rows=len(df),
-            output_rows=len(aggregated)
+            "Grouped storage data", input_rows=len(df), output_rows=len(aggregated)
         )
 
         # Convert byte-seconds to gigabyte-months
@@ -385,7 +411,7 @@ class StorageAggregator:
             if pd.isna(usage_start):
                 return 30  # Default fallback
             # Convert to datetime if needed
-            if hasattr(usage_start, 'year'):
+            if hasattr(usage_start, "year"):
                 year = usage_start.year
                 month = usage_start.month
             else:
@@ -394,47 +420,50 @@ class StorageAggregator:
                 month = dt.month
             return calendar.monthrange(year, month)[1]
 
-        df['_days_in_month'] = df['usage_start'].apply(get_days_in_month)
+        df["_days_in_month"] = df["usage_start"].apply(get_days_in_month)
 
         self.logger.debug(
             "Calculated days in month",
-            unique_values=df['_days_in_month'].unique().tolist()
+            unique_values=df["_days_in_month"].unique().tolist(),
         )
 
         # Trino formula: byte_seconds / (86400 * days_in_month) * power(2, -30)
         # = byte_seconds / (seconds_per_day * days_in_month * bytes_to_gb)
 
         # Capacity
-        df['persistentvolumeclaim_capacity_gigabyte_months'] = (
-            df['persistentvolumeclaim_capacity_byte_seconds'] /
-            (seconds_per_day * df['_days_in_month'] * bytes_to_gb)
-        )
+        df["persistentvolumeclaim_capacity_gigabyte_months"] = df[
+            "persistentvolumeclaim_capacity_byte_seconds"
+        ] / (seconds_per_day * df["_days_in_month"] * bytes_to_gb)
 
         # Request
-        df['volume_request_storage_gigabyte_months'] = (
-            df['volume_request_storage_byte_seconds'] /
-            (seconds_per_day * df['_days_in_month'] * bytes_to_gb)
-        )
+        df["volume_request_storage_gigabyte_months"] = df[
+            "volume_request_storage_byte_seconds"
+        ] / (seconds_per_day * df["_days_in_month"] * bytes_to_gb)
 
         # Usage
-        df['persistentvolumeclaim_usage_gigabyte_months'] = (
-            df['persistentvolumeclaim_usage_byte_seconds'] /
-            (seconds_per_day * df['_days_in_month'] * bytes_to_gb)
-        )
+        df["persistentvolumeclaim_usage_gigabyte_months"] = df[
+            "persistentvolumeclaim_usage_byte_seconds"
+        ] / (seconds_per_day * df["_days_in_month"] * bytes_to_gb)
 
         # Drop intermediate columns
-        df = df.drop(columns=[
-            'persistentvolumeclaim_capacity_byte_seconds',
-            'volume_request_storage_byte_seconds',
-            'persistentvolumeclaim_usage_byte_seconds',
-            '_days_in_month'
-        ])
+        df = df.drop(
+            columns=[
+                "persistentvolumeclaim_capacity_byte_seconds",
+                "volume_request_storage_byte_seconds",
+                "persistentvolumeclaim_usage_byte_seconds",
+                "_days_in_month",
+            ]
+        )
 
-        self.logger.debug("Converted storage metrics to gigabyte-months (using actual days in month)")
+        self.logger.debug(
+            "Converted storage metrics to gigabyte-months (using actual days in month)"
+        )
 
         return df
 
-    def _join_node_labels(self, df: pd.DataFrame, node_labels_df: pd.DataFrame) -> pd.DataFrame:
+    def _join_node_labels(
+        self, df: pd.DataFrame, node_labels_df: pd.DataFrame
+    ) -> pd.DataFrame:
         """
         Join with node labels.
 
@@ -447,24 +476,23 @@ class StorageAggregator:
         """
         if node_labels_df.empty:
             self.logger.warning("No node labels available")
-            df['node_labels'] = '{}'
+            df["node_labels"] = "{}"
             return df
 
         # Deduplicate node labels to avoid Cartesian product
-        node_labels_df = node_labels_df.drop_duplicates(subset=['usage_start', 'node'])
+        node_labels_df = node_labels_df.drop_duplicates(subset=["usage_start", "node"])
 
         self.logger.debug(
-            "Joining with node labels",
-            node_label_rows=len(node_labels_df)
+            "Joining with node labels", node_label_rows=len(node_labels_df)
         )
 
         before_count = len(df)
 
         df = pd.merge(
             df,
-            node_labels_df[['usage_start', 'node', 'node_labels']],
-            on=['usage_start', 'node'],
-            how='left'
+            node_labels_df[["usage_start", "node", "node_labels"]],
+            on=["usage_start", "node"],
+            how="left",
         )
 
         after_count = len(df)
@@ -475,11 +503,13 @@ class StorageAggregator:
             )
 
         # Fill missing labels
-        df['node_labels'] = df['node_labels'].fillna('{}')
+        df["node_labels"] = df["node_labels"].fillna("{}")
 
         return df
 
-    def _join_namespace_labels(self, df: pd.DataFrame, namespace_labels_df: pd.DataFrame) -> pd.DataFrame:
+    def _join_namespace_labels(
+        self, df: pd.DataFrame, namespace_labels_df: pd.DataFrame
+    ) -> pd.DataFrame:
         """
         Join with namespace labels.
 
@@ -492,24 +522,26 @@ class StorageAggregator:
         """
         if namespace_labels_df.empty:
             self.logger.warning("No namespace labels available")
-            df['namespace_labels'] = '{}'
+            df["namespace_labels"] = "{}"
             return df
 
         # Deduplicate namespace labels to avoid Cartesian product
-        namespace_labels_df = namespace_labels_df.drop_duplicates(subset=['usage_start', 'namespace'])
+        namespace_labels_df = namespace_labels_df.drop_duplicates(
+            subset=["usage_start", "namespace"]
+        )
 
         self.logger.debug(
             "Joining with namespace labels",
-            namespace_label_rows=len(namespace_labels_df)
+            namespace_label_rows=len(namespace_labels_df),
         )
 
         before_count = len(df)
 
         df = pd.merge(
             df,
-            namespace_labels_df[['usage_start', 'namespace', 'namespace_labels']],
-            on=['usage_start', 'namespace'],
-            how='left'
+            namespace_labels_df[["usage_start", "namespace", "namespace_labels"]],
+            on=["usage_start", "namespace"],
+            how="left",
         )
 
         after_count = len(df)
@@ -520,7 +552,7 @@ class StorageAggregator:
             )
 
         # Fill missing labels
-        df['namespace_labels'] = df['namespace_labels'].fillna('{}')
+        df["namespace_labels"] = df["namespace_labels"].fillna("{}")
 
         return df
 
@@ -542,7 +574,7 @@ class StorageAggregator:
 
         def parse_labels(labels_str):
             """Parse JSON label string to dict."""
-            if pd.isna(labels_str) or labels_str == '' or labels_str is None:
+            if pd.isna(labels_str) or labels_str == "" or labels_str is None:
                 return {}
             try:
                 if isinstance(labels_str, dict):
@@ -553,9 +585,9 @@ class StorageAggregator:
 
         def merge_labels_with_precedence(row):
             """Merge labels with precedence: Volume > Namespace > Node."""
-            node_labels = parse_labels(row.get('node_labels', '{}'))
-            namespace_labels = parse_labels(row.get('namespace_labels', '{}'))
-            volume_labels = parse_labels(row.get('volume_labels', '{}'))
+            node_labels = parse_labels(row.get("node_labels", "{}"))
+            namespace_labels = parse_labels(row.get("namespace_labels", "{}"))
+            volume_labels = parse_labels(row.get("volume_labels", "{}"))
 
             # Apply precedence: start with node, override with namespace, override with volume
             merged = {}
@@ -563,19 +595,17 @@ class StorageAggregator:
             merged.update(namespace_labels)
             merged.update(volume_labels)
 
-            return json.dumps(merged) if merged else '{}'
+            return json.dumps(merged) if merged else "{}"
 
         # Apply label merging
-        df['merged_labels'] = df.apply(merge_labels_with_precedence, axis=1)
+        df["merged_labels"] = df.apply(merge_labels_with_precedence, axis=1)
 
         self.logger.debug("Label precedence applied (Volume > Namespace > Node)")
 
         return df
 
     def _join_cost_category(
-        self,
-        aggregated_df: pd.DataFrame,
-        cost_category_df: pd.DataFrame
+        self, aggregated_df: pd.DataFrame, cost_category_df: pd.DataFrame
     ) -> pd.DataFrame:
         """Join with cost category namespace (LIKE matching).
 
@@ -593,26 +623,29 @@ class StorageAggregator:
         Returns:
             Joined DataFrame with cost_category_id column
         """
+
         def match_cost_category(namespace):
             matching_ids = []
             for _, row in cost_category_df.iterrows():
-                pattern = row['namespace']
+                pattern = row["namespace"]
                 # Simple pattern match (% wildcard - SQL LIKE)
-                if pattern.endswith('%'):
+                if pattern.endswith("%"):
                     if namespace.startswith(pattern[:-1]):
-                        matching_ids.append(row['cost_category_id'])
+                        matching_ids.append(row["cost_category_id"])
                 elif namespace == pattern:
-                    matching_ids.append(row['cost_category_id'])
+                    matching_ids.append(row["cost_category_id"])
 
             # Return MAX of matching IDs (Trino SQL line 406)
             return max(matching_ids) if matching_ids else None
 
-        aggregated_df['cost_category_id'] = aggregated_df['namespace'].apply(match_cost_category)
+        aggregated_df["cost_category_id"] = aggregated_df["namespace"].apply(
+            match_cost_category
+        )
 
         self.logger.debug(
             "Cost category joined for storage",
-            matched=aggregated_df['cost_category_id'].notna().sum(),
-            total=len(aggregated_df)
+            matched=aggregated_df["cost_category_id"].notna().sum(),
+            total=len(aggregated_df),
         )
 
         return aggregated_df
@@ -638,103 +671,148 @@ class StorageAggregator:
         result = pd.DataFrame()
 
         # Standard columns
-        result['usage_start'] = pd.to_datetime(df['usage_start'])
-        result['usage_end'] = pd.to_datetime(df['usage_start'])  # Same as start for daily
-        result['data_source'] = 'Storage'  # CRITICAL!
+        result["usage_start"] = pd.to_datetime(df["usage_start"])
+        result["usage_end"] = pd.to_datetime(
+            df["usage_start"]
+        )  # Same as start for daily
+        result["data_source"] = "Storage"  # CRITICAL!
 
         # Dimensions
-        result['namespace'] = df['namespace']
+        result["namespace"] = df["namespace"]
         # Convert to object type first if categorical to avoid fillna issues
-        node_col = df['node'].astype(object) if hasattr(df['node'].dtype, 'categories') else df['node']
-        result['node'] = node_col.fillna('')  # Replace NaN with empty string
-        result['pod'] = None  # NULL for storage rows
-        resource_id_col = df['resource_id'].astype(object) if hasattr(df['resource_id'].dtype, 'categories') else df['resource_id']
-        result['resource_id'] = resource_id_col.fillna('')  # Replace NaN with empty string
+        node_col = (
+            df["node"].astype(object)
+            if hasattr(df["node"].dtype, "categories")
+            else df["node"]
+        )
+        result["node"] = node_col.fillna("")  # Replace NaN with empty string
+        result["pod"] = None  # NULL for storage rows
+        resource_id_col = (
+            df["resource_id"].astype(object)
+            if hasattr(df["resource_id"].dtype, "categories")
+            else df["resource_id"]
+        )
+        result["resource_id"] = resource_id_col.fillna(
+            ""
+        )  # Replace NaN with empty string
 
         # Storage columns (populated)
-        result['persistentvolumeclaim'] = df['persistentvolumeclaim'].fillna('')
-        result['persistentvolume'] = df['persistentvolume'].fillna('')
-        result['storageclass'] = df['storageclass'].fillna('')
-        result['volume_labels'] = df['merged_labels']
+        result["persistentvolumeclaim"] = df["persistentvolumeclaim"].fillna("")
+        result["persistentvolume"] = df["persistentvolume"].fillna("")
+        result["storageclass"] = df["storageclass"].fillna("")
+        result["volume_labels"] = df["merged_labels"]
 
         # persistentvolumeclaim_capacity_gigabyte: max(capacity_bytes) * 2^-30
         # Trino SQL line 357: (sua.persistentvolumeclaim_capacity_bytes * power(2, -30))
-        if 'persistentvolumeclaim_capacity_bytes' in df.columns:
-            bytes_to_gb = 1024 ** 3  # 2^30
-            result['persistentvolumeclaim_capacity_gigabyte'] = df['persistentvolumeclaim_capacity_bytes'] / bytes_to_gb
+        if "persistentvolumeclaim_capacity_bytes" in df.columns:
+            bytes_to_gb = 1024**3  # 2^30
+            result["persistentvolumeclaim_capacity_gigabyte"] = (
+                df["persistentvolumeclaim_capacity_bytes"] / bytes_to_gb
+            )
         else:
-            result['persistentvolumeclaim_capacity_gigabyte'] = None
+            result["persistentvolumeclaim_capacity_gigabyte"] = None
 
-        result['persistentvolumeclaim_capacity_gigabyte_months'] = df['persistentvolumeclaim_capacity_gigabyte_months']
-        result['volume_request_storage_gigabyte_months'] = df['volume_request_storage_gigabyte_months']
-        result['persistentvolumeclaim_usage_gigabyte_months'] = df['persistentvolumeclaim_usage_gigabyte_months']
-        result['csi_volume_handle'] = df['csi_volume_handle'].fillna('')
+        result["persistentvolumeclaim_capacity_gigabyte_months"] = df[
+            "persistentvolumeclaim_capacity_gigabyte_months"
+        ]
+        result["volume_request_storage_gigabyte_months"] = df[
+            "volume_request_storage_gigabyte_months"
+        ]
+        result["persistentvolumeclaim_usage_gigabyte_months"] = df[
+            "persistentvolumeclaim_usage_gigabyte_months"
+        ]
+        result["csi_volume_handle"] = df["csi_volume_handle"].fillna("")
 
         # CPU/Memory columns (NULL for storage)
-        result['pod_usage_cpu_core_hours'] = None
-        result['pod_request_cpu_core_hours'] = None
-        result['pod_effective_usage_cpu_core_hours'] = None
-        result['pod_limit_cpu_core_hours'] = None
-        result['pod_usage_memory_gigabyte_hours'] = None
-        result['pod_request_memory_gigabyte_hours'] = None
-        result['pod_effective_usage_memory_gigabyte_hours'] = None
-        result['pod_limit_memory_gigabyte_hours'] = None
-        result['node_capacity_cpu_cores'] = None
-        result['node_capacity_cpu_core_hours'] = None
-        result['node_capacity_memory_gigabytes'] = None
-        result['node_capacity_memory_gigabyte_hours'] = None
-        result['cluster_capacity_cpu_core_hours'] = None
-        result['cluster_capacity_memory_gigabyte_hours'] = None
+        result["pod_usage_cpu_core_hours"] = None
+        result["pod_request_cpu_core_hours"] = None
+        result["pod_effective_usage_cpu_core_hours"] = None
+        result["pod_limit_cpu_core_hours"] = None
+        result["pod_usage_memory_gigabyte_hours"] = None
+        result["pod_request_memory_gigabyte_hours"] = None
+        result["pod_effective_usage_memory_gigabyte_hours"] = None
+        result["pod_limit_memory_gigabyte_hours"] = None
+        result["node_capacity_cpu_cores"] = None
+        result["node_capacity_cpu_core_hours"] = None
+        result["node_capacity_memory_gigabytes"] = None
+        result["node_capacity_memory_gigabyte_hours"] = None
+        result["cluster_capacity_cpu_core_hours"] = None
+        result["cluster_capacity_memory_gigabyte_hours"] = None
 
         # Labels (use merged labels with precedence)
-        result['pod_labels'] = df['merged_labels']  # Volume labels applied with precedence
+        result["pod_labels"] = df[
+            "merged_labels"
+        ]  # Volume labels applied with precedence
 
         # all_labels = merge(pod_labels, volume_labels) - Trino SQL lines 651-654
         # For Storage data, pod_labels is typically empty, so all_labels ≈ volume_labels
-        result['all_labels'] = df['merged_labels']
+        result["all_labels"] = df["merged_labels"]
 
         # Metadata columns
-        result['cluster_id'] = self.config['ocp']['cluster_id']
-        result['cluster_alias'] = self.config['ocp'].get('cluster_alias', '')
-        result['source_uuid'] = self.config['ocp']['provider_uuid']
-        result['report_period_id'] = self.config['ocp'].get('report_period_id', 1)
-        result['uuid'] = None  # Will be generated by database
-        result['infrastructure_usage_cost'] = None
+        result["cluster_id"] = self.config["ocp"]["cluster_id"]
+        result["cluster_alias"] = self.config["ocp"].get("cluster_alias", "")
+        result["source_uuid"] = self.config["ocp"]["provider_uuid"]
+        result["report_period_id"] = self.config["ocp"].get("report_period_id", 1)
+        result["uuid"] = None  # Will be generated by database
+        result["infrastructure_usage_cost"] = None
 
         # cost_category_id from _join_cost_category (Trino SQL lines 406, 428-429)
-        if 'cost_category_id' in df.columns:
-            result['cost_category_id'] = df['cost_category_id']
+        if "cost_category_id" in df.columns:
+            result["cost_category_id"] = df["cost_category_id"]
         else:
-            result['cost_category_id'] = None
+            result["cost_category_id"] = None
 
         # Replace any remaining NaN with None for PostgreSQL NULL
         result = result.replace({np.nan: None})
 
         self.logger.info(
-            "Storage output formatted",
-            rows=len(result),
-            data_source='Storage'
+            "Storage output formatted", rows=len(result), data_source="Storage"
         )
 
         return result
 
     def _create_empty_result(self) -> pd.DataFrame:
         """Create empty result DataFrame with proper schema."""
-        return pd.DataFrame(columns=[
-            'usage_start', 'usage_end', 'data_source', 'namespace', 'node', 'pod',
-            'resource_id', 'persistentvolumeclaim', 'persistentvolume', 'storageclass',
-            'volume_labels', 'all_labels', 'persistentvolumeclaim_capacity_gigabyte',
-            'persistentvolumeclaim_capacity_gigabyte_months',
-            'volume_request_storage_gigabyte_months',
-            'persistentvolumeclaim_usage_gigabyte_months', 'csi_volume_handle',
-            'pod_usage_cpu_core_hours', 'pod_request_cpu_core_hours',
-            'pod_effective_usage_cpu_core_hours', 'pod_limit_cpu_core_hours',
-            'pod_usage_memory_gigabyte_hours', 'pod_request_memory_gigabyte_hours',
-            'pod_effective_usage_memory_gigabyte_hours', 'pod_limit_memory_gigabyte_hours',
-            'node_capacity_cpu_cores', 'node_capacity_cpu_core_hours',
-            'node_capacity_memory_gigabytes', 'node_capacity_memory_gigabyte_hours',
-            'cluster_capacity_cpu_core_hours', 'cluster_capacity_memory_gigabyte_hours',
-            'pod_labels', 'cluster_id', 'cluster_alias', 'source_uuid',
-            'report_period_id', 'uuid', 'infrastructure_usage_cost', 'cost_category_id'
-        ])
-
+        return pd.DataFrame(
+            columns=[
+                "usage_start",
+                "usage_end",
+                "data_source",
+                "namespace",
+                "node",
+                "pod",
+                "resource_id",
+                "persistentvolumeclaim",
+                "persistentvolume",
+                "storageclass",
+                "volume_labels",
+                "all_labels",
+                "persistentvolumeclaim_capacity_gigabyte",
+                "persistentvolumeclaim_capacity_gigabyte_months",
+                "volume_request_storage_gigabyte_months",
+                "persistentvolumeclaim_usage_gigabyte_months",
+                "csi_volume_handle",
+                "pod_usage_cpu_core_hours",
+                "pod_request_cpu_core_hours",
+                "pod_effective_usage_cpu_core_hours",
+                "pod_limit_cpu_core_hours",
+                "pod_usage_memory_gigabyte_hours",
+                "pod_request_memory_gigabyte_hours",
+                "pod_effective_usage_memory_gigabyte_hours",
+                "pod_limit_memory_gigabyte_hours",
+                "node_capacity_cpu_cores",
+                "node_capacity_cpu_core_hours",
+                "node_capacity_memory_gigabytes",
+                "node_capacity_memory_gigabyte_hours",
+                "cluster_capacity_cpu_core_hours",
+                "cluster_capacity_memory_gigabyte_hours",
+                "pod_labels",
+                "cluster_id",
+                "cluster_alias",
+                "source_uuid",
+                "report_period_id",
+                "uuid",
+                "infrastructure_usage_cost",
+                "cost_category_id",
+            ]
+        )

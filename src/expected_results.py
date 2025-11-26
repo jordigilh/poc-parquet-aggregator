@@ -12,12 +12,14 @@ Edge cases handled:
 - YAML structure: `- node:` creates {'node': None, 'node_name': 'xxx', ...}
 """
 
-from datetime import datetime, timedelta, date as date_type
-from typing import Dict, List, Optional
-import yaml
-import pandas as pd
-from pathlib import Path
 import re
+from datetime import date as date_type
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Dict, List, Optional
+
+import pandas as pd
+import yaml
 
 from .utils import get_logger
 
@@ -41,7 +43,7 @@ class ExpectedResultsCalculator:
         Returns:
             Parsed YAML configuration
         """
-        with open(self.yaml_path, 'r') as f:
+        with open(self.yaml_path, "r") as f:
             config = yaml.safe_load(f)
 
         self.logger.info(f"Loaded YAML configuration: {self.yaml_path}")
@@ -66,13 +68,13 @@ class ExpectedResultsCalculator:
         # String
         if isinstance(date_value, str):
             # Template (e.g., {{start_date}})
-            if '{{' in date_value:
+            if "{{" in date_value:
                 self.logger.warning(f"Skipping template date: {date_value}")
                 return None
 
             # Parse YYYY-MM-DD
             try:
-                return datetime.strptime(date_value, '%Y-%m-%d').date()
+                return datetime.strptime(date_value, "%Y-%m-%d").date()
             except ValueError:
                 self.logger.error(f"Invalid date format: {date_value}")
                 return None
@@ -88,15 +90,15 @@ class ExpectedResultsCalculator:
         results = []
 
         # Extract OCP generator config
-        for generator in self.config.get('generators', []):
-            if 'OCPGenerator' not in generator:
+        for generator in self.config.get("generators", []):
+            if "OCPGenerator" not in generator:
                 continue
 
-            ocp_gen = generator['OCPGenerator']
+            ocp_gen = generator["OCPGenerator"]
 
             # Parse dates
-            start_date = self._parse_date(ocp_gen.get('start_date'))
-            end_date = self._parse_date(ocp_gen.get('end_date'))
+            start_date = self._parse_date(ocp_gen.get("start_date"))
+            end_date = self._parse_date(ocp_gen.get("end_date"))
 
             if not start_date or not end_date:
                 self.logger.warning("Skipping generator with template dates")
@@ -106,7 +108,7 @@ class ExpectedResultsCalculator:
             current_date = start_date
             while current_date <= end_date:
                 # Process each node
-                for node in ocp_gen.get('nodes', []):
+                for node in ocp_gen.get("nodes", []):
                     node_results = self._process_node(node, current_date)
                     results.extend(node_results)
 
@@ -121,8 +123,8 @@ class ExpectedResultsCalculator:
         self.logger.info(
             f"Calculated expected results",
             total_rows=len(df),
-            namespaces=df['namespace'].nunique() if not df.empty else 0,
-            nodes=df['node'].nunique() if not df.empty else 0
+            namespaces=df["namespace"].nunique() if not df.empty else 0,
+            nodes=df["node"].nunique() if not df.empty else 0,
         )
 
         return df
@@ -141,10 +143,10 @@ class ExpectedResultsCalculator:
 
         # YAML structure: `- node:` creates {'node': None, 'node_name': 'xxx', ...}
         # All node properties are at the root level
-        node_name = node.get('node_name')
-        cpu_cores = node.get('cpu_cores', 0)
-        memory_gig = node.get('memory_gig', 0)
-        resource_id = node.get('resource_id', 0)
+        node_name = node.get("node_name")
+        cpu_cores = node.get("cpu_cores", 0)
+        memory_gig = node.get("memory_gig", 0)
+        resource_id = node.get("resource_id", 0)
 
         if not node_name:
             self.logger.warning(f"Skipping node without node_name: {node}")
@@ -155,32 +157,32 @@ class ExpectedResultsCalculator:
         node_capacity_memory_gigabyte_hours = float(memory_gig) * 24.0
 
         # Process each namespace
-        namespaces = node.get('namespaces', {})
+        namespaces = node.get("namespaces", {})
         for namespace_name, namespace_config in namespaces.items():
             # Initialize aggregates for this namespace-node combination
             agg = {
-                'usage_start': date,
-                'usage_end': date,
-                'namespace': namespace_name,
-                'node': node_name,
-                'resource_id': str(resource_id),
-                'pod_usage_cpu_core_hours': 0.0,
-                'pod_request_cpu_core_hours': 0.0,
-                'pod_effective_usage_cpu_core_hours': 0.0,
-                'pod_limit_cpu_core_hours': 0.0,
-                'pod_usage_memory_gigabyte_hours': 0.0,
-                'pod_request_memory_gigabyte_hours': 0.0,
-                'pod_effective_usage_memory_gigabyte_hours': 0.0,
-                'pod_limit_memory_gigabyte_hours': 0.0,
-                'node_capacity_cpu_cores': float(cpu_cores),
-                'node_capacity_cpu_core_hours': node_capacity_cpu_core_hours,
-                'node_capacity_memory_gigabytes': float(memory_gig),
-                'node_capacity_memory_gigabyte_hours': node_capacity_memory_gigabyte_hours,
-                'data_source': 'Pod',
+                "usage_start": date,
+                "usage_end": date,
+                "namespace": namespace_name,
+                "node": node_name,
+                "resource_id": str(resource_id),
+                "pod_usage_cpu_core_hours": 0.0,
+                "pod_request_cpu_core_hours": 0.0,
+                "pod_effective_usage_cpu_core_hours": 0.0,
+                "pod_limit_cpu_core_hours": 0.0,
+                "pod_usage_memory_gigabyte_hours": 0.0,
+                "pod_request_memory_gigabyte_hours": 0.0,
+                "pod_effective_usage_memory_gigabyte_hours": 0.0,
+                "pod_limit_memory_gigabyte_hours": 0.0,
+                "node_capacity_cpu_cores": float(cpu_cores),
+                "node_capacity_cpu_core_hours": node_capacity_cpu_core_hours,
+                "node_capacity_memory_gigabytes": float(memory_gig),
+                "node_capacity_memory_gigabyte_hours": node_capacity_memory_gigabyte_hours,
+                "data_source": "Pod",
             }
 
             # Sum across all pods in this namespace
-            pods = namespace_config.get('pods', [])
+            pods = namespace_config.get("pods", [])
             for pod in pods:
                 # YAML structure: `- pod:` creates {'pod': None, 'pod_name': 'xxx', ...}
                 self._aggregate_pod(pod, agg)
@@ -205,7 +207,7 @@ class ExpectedResultsCalculator:
             agg: Accumulator dictionary (modified in place)
         """
         # Skip pods with missing pod_seconds
-        pod_seconds = pod.get('pod_seconds', 0)
+        pod_seconds = pod.get("pod_seconds", 0)
         if not pod_seconds:
             return
 
@@ -213,34 +215,36 @@ class ExpectedResultsCalculator:
         pod_hours = float(pod_seconds) / 3600.0
 
         # CPU metrics
-        cpu_request = float(pod.get('cpu_request', 0))
-        cpu_limit = float(pod.get('cpu_limit', 0))
+        cpu_request = float(pod.get("cpu_request", 0))
+        cpu_limit = float(pod.get("cpu_limit", 0))
 
         # For nise data, usage = request (no separate usage field)
         cpu_usage = cpu_request
 
-        agg['pod_usage_cpu_core_hours'] += cpu_usage * pod_hours
-        agg['pod_request_cpu_core_hours'] += cpu_request * pod_hours
-        agg['pod_limit_cpu_core_hours'] += cpu_limit * pod_hours
+        agg["pod_usage_cpu_core_hours"] += cpu_usage * pod_hours
+        agg["pod_request_cpu_core_hours"] += cpu_request * pod_hours
+        agg["pod_limit_cpu_core_hours"] += cpu_limit * pod_hours
 
         # Effective usage = max(usage, request)
         cpu_effective = max(cpu_usage, cpu_request)
-        agg['pod_effective_usage_cpu_core_hours'] += cpu_effective * pod_hours
+        agg["pod_effective_usage_cpu_core_hours"] += cpu_effective * pod_hours
 
         # Memory metrics
-        mem_request_gig = float(pod.get('mem_request_gig', 0))
-        mem_limit_gig = float(pod.get('mem_limit_gig', 0))
+        mem_request_gig = float(pod.get("mem_request_gig", 0))
+        mem_limit_gig = float(pod.get("mem_limit_gig", 0))
 
         # For nise data, usage = request
         mem_usage_gig = mem_request_gig
 
-        agg['pod_usage_memory_gigabyte_hours'] += mem_usage_gig * pod_hours
-        agg['pod_request_memory_gigabyte_hours'] += mem_request_gig * pod_hours
-        agg['pod_limit_memory_gigabyte_hours'] += mem_limit_gig * pod_hours
+        agg["pod_usage_memory_gigabyte_hours"] += mem_usage_gig * pod_hours
+        agg["pod_request_memory_gigabyte_hours"] += mem_request_gig * pod_hours
+        agg["pod_limit_memory_gigabyte_hours"] += mem_limit_gig * pod_hours
 
         # Effective usage = max(usage, request)
         mem_effective_gig = max(mem_usage_gig, mem_request_gig)
-        agg['pod_effective_usage_memory_gigabyte_hours'] += mem_effective_gig * pod_hours
+        agg["pod_effective_usage_memory_gigabyte_hours"] += (
+            mem_effective_gig * pod_hours
+        )
 
     def print_summary(self, df: pd.DataFrame):
         """Print a summary of expected results.
@@ -259,34 +263,56 @@ class ExpectedResultsCalculator:
         print(f"Total Rows: {len(df)}")
         print(f"Date Range: {df['usage_start'].min()} to {df['usage_start'].max()}")
         print(f"Days: {df['usage_start'].nunique()}")
-        print(f"Nodes: {df['node'].nunique()} ({', '.join(sorted(df['node'].unique()))})")
-        print(f"Namespaces: {df['namespace'].nunique()} ({', '.join(sorted(df['namespace'].unique()))})")
+        print(
+            f"Nodes: {df['node'].nunique()} ({', '.join(sorted(df['node'].unique()))})"
+        )
+        print(
+            f"Namespaces: {df['namespace'].nunique()} ({', '.join(sorted(df['namespace'].unique()))})"
+        )
         print()
 
         print("Total Metrics Across All Days:")
-        print(f"  CPU Request:      {df['pod_request_cpu_core_hours'].sum():>10.2f} core-hours")
-        print(f"  CPU Effective:    {df['pod_effective_usage_cpu_core_hours'].sum():>10.2f} core-hours")
-        print(f"  Memory Request:   {df['pod_request_memory_gigabyte_hours'].sum():>10.2f} GB-hours")
-        print(f"  Memory Effective: {df['pod_effective_usage_memory_gigabyte_hours'].sum():>10.2f} GB-hours")
-        print(f"  Node CPU Capacity:{df['node_capacity_cpu_core_hours'].sum():>10.2f} core-hours")
-        print(f"  Node Mem Capacity:{df['node_capacity_memory_gigabyte_hours'].sum():>10.2f} GB-hours")
+        print(
+            f"  CPU Request:      {df['pod_request_cpu_core_hours'].sum():>10.2f} core-hours"
+        )
+        print(
+            f"  CPU Effective:    {df['pod_effective_usage_cpu_core_hours'].sum():>10.2f} core-hours"
+        )
+        print(
+            f"  Memory Request:   {df['pod_request_memory_gigabyte_hours'].sum():>10.2f} GB-hours"
+        )
+        print(
+            f"  Memory Effective: {df['pod_effective_usage_memory_gigabyte_hours'].sum():>10.2f} GB-hours"
+        )
+        print(
+            f"  Node CPU Capacity:{df['node_capacity_cpu_core_hours'].sum():>10.2f} core-hours"
+        )
+        print(
+            f"  Node Mem Capacity:{df['node_capacity_memory_gigabyte_hours'].sum():>10.2f} GB-hours"
+        )
         print()
 
         print("Per-Day Breakdown:")
-        for date in sorted(df['usage_start'].unique()):
-            day_df = df[df['usage_start'] == date]
+        for date in sorted(df["usage_start"].unique()):
+            day_df = df[df["usage_start"] == date]
             print(f"\n  {date}:")
             print(f"    Namespace-Node Combinations: {len(day_df)}")
-            print(f"    CPU Request:    {day_df['pod_request_cpu_core_hours'].sum():>8.2f} core-hours")
-            print(f"    Memory Request: {day_df['pod_request_memory_gigabyte_hours'].sum():>8.2f} GB-hours")
+            print(
+                f"    CPU Request:    {day_df['pod_request_cpu_core_hours'].sum():>8.2f} core-hours"
+            )
+            print(
+                f"    Memory Request: {day_df['pod_request_memory_gigabyte_hours'].sum():>8.2f} GB-hours"
+            )
 
             # Show detail for first day only
-            if date == sorted(df['usage_start'].unique())[0]:
+            if date == sorted(df["usage_start"].unique())[0]:
                 print(f"\n    Details:")
                 for _, row in day_df.iterrows():
-                    print(f"      {row['namespace']:20s} @ {row['node']:20s}: "
-                          f"CPU={row['pod_request_cpu_core_hours']:6.2f}, "
-                          f"Mem={row['pod_request_memory_gigabyte_hours']:6.2f}")
+                    print(
+                        f"      {row['namespace']:20s} @ {row['node']:20s}: "
+                        f"CPU={row['pod_request_cpu_core_hours']:6.2f}, "
+                        f"Mem={row['pod_request_memory_gigabyte_hours']:6.2f}"
+                    )
 
         print("\n" + "=" * 80)
         print()
@@ -302,7 +328,9 @@ class ExpectedResultsCalculator:
         self.logger.info(f"Saved expected results to: {output_path}")
 
 
-def compare_results(expected_df: pd.DataFrame, actual_df: pd.DataFrame, tolerance: float = 0.0001) -> Dict:
+def compare_results(
+    expected_df: pd.DataFrame, actual_df: pd.DataFrame, tolerance: float = 0.0001
+) -> Dict:
     """Compare expected vs actual aggregation results.
 
     Args:
@@ -316,28 +344,28 @@ def compare_results(expected_df: pd.DataFrame, actual_df: pd.DataFrame, toleranc
     logger = get_logger("compare_results")
 
     # Merge on key columns
-    merge_keys = ['usage_start', 'namespace', 'node']
+    merge_keys = ["usage_start", "namespace", "node"]
 
     comparison = expected_df.merge(
         actual_df,
         on=merge_keys,
-        how='outer',
-        suffixes=('_expected', '_actual'),
-        indicator=True
+        how="outer",
+        suffixes=("_expected", "_actual"),
+        indicator=True,
     )
 
     # Metrics to compare
     metrics = [
-        'pod_usage_cpu_core_hours',
-        'pod_request_cpu_core_hours',
-        'pod_effective_usage_cpu_core_hours',
-        'pod_limit_cpu_core_hours',
-        'pod_usage_memory_gigabyte_hours',
-        'pod_request_memory_gigabyte_hours',
-        'pod_effective_usage_memory_gigabyte_hours',
-        'pod_limit_memory_gigabyte_hours',
-        'node_capacity_cpu_core_hours',
-        'node_capacity_memory_gigabyte_hours',
+        "pod_usage_cpu_core_hours",
+        "pod_request_cpu_core_hours",
+        "pod_effective_usage_cpu_core_hours",
+        "pod_limit_cpu_core_hours",
+        "pod_usage_memory_gigabyte_hours",
+        "pod_request_memory_gigabyte_hours",
+        "pod_effective_usage_memory_gigabyte_hours",
+        "pod_limit_memory_gigabyte_hours",
+        "node_capacity_cpu_core_hours",
+        "node_capacity_memory_gigabyte_hours",
     ]
 
     issues = []
@@ -345,21 +373,25 @@ def compare_results(expected_df: pd.DataFrame, actual_df: pd.DataFrame, toleranc
     total_comparisons = 0
 
     # Check for missing rows
-    missing_in_actual = comparison[comparison['_merge'] == 'left_only']
-    missing_in_expected = comparison[comparison['_merge'] == 'right_only']
+    missing_in_actual = comparison[comparison["_merge"] == "left_only"]
+    missing_in_expected = comparison[comparison["_merge"] == "right_only"]
 
     if not missing_in_actual.empty:
         issues.append(f"Missing in actual: {len(missing_in_actual)} rows")
         for _, row in missing_in_actual.iterrows():
-            issues.append(f"  - {row['usage_start']}, {row['namespace']}, {row['node']}")
+            issues.append(
+                f"  - {row['usage_start']}, {row['namespace']}, {row['node']}"
+            )
 
     if not missing_in_expected.empty:
         issues.append(f"Extra in actual: {len(missing_in_expected)} rows")
         for _, row in missing_in_expected.iterrows():
-            issues.append(f"  - {row['usage_start']}, {row['namespace']}, {row['node']}")
+            issues.append(
+                f"  - {row['usage_start']}, {row['namespace']}, {row['node']}"
+            )
 
     # Compare values for matching rows
-    both = comparison[comparison['_merge'] == 'both']
+    both = comparison[comparison["_merge"] == "both"]
 
     for metric in metrics:
         expected_col = f"{metric}_expected"
@@ -402,22 +434,26 @@ def compare_results(expected_df: pd.DataFrame, actual_df: pd.DataFrame, toleranc
                 )
 
     result = {
-        'all_match': len(issues) == 0,
-        'match_count': match_count,
-        'total_comparisons': total_comparisons,
-        'match_percentage': (match_count / total_comparisons * 100) if total_comparisons > 0 else 0,
-        'issues': issues,
-        'missing_in_actual_count': len(missing_in_actual),
-        'extra_in_actual_count': len(missing_in_expected),
+        "all_match": len(issues) == 0,
+        "match_count": match_count,
+        "total_comparisons": total_comparisons,
+        "match_percentage": (match_count / total_comparisons * 100)
+        if total_comparisons > 0
+        else 0,
+        "issues": issues,
+        "missing_in_actual_count": len(missing_in_actual),
+        "extra_in_actual_count": len(missing_in_expected),
     }
 
     # Log summary
-    if result['all_match']:
+    if result["all_match"]:
         logger.info("✅ ALL RESULTS MATCH EXPECTED VALUES!")
         logger.info(f"   {match_count}/{total_comparisons} comparisons passed")
     else:
         logger.error(f"❌ FOUND {len(issues)} DISCREPANCIES")
-        logger.error(f"   {match_count}/{total_comparisons} comparisons passed ({result['match_percentage']:.1f}%)")
+        logger.error(
+            f"   {match_count}/{total_comparisons} comparisons passed ({result['match_percentage']:.1f}%)"
+        )
         for issue in issues[:10]:  # Show first 10
             logger.error(f"   {issue}")
         if len(issues) > 10:
@@ -426,14 +462,18 @@ def compare_results(expected_df: pd.DataFrame, actual_df: pd.DataFrame, toleranc
     return result
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     """Run as standalone script to generate expected results."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Calculate expected results from nise YAML")
-    parser.add_argument('yaml_file', help='Path to nise static YAML file')
-    parser.add_argument('--output', '-o', help='Output CSV file path')
-    parser.add_argument('--print', '-p', action='store_true', help='Print summary to console')
+    parser = argparse.ArgumentParser(
+        description="Calculate expected results from nise YAML"
+    )
+    parser.add_argument("yaml_file", help="Path to nise static YAML file")
+    parser.add_argument("--output", "-o", help="Output CSV file path")
+    parser.add_argument(
+        "--print", "-p", action="store_true", help="Print summary to console"
+    )
 
     args = parser.parse_args()
 
@@ -447,5 +487,5 @@ if __name__ == '__main__':
         calculator.save_to_csv(df, args.output)
     else:
         # Default output
-        output_path = Path(args.yaml_file).parent / 'expected_results.csv'
+        output_path = Path(args.yaml_file).parent / "expected_results.csv"
         calculator.save_to_csv(df, str(output_path))

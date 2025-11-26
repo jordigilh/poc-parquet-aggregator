@@ -15,7 +15,7 @@
 4. [Memory Scaling Analysis](#memory-scaling-analysis)
 5. [Processing Time Analysis](#processing-time-analysis)
 6. [Statistical Variance](#statistical-variance)
-7. [Comparison with Trino](#comparison-with-trino)
+7. [Architecture Simplification](#architecture-simplification)
 8. [Why Streaming Was Not Used](#why-streaming-was-not-used)
 9. [Recommendations](#recommendations)
 10. [Environment & Reproducibility](#environment--reproducibility)
@@ -26,7 +26,7 @@
 
 ### ✅ Recommendation: **GO** - In-Memory Processing is Sufficient
 
-The POC can process **333K output rows using only 2.4 GB of memory**, well within the production VM limit of **48 GB**. Streaming mode is **not required** for OCP-on-AWS due to:
+The POC can process **666K output rows using only 6.2 GB of memory**, well within a production-like **32 GB Trino worker node**. Streaming mode is **not required** for OCP-on-AWS due to:
 
 1. JOIN operations require full AWS data in memory regardless of processing mode
 2. Streaming adds overhead with minimal memory benefit
@@ -81,7 +81,6 @@ The POC can process **333K output rows using only 2.4 GB of memory**, well withi
 | scale-1m | 333,312 | 120.97 | ±0.22 | 3,304 | ±107 | 2,755 rows/s |
 | scale-1.5m | 499,968 | 184.10 | ±0.34 | 4,924 | ±22 | 2,715 rows/s |
 | scale-2m | 666,624 | 249.18 | ±0.78 | 6,215 | ±27 | 2,675 rows/s |
-| scale-1m | 333,312 | 122.69 | ±1.23 | 3,258 | ±24 | 2,717 rows/s |
 
 ### Raw Run Data
 
@@ -204,17 +203,17 @@ xychart-beta
 
 ---
 
-## Comparison with Trino
+## Architecture Simplification
 
-| Aspect | Trino + Hive | Python POC | Advantage |
-|--------|--------------|------------|-----------|
-| **Components** | 6+ services | 3 services | 🏆 POC (simpler) |
-| **Memory footprint** | 10-20 GB JVM | 2-3 GB Python | 🏆 POC (lighter) |
-| **Throughput** | ~1,000 rows/s* | ~3,000 rows/s | 🏆 POC (3x faster) |
-| **Setup complexity** | High (Hive metastore, S3 connector) | Low (pip install) | 🏆 POC |
-| **Debuggability** | JVM stack traces, distributed logs | Python exceptions | 🏆 POC |
+| Aspect | Python POC |
+|--------|------------|
+| **Components** | 3 services (MinIO, PostgreSQL, Python) |
+| **Memory footprint** | 2-7 GB depending on scale |
+| **Throughput** | ~2,700 rows/sec |
+| **Setup complexity** | Low (pip install) |
+| **Debuggability** | Python exceptions, standard logging |
 
-*Trino estimate based on similar workloads; direct comparison not available.
+> **Note**: Direct comparison with Trino is not available as production Trino benchmarks were not conducted.
 
 ---
 
@@ -242,18 +241,18 @@ Streaming mode was evaluated but **not adopted** for the following reasons:
 ### For Production Deployment
 
 1. ✅ **Use in-memory processing** - sufficient for all projected workloads
-2. ✅ **Plan for 48 GB VM** - handles up to 6.5M output rows
+2. ✅ **Plan for standard 32 GB worker node** - handles up to 3.5M output rows
 3. ✅ **Monitor memory at scale** - track peak memory in production
-4. ⏳ **Consider horizontal scaling** - for extreme workloads (>5M rows)
+4. ⏳ **Consider horizontal scaling** - for extreme workloads (>3M rows)
 
 ### Memory Guidelines
 
-| Customer Size | Expected Output Rows | Recommended VM Memory |
+| Customer Size | Expected Output Rows | Recommended Worker Memory |
 |--------------|---------------------|----------------------|
 | Small | < 100K | 8 GB |
 | Medium | 100K - 500K | 16 GB |
-| Large | 500K - 1M | 32 GB |
-| Enterprise | 1M - 3M | 48 GB |
+| Large | 500K - 2M | 32 GB |
+| Enterprise | 2M - 3.5M | 32 GB (at capacity) |
 
 ---
 

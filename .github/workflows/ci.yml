@@ -103,20 +103,21 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      minio:
-        image: minio/minio:latest
-        ports:
-          - 9000:9000
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio \
+            -p 9000:9000 -p 9001:9001 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data --console-address ":9001"
+          # Wait for MinIO to be ready
+          for i in {1..30}; do
+            curl -sf http://localhost:9000/minio/health/live && break
+            echo "Waiting for MinIO..."
+            sleep 2
+          done
+
       - uses: actions/checkout@v4
 
       - name: Set up Python
@@ -147,6 +148,7 @@ jobs:
               resource_id VARCHAR(255),
               pod VARCHAR(255),
               pod_labels JSONB,
+              all_labels JSONB,
               pod_usage_cpu_core_hours DOUBLE PRECISION,
               pod_request_cpu_core_hours DOUBLE PRECISION,
               pod_effective_usage_cpu_core_hours DOUBLE PRECISION,
@@ -212,20 +214,20 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      minio:
-        image: minio/minio:latest
-        ports:
-          - 9000:9000
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio \
+            -p 9000:9000 -p 9001:9001 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data --console-address ":9001"
+          for i in {1..30}; do
+            curl -sf http://localhost:9000/minio/health/live && break
+            echo "Waiting for MinIO..."
+            sleep 2
+          done
+
       - uses: actions/checkout@v4
 
       - name: Set up Python
@@ -289,20 +291,20 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      minio:
-        image: minio/minio:latest
-        ports:
-          - 9000:9000
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio \
+            -p 9000:9000 -p 9001:9001 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data --console-address ":9001"
+          for i in {1..30}; do
+            curl -sf http://localhost:9000/minio/health/live && break
+            echo "Waiting for MinIO..."
+            sleep 2
+          done
+
       - uses: actions/checkout@v4
 
       - name: Set up Python

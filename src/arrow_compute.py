@@ -7,9 +7,11 @@ by using PyArrow compute functions that execute in C++.
 
 import json
 from typing import Dict, List, Optional
+
+import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
-import pandas as pd
+
 from .utils import get_logger
 
 
@@ -24,37 +26,37 @@ class ArrowLabelProcessor:
     def _parse_single_label(self, value: str) -> Dict:
         """
         Parse a single label string (handles both JSON and pipe-delimited formats).
-        
+
         Args:
             value: Label string (JSON or pipe-delimited)
-            
+
         Returns:
             Parsed label dictionary
         """
-        if value is None or value == '' or value == 'null':
+        if value is None or value == "" or value == "null":
             return {}
-        
+
         value = str(value).strip()
-        
+
         # Handle pipe-delimited format (from nise CSV): "app:benchmark|tier:web|node:node-001"
-        if '|' in value or (':' in value and '{' not in value):
+        if "|" in value or (":" in value and "{" not in value):
             result = {}
-            pairs = value.split('|') if '|' in value else [value]
+            pairs = value.split("|") if "|" in value else [value]
             for pair in pairs:
                 pair = pair.strip()
-                if ':' in pair:
-                    key, val = pair.split(':', 1)
+                if ":" in pair:
+                    key, val = pair.split(":", 1)
                     # Remove 'label_' prefix if present
-                    key = key.replace('label_', '').strip()
+                    key = key.replace("label_", "").strip()
                     result[key] = val.strip()
             return result
-        
+
         # Handle JSON format
         try:
             return json.loads(value)
         except (json.JSONDecodeError, TypeError):
             return {}
-    
+
     def parse_json_labels_vectorized(self, labels_series: pd.Series) -> List[Dict]:
         """
         Parse JSON label strings to dictionaries using vectorized operations.
@@ -73,13 +75,14 @@ class ArrowLabelProcessor:
         """
         # Check if data is already dict objects (not JSON strings)
         if len(labels_series) > 0:
-            first_non_null = labels_series.dropna().iloc[0] if not labels_series.dropna().empty else None
+            first_non_null = (
+                labels_series.dropna().iloc[0]
+                if not labels_series.dropna().empty
+                else None
+            )
             if isinstance(first_non_null, dict):
                 # Data is already parsed - no need to JSON decode
-                return [
-                    x if isinstance(x, dict) else {}
-                    for x in labels_series
-                ]
+                return [x if isinstance(x, dict) else {} for x in labels_series]
 
         try:
             # Convert to Arrow array for zero-copy operation
@@ -96,17 +99,14 @@ class ArrowLabelProcessor:
         except Exception as e:
             # Fallback to standard Python with format detection
             self.logger.warning(f"Arrow parsing failed, using fallback: {e}")
-            return [
-                self._parse_single_label(x) if x else {}
-                for x in labels_series
-            ]
+            return [self._parse_single_label(x) if x else {} for x in labels_series]
 
     def merge_labels_vectorized(
         self,
         node_labels: List[Dict],
         namespace_labels: List[Dict],
         pod_labels: List[Dict],
-        merge_func
+        merge_func,
     ) -> List[Dict]:
         """
         Merge label dictionaries using vectorized operations.
@@ -144,14 +144,18 @@ class ArrowLabelProcessor:
             # Fast JSON serialization
             # Handle NaN, None, and empty values
             return [
-                json.dumps(labels, sort_keys=True) if (labels and not (isinstance(labels, float) and pd.isna(labels))) else '{}'
+                json.dumps(labels, sort_keys=True)
+                if (labels and not (isinstance(labels, float) and pd.isna(labels)))
+                else "{}"
                 for labels in labels_list
             ]
         except Exception as e:
             self.logger.warning(f"Arrow JSON serialization failed, falling back: {e}")
             # Fallback - also handle NaN
             return [
-                '{}' if (not labels or (isinstance(labels, float) and pd.isna(labels))) else json.dumps(labels, sort_keys=True)
+                "{}"
+                if (not labels or (isinstance(labels, float) and pd.isna(labels)))
+                else json.dumps(labels, sort_keys=True)
                 for labels in labels_list
             ]
 
@@ -161,7 +165,7 @@ class ArrowLabelProcessor:
         namespace_labels_series: pd.Series,
         pod_labels_series: pd.Series,
         merge_func,
-        filter_func=None
+        filter_func=None,
     ) -> pd.DataFrame:
         """
         Process all label operations in a batch using Arrow compute.
@@ -180,7 +184,9 @@ class ArrowLabelProcessor:
 
         Performance: 10-50x faster than pandas operations
         """
-        self.logger.info("Processing labels with Arrow compute", rows=len(node_labels_series))
+        self.logger.info(
+            "Processing labels with Arrow compute", rows=len(node_labels_series)
+        )
 
         # Step 1: Parse JSON strings to dicts (vectorized)
         node_dicts = self.parse_json_labels_vectorized(node_labels_series)
@@ -198,10 +204,7 @@ class ArrowLabelProcessor:
 
         # Step 3: Merge labels (vectorized)
         merged_dicts = self.merge_labels_vectorized(
-            node_dicts,
-            namespace_dicts,
-            pod_dicts,
-            merge_func
+            node_dicts, namespace_dicts, pod_dicts, merge_func
         )
         self.logger.info("✓ Merged labels")
 
@@ -210,13 +213,15 @@ class ArrowLabelProcessor:
         self.logger.info("✓ Converted to JSON")
 
         # Return as DataFrame
-        return pd.DataFrame({
-            'node_labels_dict': node_dicts,
-            'namespace_labels_dict': namespace_dicts,
-            'pod_labels_dict': pod_dicts,
-            'merged_labels_dict': merged_dicts,
-            'merged_labels': merged_json
-        })
+        return pd.DataFrame(
+            {
+                "node_labels_dict": node_dicts,
+                "namespace_labels_dict": namespace_dicts,
+                "pod_labels_dict": pod_dicts,
+                "merged_labels_dict": merged_dicts,
+                "merged_labels": merged_json,
+            }
+        )
 
 
 class ArrowComputeHelper:
@@ -232,6 +237,7 @@ class ArrowComputeHelper:
         """
         try:
             import pyarrow.compute as pc
+
             # Test basic operation
             arr = pa.array([1, 2, 3])
             pc.sum(arr)
@@ -259,7 +265,9 @@ class ArrowComputeHelper:
             Dictionary with benchmark results
         """
         import time
+
         import pandas as pd
+
         from .utils import parse_json_labels
 
         # Generate test data
@@ -268,9 +276,7 @@ class ArrowComputeHelper:
 
         # Test pandas .apply()
         start = time.time()
-        pandas_result = test_series.apply(
-            lambda x: parse_json_labels(x) if x else {}
-        )
+        pandas_result = test_series.apply(lambda x: parse_json_labels(x) if x else {})
         pandas_time = time.time() - start
 
         # Test Arrow compute
@@ -282,10 +288,10 @@ class ArrowComputeHelper:
         speedup = pandas_time / arrow_time
 
         return {
-            'sample_size': sample_size,
-            'pandas_time': f"{pandas_time:.3f}s",
-            'arrow_time': f"{arrow_time:.3f}s",
-            'speedup': f"{speedup:.1f}x"
+            "sample_size": sample_size,
+            "pandas_time": f"{pandas_time:.3f}s",
+            "arrow_time": f"{arrow_time:.3f}s",
+            "speedup": f"{speedup:.1f}x",
         }
 
 
@@ -321,4 +327,3 @@ if __name__ == "__main__":
         print("\n✅ Arrow compute is working!")
     else:
         print("\n⚠️  Arrow compute not available")
-

@@ -22,7 +22,7 @@
 1. **Measure processing performance** at 6 scale points: 20K, 50K, 100K, 250K, 500K, 1M output rows
 2. **Capture time and memory** for data processing + PostgreSQL insertion (NOT data generation)
 3. **Generate reproducible benchmark results** with chart visualizations
-4. **Validate memory stays within production limits** (target: < 48 GB)
+4. **Validate memory stays within production limits** (target: < 32 GB)
 
 ---
 

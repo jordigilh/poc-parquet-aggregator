@@ -34,8 +34,9 @@ Usage:
 """
 
 import gc
-from typing import Any, Callable, Dict, Iterator, List, Optional, Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Callable, Dict, Iterator, List, Optional, Union
+
 import pandas as pd
 
 from .utils import PerformanceTimer, get_logger
@@ -63,7 +64,7 @@ class StreamingProcessor:
         self,
         config: Dict[str, Any],
         logger: Optional[Any] = None,
-        name: str = "streaming_processor"
+        name: str = "streaming_processor",
     ):
         """
         Initialize streaming processor.
@@ -77,17 +78,19 @@ class StreamingProcessor:
         self.logger = logger or get_logger(name)
 
         # Performance settings
-        perf_config = config.get('performance', {})
-        self.parallel_enabled = perf_config.get('parallel_chunks', False)
-        self.max_workers = perf_config.get('max_workers', 4)
-        chunk_size_raw = perf_config.get('chunk_size', 50000)
-        self.chunk_size = int(chunk_size_raw) if isinstance(chunk_size_raw, str) else chunk_size_raw
+        perf_config = config.get("performance", {})
+        self.parallel_enabled = perf_config.get("parallel_chunks", False)
+        self.max_workers = perf_config.get("max_workers", 4)
+        chunk_size_raw = perf_config.get("chunk_size", 50000)
+        self.chunk_size = (
+            int(chunk_size_raw) if isinstance(chunk_size_raw, str) else chunk_size_raw
+        )
 
         self.logger.info(
             "StreamingProcessor initialized",
             parallel=self.parallel_enabled,
             max_workers=self.max_workers if self.parallel_enabled else 1,
-            chunk_size=self.chunk_size
+            chunk_size=self.chunk_size,
         )
 
     def process_chunks(
@@ -96,7 +99,7 @@ class StreamingProcessor:
         reference_data: Dict[str, Any],
         process_fn: Callable[[pd.DataFrame, Dict[str, Any], int], pd.DataFrame],
         combine_fn: Optional[Callable[[List[pd.DataFrame]], pd.DataFrame]] = None,
-        timer_name: str = "Streaming processing"
+        timer_name: str = "Streaming processing",
     ) -> pd.DataFrame:
         """
         Process data chunks with a custom processing function.
@@ -118,20 +121,26 @@ class StreamingProcessor:
             Combined DataFrame from all processed chunks
         """
         if combine_fn is None:
-            combine_fn = lambda dfs: pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+            combine_fn = (
+                lambda dfs: pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+            )
 
         with PerformanceTimer(timer_name, self.logger):
             if self.parallel_enabled:
-                return self._process_parallel(chunks, reference_data, process_fn, combine_fn)
+                return self._process_parallel(
+                    chunks, reference_data, process_fn, combine_fn
+                )
             else:
-                return self._process_serial(chunks, reference_data, process_fn, combine_fn)
+                return self._process_serial(
+                    chunks, reference_data, process_fn, combine_fn
+                )
 
     def _process_serial(
         self,
         chunks: Iterator[pd.DataFrame],
         reference_data: Dict[str, Any],
         process_fn: Callable,
-        combine_fn: Callable
+        combine_fn: Callable,
     ) -> pd.DataFrame:
         """Process chunks serially (single-threaded)."""
         self.logger.info("Using SERIAL chunk processing (bounded memory)")
@@ -149,7 +158,7 @@ class StreamingProcessor:
             self.logger.info(
                 f"Processing chunk {chunk_count}",
                 input_rows=input_rows,
-                cumulative_input=total_input_rows
+                cumulative_input=total_input_rows,
             )
 
             try:
@@ -161,8 +170,7 @@ class StreamingProcessor:
                     total_output_rows += len(result)
 
                     self.logger.debug(
-                        f"Chunk {chunk_count} processed",
-                        output_rows=len(result)
+                        f"Chunk {chunk_count} processed", output_rows=len(result)
                     )
 
                 # Free memory immediately
@@ -171,8 +179,7 @@ class StreamingProcessor:
 
             except Exception as e:
                 self.logger.error(
-                    f"Failed to process chunk {chunk_count}",
-                    error=str(e)
+                    f"Failed to process chunk {chunk_count}", error=str(e)
                 )
                 raise
 
@@ -180,7 +187,7 @@ class StreamingProcessor:
             "All chunks processed (serial)",
             chunks=chunk_count,
             total_input_rows=total_input_rows,
-            total_output_rows=total_output_rows
+            total_output_rows=total_output_rows,
         )
 
         # Combine results
@@ -200,13 +207,10 @@ class StreamingProcessor:
         chunks: Iterator[pd.DataFrame],
         reference_data: Dict[str, Any],
         process_fn: Callable,
-        combine_fn: Callable
+        combine_fn: Callable,
     ) -> pd.DataFrame:
         """Process chunks in parallel (multi-threaded)."""
-        self.logger.info(
-            "Using PARALLEL chunk processing",
-            workers=self.max_workers
-        )
+        self.logger.info("Using PARALLEL chunk processing", workers=self.max_workers)
 
         # Collect chunks first (required for parallel distribution)
         # Note: This means parallel mode uses more memory during collection
@@ -216,7 +220,7 @@ class StreamingProcessor:
 
         self.logger.info(
             f"Collected {chunk_count} chunks for parallel processing",
-            total_input_rows=total_input_rows
+            total_input_rows=total_input_rows,
         )
 
         processed_chunks = []
@@ -241,14 +245,11 @@ class StreamingProcessor:
 
                     self.logger.info(
                         f"Chunk {chunk_idx + 1}/{chunk_count} completed",
-                        output_rows=len(result) if result is not None else 0
+                        output_rows=len(result) if result is not None else 0,
                     )
 
                 except Exception as e:
-                    self.logger.error(
-                        f"Chunk {chunk_idx} failed",
-                        error=str(e)
-                    )
+                    self.logger.error(f"Chunk {chunk_idx} failed", error=str(e))
                     raise
 
         # Free chunk list
@@ -259,7 +260,7 @@ class StreamingProcessor:
             "All chunks processed (parallel)",
             chunks=chunk_count,
             total_input_rows=total_input_rows,
-            total_output_rows=total_output_rows
+            total_output_rows=total_output_rows,
         )
 
         # Combine results
@@ -275,9 +276,7 @@ class StreamingProcessor:
         return combined
 
     def create_chunks(
-        self,
-        df: pd.DataFrame,
-        chunk_size: Optional[int] = None
+        self, df: pd.DataFrame, chunk_size: Optional[int] = None
     ) -> Iterator[pd.DataFrame]:
         """
         Create a chunk iterator from a DataFrame.
@@ -295,7 +294,7 @@ class StreamingProcessor:
         chunk_size = chunk_size or self.chunk_size
 
         for i in range(0, len(df), chunk_size):
-            yield df.iloc[i:i + chunk_size].copy()
+            yield df.iloc[i : i + chunk_size].copy()
 
     @staticmethod
     def log_memory_stats(logger, prefix: str = ""):
@@ -304,14 +303,14 @@ class StreamingProcessor:
         import sys
 
         max_rss_bytes = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-        if sys.platform == 'darwin':
+        if sys.platform == "darwin":
             max_rss_mb = max_rss_bytes / (1024 * 1024)
         else:
             max_rss_mb = max_rss_bytes / 1024
 
         logger.info(
             f"{prefix}Memory stats" if prefix else "Memory stats",
-            peak_rss_mb=f"{max_rss_mb:.2f} MB"
+            peak_rss_mb=f"{max_rss_mb:.2f} MB",
         )
 
 
@@ -330,7 +329,10 @@ def make_chunk_processor(
     Returns:
         A chunk processor function suitable for StreamingProcessor.process_chunks()
     """
-    def chunk_processor(chunk_df: pd.DataFrame, reference_data: Dict[str, Any], chunk_idx: int) -> pd.DataFrame:
+
+    def chunk_processor(
+        chunk_df: pd.DataFrame, reference_data: Dict[str, Any], chunk_idx: int
+    ) -> pd.DataFrame:
         results = []
         for _, row in chunk_df.iterrows():
             result = process_single_row_fn(row, reference_data)
@@ -339,4 +341,3 @@ def make_chunk_processor(
         return pd.DataFrame(results) if results else pd.DataFrame()
 
     return chunk_processor
-

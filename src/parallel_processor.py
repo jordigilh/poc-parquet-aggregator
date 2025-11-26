@@ -5,10 +5,13 @@ This module enables concurrent processing of multiple data chunks to maximize
 CPU utilization and achieve 2-4x speedup for streaming mode.
 """
 
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-from typing import Iterator, List, Callable, Any, Optional
-import pandas as pd
 import multiprocessing as mp
+from concurrent.futures import (ProcessPoolExecutor, ThreadPoolExecutor,
+                                as_completed)
+from typing import Any, Callable, Iterator, List, Optional
+
+import pandas as pd
+
 from .utils import get_logger
 
 
@@ -33,7 +36,7 @@ class ParallelChunkProcessor:
         self.logger.info(
             f"Initialized parallel processor",
             max_workers=self.max_workers,
-            executor_type=executor_type
+            executor_type=executor_type,
         )
 
     def process_chunks_parallel(
@@ -41,7 +44,7 @@ class ParallelChunkProcessor:
         chunks: Iterator[pd.DataFrame],
         process_func: Callable[[pd.DataFrame, Any], pd.DataFrame],
         process_args: tuple = (),
-        ordered: bool = False
+        ordered: bool = False,
     ) -> List[pd.DataFrame]:
         """
         Process chunks in parallel.
@@ -77,7 +80,7 @@ class ParallelChunkProcessor:
                     chunk,
                     process_func,
                     process_args,
-                    idx
+                    idx,
                 )
                 future_to_idx[future] = idx
 
@@ -115,17 +118,14 @@ class ParallelChunkProcessor:
         self.logger.info(
             "✓ Parallel processing complete",
             total_chunks=total_chunks,
-            total_results=len(results)
+            total_results=len(results),
         )
 
         return results
 
     @staticmethod
     def _process_single_chunk_wrapper(
-        chunk: pd.DataFrame,
-        process_func: Callable,
-        process_args: tuple,
-        chunk_idx: int
+        chunk: pd.DataFrame, process_func: Callable, process_args: tuple, chunk_idx: int
     ) -> pd.DataFrame:
         """
         Wrapper for processing a single chunk (runs in worker process/thread).
@@ -178,9 +178,7 @@ class ChunkBatcher:
                 # Combine batch into single DataFrame
                 combined = pd.concat(batch, ignore_index=True)
                 self.logger.debug(
-                    f"Created batch",
-                    num_chunks=len(batch),
-                    total_rows=batch_rows
+                    f"Created batch", num_chunks=len(batch), total_rows=batch_rows
                 )
                 yield combined
                 batch = []
@@ -190,9 +188,7 @@ class ChunkBatcher:
         if batch:
             combined = pd.concat(batch, ignore_index=True)
             self.logger.debug(
-                f"Created final batch",
-                num_chunks=len(batch),
-                total_rows=batch_rows
+                f"Created final batch", num_chunks=len(batch), total_rows=batch_rows
             )
             yield combined
 
@@ -244,8 +240,7 @@ if __name__ == "__main__":
     if PARALLEL_PROCESSING_AVAILABLE:
         # Create test chunks
         test_chunks = [
-            pd.DataFrame({'x': range(i*100, (i+1)*100)})
-            for i in range(8)
+            pd.DataFrame({"x": range(i * 100, (i + 1) * 100)}) for i in range(8)
         ]
 
         def test_process_func(chunk: pd.DataFrame) -> pd.DataFrame:
@@ -265,8 +260,7 @@ if __name__ == "__main__":
         processor = ParallelChunkProcessor(max_workers=4)
         start = time.time()
         parallel_results = processor.process_chunks_parallel(
-            iter(test_chunks),
-            test_process_func
+            iter(test_chunks), test_process_func
         )
         parallel_time = time.time() - start
         print(f"Parallel time: {parallel_time:.2f}s")
@@ -275,4 +269,3 @@ if __name__ == "__main__":
         print(f"\n✅ Speedup: {speedup:.2f}x")
     else:
         print("\n⚠️  Parallel processing not available")
-

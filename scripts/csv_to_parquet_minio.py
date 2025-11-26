@@ -23,6 +23,7 @@ def main():
     BUCKET = os.getenv('S3_BUCKET', 'test-bucket')
     ORG_ID = os.getenv('ORG_ID', 'org1234567')
     PROVIDER_UUID = os.getenv('OCP_PROVIDER_UUID', '00000000-0000-0000-0000-000000000001')
+    OCP_CLUSTER_ID = os.getenv('OCP_CLUSTER_ID', '')  # Fallback cluster_id from environment
 
     # CSV input directory
     csv_dir_arg = sys.argv[1] if len(sys.argv) > 1 else '/tmp/nise-poc-data'
@@ -40,6 +41,7 @@ def main():
     print(f"Bucket:         {BUCKET}")
     print(f"Org ID:         {ORG_ID}")
     print(f"Provider UUID:  {PROVIDER_UUID}")
+    print(f"Cluster ID:     {OCP_CLUSTER_ID or '(auto-detect)'}")
     print("=" * 80)
     print()
 
@@ -172,20 +174,22 @@ def main():
 
                     # For OCP data in multi-cluster scenarios, extract cluster_id from directory path
                     # Nise generates directory structure: ocp/prod-cluster/YYYY-MM-DD/openshift_pod_usage_line_items.csv
+                    # Also works with: e2e_test_data/cluster-name/YYYYMMDD-YYYYMMDD/openshift_report.*.csv
                     # Extract cluster_id from parent directory and add it as a column if not already present
                     if provider == 'OCP' and 'cluster_id' not in df_temp.columns:
-                        # Check if file is in a subdirectory of ocp/ (multi-cluster)
-                        # Path example: /tmp/.../ocp/prod-cluster/2025-10-01/openshift_pod_usage_line_items.csv
+                        detected_cluster_id = None
+                        
+                        # Check if file is in a subdirectory of ocp/ or e2e_test_data/ (multi-cluster)
                         parts = csv_file.parts
-                        ocp_index = -1
+                        base_index = -1
                         for i, part in enumerate(parts):
-                            if part == 'ocp':
-                                ocp_index = i
+                            if part in ('ocp', 'e2e_test_data'):
+                                base_index = i
                                 break
 
-                        # If ocp/ is found and there's a subdirectory after it, that's the cluster_id
-                        if ocp_index >= 0 and ocp_index + 1 < len(parts):
-                            potential_cluster_id = parts[ocp_index + 1]
+                        # If base dir is found and there's a subdirectory after it, that might be the cluster_id
+                        if base_index >= 0 and base_index + 1 < len(parts):
+                            potential_cluster_id = parts[base_index + 1]
                             # Verify it's not a date directory
                             # Nise uses patterns: YYYYMMDD-YYYYMMDD or YYYY-MM-DD
                             is_date_dir = (
@@ -193,8 +197,16 @@ def main():
                                 re.match(r'^\d{4}-\d{2}-\d{2}$', potential_cluster_id)  # 2025-10-01
                             )
                             if not is_date_dir:
-                                df_temp['cluster_id'] = potential_cluster_id
-                                print(f"   🔍 Detected cluster_id '{potential_cluster_id}' from directory path")
+                                detected_cluster_id = potential_cluster_id
+                                print(f"   🔍 Detected cluster_id '{detected_cluster_id}' from directory path")
+                        
+                        # Fallback to OCP_CLUSTER_ID environment variable if not detected from path
+                        if not detected_cluster_id and OCP_CLUSTER_ID:
+                            detected_cluster_id = OCP_CLUSTER_ID
+                            print(f"   🔍 Using cluster_id '{detected_cluster_id}' from OCP_CLUSTER_ID env var")
+                        
+                        if detected_cluster_id:
+                            df_temp['cluster_id'] = detected_cluster_id
 
                     all_dfs.append(df_temp)
                     print(f"   ✓ {csv_file.name}: {len(df_temp)} rows")
