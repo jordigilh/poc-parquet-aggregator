@@ -10,15 +10,16 @@
 ## Table of Contents
 
 1. [Executive Summary](#executive-summary)
-2. [Benchmark Methodology](#benchmark-methodology)
-3. [Aggregation Performance](#aggregation-performance-primary-metrics)
-4. [Memory Scaling Analysis](#memory-scaling-analysis)
-5. [Processing Time Analysis](#processing-time-analysis)
-6. [Statistical Variance](#statistical-variance)
-7. [Architecture Simplification](#architecture-simplification)
-8. [Why Streaming Was Not Used](#why-streaming-was-not-used)
-9. [Recommendations](#recommendations)
-10. [Environment & Reproducibility](#environment--reproducibility)
+2. [Scale Interpretation](#scale-interpretation)
+3. [Benchmark Methodology](#benchmark-methodology)
+4. [Aggregation Performance](#aggregation-performance-primary-metrics)
+5. [Memory Scaling Analysis](#memory-scaling-analysis)
+6. [Processing Time Analysis](#processing-time-analysis)
+7. [Statistical Variance](#statistical-variance)
+8. [Architecture Simplification](#architecture-simplification)
+9. [Why Streaming Was Not Used](#why-streaming-was-not-used)
+10. [Recommendations](#recommendations)
+11. [Environment & Reproducibility](#environment--reproducibility)
 
 ---
 
@@ -43,6 +44,25 @@ The POC can process **666K output rows using only 6.2 GB of memory**, well withi
 | **Time variance** | < 1% stddev | Highly reproducible |
 
 > **Note**: All results based on 3 runs per scale with median values reported.
+
+---
+
+## Scale Interpretation
+
+What does each scale represent in a production environment?
+
+| Scale | OCP Cluster | AWS Resources | Use Case Example |
+|-------|-------------|---------------|------------------|
+| **scale-20k** | 10 nodes, ~420 pods | 10 EC2 + EBS | Small OCP-on-AWS deployment |
+| **scale-50k** | 25 nodes, ~1,050 pods | 25 EC2 + EBS | Growing hybrid workload |
+| **scale-100k** | 50 nodes, ~2,085 pods | 50 EC2 + EBS | Medium enterprise |
+| **scale-250k** | 125 nodes, ~5,225 pods | 125 EC2 + EBS | Large enterprise |
+| **scale-500k** | 250 nodes, ~10,417 pods | 250 EC2 + EBS | Multi-cluster deployment |
+| **scale-1m** | 500 nodes, ~20,833 pods | 500 EC2 + EBS | Enterprise platform |
+| **scale-1.5m** | 750 nodes, ~31,250 pods | 750 EC2 + EBS | Large-scale platform |
+| **scale-2m** | 1,000 nodes, ~41,667 pods | 1,000 EC2 + EBS | Cloud-scale operations |
+
+> **Note**: OCP-on-AWS output rows = OCP pods × matched AWS resources × 24 hours × cost methods
 
 ---
 
