@@ -1,0 +1,67 @@
+start_date: 2025-10-01
+end_date: 2025-10-02
+ocp:
+  generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node_name: ip-10-0-5-100.ec2.internal
+          resource_id: '{{ resource_id_5 }}'
+          cpu_cores: 4
+          memory_gig: 16
+          namespaces:
+            database:
+              pods:
+                - pod:
+                  pod_name: postgres-0
+                  cpu_request: 2
+                  mem_request_gig: 8
+                  cpu_limit: 4
+                  mem_limit_gig: 16
+                  pod_seconds: 3600
+                  cpu_usage:
+                    full_period: 2
+                  mem_usage_gig:
+                    full_period: 10
+              volumes:
+                - volume:
+                  volume_name: postgres-data
+                  volume_request_gig: 100
+                  storage_class: gp3
+                  csi_driver: ebs.csi.aws.com
+                  csi_volume_handle: vol-test0001
+                  volume_claims:
+                    - volume_claim:
+                      volume_claim_name: postgres-data-pvc
+                      pod_name: postgres-0
+                      capacity_gig: 100
+                      volume_claim_usage_gig:
+                        full_period: 50
+aws:
+  generators:
+  - EC2Generator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      resource_id: '{{ resource_id_5 }}'
+      instance_type:
+        inst_type: m5.xlarge
+        physical_cores: 1
+        vcpu: '4'
+        memory: 16 GiB
+        storage: EBS Only
+        family: General Purpose
+        cost: 0.192
+        rate: 0.192
+  - EBSGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      resource_id: test0001
+      disk_size: 100
+      rate: 0.596  # $0.596/GB-month × 100GB × (24h/744h) = $1.92
+expected_outcome:
+  ec2_cost: 4.608
+  ebs_cost: 1.92
+  total_cost: 6.528
+  namespace: database
+  disk_capacity_gb_month: 100

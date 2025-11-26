@@ -1,0 +1,48 @@
+# Scenario 09: Days in Month Formula
+# Trino SQL: Storage metrics use actual days in month (lines 358-363)
+# Purpose: Validate storage metrics use actual days (28/29/30/31)
+# CRITICAL: Tests Gap 2 - Days in Month Formula
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-1
+          cpu_cores: 4
+          memory_gig: 16
+          resource_id: i-worker001
+          namespaces:
+            storage-test:
+              pods:
+                - pod: null
+                  pod_name: db-pod
+                  cpu_request: 1.0
+                  mem_request_gig: 4
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.8
+                  mem_usage_gig:
+                    full_period: 3.0
+                  pod_labels: app:database
+
+              volumes:
+                - volume:
+                  volume_name: db-pvc
+                  storage_class: gp2
+                  volume_request_gig: 100
+                  labels: storage:database
+                  volume_claims:
+                    - volume_claim:
+                      volume_claim_name: db-pvc
+                      pod_name: db-pod
+                      capacity_gig: 100
+                      volume_claim_usage_gig:
+                        full_period: 50
+
+# Expected: October has 31 days
+# 1 day of 100 GB = 100 / 31 GB-months ≈ 3.226 GB-months

@@ -1,0 +1,133 @@
+# Scenario 19: Non-CSI Storage (Tag-Based Attribution)
+# Purpose: Validate that EBS volumes without CSI handles can be attributed to
+#          OCP namespaces via AWS resource tags (fallback mechanism)
+# Business Case: Legacy storage, manually provisioned EBS volumes, or non-CSI drivers
+#                where volumes are tagged with openshift_project/openshift_cluster
+
+start_date: '2025-10-01'
+end_date: '2025-10-02'
+
+ocp:
+  generators:
+  - OCPGenerator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      nodes:
+      # Node 1: Has PVCs but NO CSI handles (legacy storage)
+      - node_name: ip-10-0-4-10.ec2.internal
+        resource_id: legacy-node-01
+        cpu_cores: 2
+        memory_gig: 8
+        namespaces:
+          legacy-app:
+            pods:
+            - pod_name: legacy-service
+              cpu_request: 1
+              mem_request_gig: 4
+              cpu_limit: 2
+              mem_limit_gig: 8
+              pod_seconds: 3600
+              cpu_usage:
+                full_period: 1.5
+              mem_usage_gig:
+                full_period: 6
+            # Note: No volumes defined here - simulating non-CSI legacy storage
+
+          modern-app:
+            pods:
+            - pod_name: modern-service
+              cpu_request: 1
+              mem_request_gig: 4
+              cpu_limit: 2
+              mem_limit_gig: 8
+              pod_seconds: 3600
+              cpu_usage:
+                full_period: 1.5
+              mem_usage_gig:
+                full_period: 6
+
+aws:
+  generators:
+  # EC2 compute (baseline)
+  - EC2Generator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: legacy-node-01
+      instance_type:
+        inst_type: t3.medium
+        physical_cores: 0.5
+        vcpu: '2'
+        memory: 4 GiB
+        storage: EBS Only
+        family: General Purpose
+        cost: 0.0416  # $0.0416/hr = $0.9984/day
+        rate: 0.0416
+      tags:
+        openshift_cluster: test-cluster-001
+        openshift_node: ip-10-0-4-10.ec2.internal
+
+  # EBS Volume 1: Tagged with openshift_project (should be attributed to legacy-app)
+  - EBSGenerator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: legacy-vol-001  # No matching CSI handle
+      disk_size: 50  # 50 GB
+      rate: 0.383    # $0.383/GB/month → 50 * 0.383 = $19.15/month = $0.6383/day
+      tags:
+        openshift_cluster: test-cluster-001
+        openshift_project: legacy-app  # Direct tag to namespace
+        storage_type: legacy
+
+  # EBS Volume 2: Tagged with openshift_project (should be attributed to modern-app)
+  - EBSGenerator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: modern-vol-002  # No matching CSI handle
+      disk_size: 100  # 100 GB
+      rate: 0.383    # $0.383/GB/month → 100 * 0.383 = $38.30/month = $1.277/day
+      tags:
+        openshift_cluster: test-cluster-001
+        openshift_project: modern-app  # Direct tag to namespace
+        storage_type: gp3
+
+  # EBS Volume 3: Has cluster tag but NO openshift_project (should go to "Storage unattributed")
+  - EBSGenerator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: untagged-vol-003
+      disk_size: 25  # 25 GB
+      rate: 0.383    # $0.383/GB/month → 25 * 0.383 = $9.575/month = $0.3192/day
+      tags:
+        openshift_cluster: test-cluster-001  # Has cluster tag for matching
+        environment: production
+        cost_center: engineering
+        # Note: NO openshift_project tag - goes to "Storage unattributed"
+
+expected_outcome:
+  # EC2 cost: $0.9984 (split between legacy-app and modern-app by CPU ratio)
+  #   - Each pod uses 1.5 CPU, total 3.0 CPU
+  #   - legacy-app: (1.5/3.0) * $0.9984 = $0.4992
+  #   - modern-app: (1.5/3.0) * $0.9984 = $0.4992
+  #
+  # EBS costs (tag-based attribution):
+  #   - legacy-vol-001: $0.6383 → legacy-app
+  #   - modern-vol-002: $1.277 → modern-app
+  #   - untagged-vol-003: $0.3192 → Storage unattributed (has cluster tag, no project tag)
+  #
+  # Total costs:
+  #   - legacy-app: $0.4992 (EC2) + $0.6383 (EBS) = $1.1375
+  #   - modern-app: $0.4992 (EC2) + $1.277 (EBS) = $1.7762
+  #   - Storage unattributed: $0.3192
+  #
+  # Grand total: $1.1375 + $1.7762 + $0.3192 = $3.2329
+
+  total_cost: 3.2329
+
+  # Namespace breakdown
+  legacy_app_namespace_cost: 1.1375   # EC2 + tag-matched EBS
+  modern_app_namespace_cost: 1.7762   # EC2 + tag-matched EBS
+  storage_unattributed_namespace_cost: 0.3192  # Untagged EBS
+
+  # Verify tag-based storage attribution works
+  storage_attribution_method: tag_matching  # Not CSI handle matching
+

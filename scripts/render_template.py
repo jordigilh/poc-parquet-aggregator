@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Render Jinja2 templates in IQE YAML files.
+Render Jinja2 templates in Core YAML files.
 
-This script renders template variables in IQE YAML files to make them usable by nise.
+This script renders template variables in Core YAML files to make them usable by nise.
 """
 
 import sys
@@ -24,7 +24,7 @@ def render_ocp_template(template_file: str, output_file: str) -> None:
     with open(template_file, 'r') as f:
         template_content = f.read()
 
-    # Define template variables (matching IQE's ocp_fixtures.py)
+    # Define template variables (matching Core's ocp_fixtures.py)
     today = datetime.now().strftime('%Y-%m-%d')
     template_vars = {
         'echo_orig_end': f'{today}T00 +0000',

@@ -411,7 +411,8 @@ class PodAggregator:
             'node_capacity_memory_gigabytes': 'max'
         }
 
-        return df.groupby(group_keys, dropna=False).agg(agg_funcs).reset_index()
+        # Note: observed=True is critical when columns are categorical
+        return df.groupby(group_keys, dropna=False, observed=True).agg(agg_funcs).reset_index()
 
     def _prepare_pod_usage_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Prepare pod usage data (parse dates, parse labels).
@@ -437,10 +438,19 @@ class PodAggregator:
             )
 
         # Parse interval_start as date
-        # Handle nise date format: "2025-11-01 00:00:00 +0000 UTC"
-        df['interval_start_clean'] = df['interval_start'].str.replace(r' \+\d{4} UTC$', '', regex=True)
-        df['usage_start'] = pd.to_datetime(df['interval_start_clean']).dt.date
-        df.drop('interval_start_clean', axis=1, inplace=True)
+        # Handle both string and datetime formats
+        if 'interval_start' in df.columns:
+            if pd.api.types.is_string_dtype(df['interval_start']):
+                # Handle nise string format: "2025-11-01 00:00:00 +0000 UTC"
+                df['interval_start_clean'] = df['interval_start'].str.replace(r' \+\d{4} UTC$', '', regex=True)
+                df['usage_start'] = pd.to_datetime(df['interval_start_clean']).dt.date
+                df.drop('interval_start_clean', axis=1, inplace=True)
+            elif pd.api.types.is_datetime64_any_dtype(df['interval_start']):
+                # Already datetime, just extract date
+                df['usage_start'] = df['interval_start'].dt.date
+            else:
+                # Try to convert to datetime first
+                df['usage_start'] = pd.to_datetime(df['interval_start']).dt.date
 
         # Parse pod_labels JSON
         df['pod_labels_dict'] = df['pod_labels'].apply(parse_json_labels)
@@ -526,9 +536,21 @@ class PodAggregator:
         """
         # Parse node labels
         node_labels_df = node_labels_df.copy()
-        node_labels_df['interval_start_clean'] = node_labels_df['interval_start'].str.replace(r' \+\d{4} UTC$', '', regex=True)
-        node_labels_df['usage_start'] = pd.to_datetime(node_labels_df['interval_start_clean']).dt.date
-        node_labels_df.drop('interval_start_clean', axis=1, inplace=True)
+
+        # Handle both interval_start (from parquet) and usage_start (from tests)
+        if 'interval_start' in node_labels_df.columns:
+            if pd.api.types.is_string_dtype(node_labels_df['interval_start']):
+                node_labels_df['interval_start_clean'] = node_labels_df['interval_start'].str.replace(r' \+\d{4} UTC$', '', regex=True)
+                node_labels_df['usage_start'] = pd.to_datetime(node_labels_df['interval_start_clean']).dt.date
+                node_labels_df.drop('interval_start_clean', axis=1, inplace=True)
+            elif pd.api.types.is_datetime64_any_dtype(node_labels_df['interval_start']):
+                node_labels_df['usage_start'] = node_labels_df['interval_start'].dt.date
+            else:
+                node_labels_df['usage_start'] = pd.to_datetime(node_labels_df['interval_start']).dt.date
+        elif 'usage_start' not in node_labels_df.columns:
+            self.logger.warning("Node labels missing both 'interval_start' and 'usage_start' columns")
+            return pod_df
+
         node_labels_df['node_labels_dict'] = node_labels_df['node_labels'].apply(parse_json_labels)
 
         # Filter by enabled keys
@@ -569,9 +591,21 @@ class PodAggregator:
         """
         # Parse namespace labels
         namespace_labels_df = namespace_labels_df.copy()
-        namespace_labels_df['interval_start_clean'] = namespace_labels_df['interval_start'].str.replace(r' \+\d{4} UTC$', '', regex=True)
-        namespace_labels_df['usage_start'] = pd.to_datetime(namespace_labels_df['interval_start_clean']).dt.date
-        namespace_labels_df.drop('interval_start_clean', axis=1, inplace=True)
+
+        # Handle both interval_start (from parquet) and usage_start (from tests)
+        if 'interval_start' in namespace_labels_df.columns:
+            if pd.api.types.is_string_dtype(namespace_labels_df['interval_start']):
+                namespace_labels_df['interval_start_clean'] = namespace_labels_df['interval_start'].str.replace(r' \+\d{4} UTC$', '', regex=True)
+                namespace_labels_df['usage_start'] = pd.to_datetime(namespace_labels_df['interval_start_clean']).dt.date
+                namespace_labels_df.drop('interval_start_clean', axis=1, inplace=True)
+            elif pd.api.types.is_datetime64_any_dtype(namespace_labels_df['interval_start']):
+                namespace_labels_df['usage_start'] = namespace_labels_df['interval_start'].dt.date
+            else:
+                namespace_labels_df['usage_start'] = pd.to_datetime(namespace_labels_df['interval_start']).dt.date
+        elif 'usage_start' not in namespace_labels_df.columns:
+            self.logger.warning("Namespace labels missing both 'interval_start' and 'usage_start' columns")
+            return pod_df
+
         namespace_labels_df['namespace_labels_dict'] = namespace_labels_df['namespace_labels'].apply(parse_json_labels)
 
         # Filter by enabled keys
@@ -685,7 +719,9 @@ class PodAggregator:
         agg_funcs['pod_effective_usage_memory_byte_seconds'] = lambda x: convert_bytes_to_gigabytes(convert_seconds_to_hours(x.sum()))
 
         # Group and aggregate
-        aggregated = df.groupby(group_keys, dropna=False).agg(agg_funcs).reset_index()
+        # Note: observed=True is critical when columns are categorical to avoid
+        # creating rows for all category combinations (Cartesian product)
+        aggregated = df.groupby(group_keys, dropna=False, observed=True).agg(agg_funcs).reset_index()
 
         # Rename columns to match output schema
         aggregated = aggregated.rename(columns={
@@ -722,16 +758,30 @@ class PodAggregator:
         if node_capacity_df.empty:
             aggregated_df['node_capacity_cpu_core_hours'] = None
             aggregated_df['node_capacity_memory_gigabyte_hours'] = None
+            aggregated_df['node_capacity_cpu_cores'] = None
+            aggregated_df['node_capacity_memory_gigabytes'] = None
             aggregated_df['cluster_capacity_cpu_core_hours'] = None
             aggregated_df['cluster_capacity_memory_gigabyte_hours'] = None
             return aggregated_df
 
         # Join with node capacity
-        return aggregated_df.merge(
+        result = aggregated_df.merge(
             node_capacity_df,
             on=['usage_start', 'node'],
             how='left'
         )
+
+        # Add missing capacity columns with defaults if not present
+        capacity_columns = [
+            'node_capacity_cpu_core_hours', 'node_capacity_memory_gigabyte_hours',
+            'node_capacity_cpu_cores', 'node_capacity_memory_gigabytes',
+            'cluster_capacity_cpu_core_hours', 'cluster_capacity_memory_gigabyte_hours'
+        ]
+        for col in capacity_columns:
+            if col not in result.columns:
+                result[col] = None
+
+        return result
 
     def _join_cost_category(
         self,
@@ -778,8 +828,8 @@ class PodAggregator:
         Returns:
             Formatted DataFrame
         """
-        # Convert merged_labels dict to JSON string
-        df['pod_labels'] = df['merged_labels'].apply(labels_to_json_string)
+        # merged_labels is already a JSON string from _process_labels_optimized
+        df['pod_labels'] = df['merged_labels']
 
         # Add fixed columns
         df['uuid'] = None  # PostgreSQL will generate
@@ -788,6 +838,10 @@ class PodAggregator:
         df['cluster_alias'] = self.cluster_alias
         df['data_source'] = 'Pod'
         df['usage_end'] = df['usage_start']  # Same as usage_start for daily
+
+        # Pod column (NULL for aggregated data - individual pod names lost during grouping)
+        if 'pod' not in df.columns:
+            df['pod'] = None
 
         # Storage columns (NULL for pod data)
         df['persistentvolumeclaim'] = None
@@ -800,21 +854,23 @@ class PodAggregator:
         df['persistentvolumeclaim_usage_gigabyte_months'] = None
         df['csi_volume_handle'] = None
 
+        # all_labels = merge(pod_labels, volume_labels) - Trino SQL lines 651-654
+        # For Pod data, volume_labels is NULL, so all_labels = pod_labels
+        df['all_labels'] = df['pod_labels']
+
         # Infrastructure cost (default JSON)
         df['infrastructure_usage_cost'] = '{"cpu": 0.000000000, "memory": 0.000000000, "storage": 0.000000000}'
 
         # Partition columns
         # Note: Trino SQL line 665 uses lpad(month, 2, '0') for zero-padding
-        df['source_uuid'] = self.provider_uuid  # UUID column for database
-        df['source'] = self.provider_uuid  # Partition column
-        df['year'] = df['usage_start'].apply(lambda d: str(d.year))
-        df['month'] = df['usage_start'].apply(lambda d: str(d.month).zfill(2))  # Zero-pad: '1' → '01'
-        df['day'] = df['usage_start'].apply(lambda d: str(d.day))
+        df['source_uuid'] = self.provider_uuid  # UUID column for database foreign key
 
-        # Select columns in correct order
+        # Select columns in correct order (PostgreSQL schema - no partition columns)
+        # NOTE: Partition columns (source, year, month, day) are for Hive/Trino only, not PostgreSQL
+        # all_labels added per Trino SQL lines 651-654
         output_columns = [
             'uuid', 'report_period_id', 'cluster_id', 'cluster_alias', 'data_source',
-            'usage_start', 'usage_end', 'namespace', 'node', 'resource_id',
+            'usage_start', 'usage_end', 'namespace', 'node', 'pod', 'resource_id',
             'pod_labels',
             'pod_usage_cpu_core_hours', 'pod_request_cpu_core_hours',
             'pod_effective_usage_cpu_core_hours', 'pod_limit_cpu_core_hours',
@@ -824,10 +880,10 @@ class PodAggregator:
             'node_capacity_memory_gigabytes', 'node_capacity_memory_gigabyte_hours',
             'cluster_capacity_cpu_core_hours', 'cluster_capacity_memory_gigabyte_hours',
             'persistentvolumeclaim', 'persistentvolume', 'storageclass', 'volume_labels',
+            'all_labels',  # Trino SQL lines 651-654: merge(pod_labels, volume_labels)
             'persistentvolumeclaim_capacity_gigabyte', 'persistentvolumeclaim_capacity_gigabyte_months',
             'volume_request_storage_gigabyte_months', 'persistentvolumeclaim_usage_gigabyte_months',
-            'source_uuid', 'infrastructure_usage_cost', 'csi_volume_handle', 'cost_category_id',
-            'source', 'year', 'month', 'day'
+            'source_uuid', 'infrastructure_usage_cost', 'csi_volume_handle', 'cost_category_id'
         ]
 
         return df[output_columns]
@@ -858,10 +914,31 @@ def calculate_node_capacity(pod_usage_df: pd.DataFrame) -> Tuple[pd.DataFrame, p
     with PerformanceTimer("Calculate node/cluster capacity", logger):
         # Parse usage_start
         df = pod_usage_df.copy()
-        # Handle nise date format: "2025-11-01 00:00:00 +0000 UTC"
-        df['interval_start_clean'] = df['interval_start'].str.replace(r' \+\d{4} UTC$', '', regex=True)
-        df['usage_start'] = pd.to_datetime(df['interval_start_clean']).dt.date
-        df.drop('interval_start_clean', axis=1, inplace=True)
+
+        # Handle empty DataFrame
+        if df.empty:
+            logger.warning("Empty DataFrame passed to calculate_node_capacity, returning empty capacity")
+            empty_node_capacity = pd.DataFrame(columns=[
+                'usage_start', 'node', 'node_capacity_cpu_cores', 'node_capacity_memory_gigabytes',
+                'node_capacity_cpu_core_hours', 'node_capacity_memory_gigabyte_hours'
+            ])
+            empty_cluster_capacity = pd.DataFrame(columns=[
+                'usage_start', 'cluster_capacity_cpu_core_hours', 'cluster_capacity_memory_gigabyte_hours'
+            ])
+            return empty_node_capacity, empty_cluster_capacity
+
+        # Handle both string and datetime formats for interval_start
+        if pd.api.types.is_string_dtype(df['interval_start']):
+            # Handle nise string format: "2025-11-01 00:00:00 +0000 UTC"
+            df['interval_start_clean'] = df['interval_start'].str.replace(r' \+\d{4} UTC$', '', regex=True)
+            df['usage_start'] = pd.to_datetime(df['interval_start_clean']).dt.date
+            df.drop('interval_start_clean', axis=1, inplace=True)
+        elif pd.api.types.is_datetime64_any_dtype(df['interval_start']):
+            # Already datetime, just extract date
+            df['usage_start'] = df['interval_start'].dt.date
+        else:
+            # Try to convert to datetime first
+            df['usage_start'] = pd.to_datetime(df['interval_start']).dt.date
 
         # Step 1: Get max capacity per interval + node (Trino lines 149-160)
         # NOTE: If input is already daily aggregated, this step is a no-op
@@ -871,10 +948,15 @@ def calculate_node_capacity(pod_usage_df: pd.DataFrame) -> Tuple[pd.DataFrame, p
         }).reset_index()
 
         # Step 2: Sum across intervals for each day + node (Trino lines 143-164)
-        # Handle nise date format
-        interval_capacity['interval_start_clean'] = interval_capacity['interval_start'].str.replace(r' \+\d{4} UTC$', '', regex=True)
-        interval_capacity['usage_start'] = pd.to_datetime(interval_capacity['interval_start_clean']).dt.date
-        interval_capacity.drop('interval_start_clean', axis=1, inplace=True)
+        # Handle both string and datetime formats
+        if pd.api.types.is_string_dtype(interval_capacity['interval_start']):
+            interval_capacity['interval_start_clean'] = interval_capacity['interval_start'].str.replace(r' \+\d{4} UTC$', '', regex=True)
+            interval_capacity['usage_start'] = pd.to_datetime(interval_capacity['interval_start_clean']).dt.date
+            interval_capacity.drop('interval_start_clean', axis=1, inplace=True)
+        elif pd.api.types.is_datetime64_any_dtype(interval_capacity['interval_start']):
+            interval_capacity['usage_start'] = interval_capacity['interval_start'].dt.date
+        else:
+            interval_capacity['usage_start'] = pd.to_datetime(interval_capacity['interval_start']).dt.date
         node_capacity = interval_capacity.groupby(['usage_start', 'node']).agg({
             'node_capacity_cpu_core_seconds': 'sum',
             'node_capacity_memory_byte_seconds': 'sum'

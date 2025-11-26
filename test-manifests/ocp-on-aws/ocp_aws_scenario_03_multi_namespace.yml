@@ -1,0 +1,60 @@
+start_date: '2025-10-01'
+end_date: '2025-10-02'
+ocp:
+  generators:
+  - OCPGenerator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      nodes:
+      - node: null
+        node_name: ip-10-0-1-100.ec2.internal
+        resource_id: '{{ resource_id_1 }}'
+        cpu_cores: 4
+        memory_gig: 16
+        namespaces:
+          backend:
+            pods:
+            - pod: null
+              pod_name: api-1
+              cpu_request: 1
+              mem_request_gig: 2
+              cpu_limit: 2
+              mem_limit_gig: 4
+              pod_seconds: 3600
+              cpu_usage:
+                full_period: 1
+              mem_usage_gig:
+                full_period: 3
+          frontend:
+            pods:
+            - pod: null
+              pod_name: web-1
+              cpu_request: 1
+              mem_request_gig: 2
+              cpu_limit: 2
+              mem_limit_gig: 4
+              pod_seconds: 3600
+              cpu_usage:
+                full_period: 1
+              mem_usage_gig:
+                full_period: 3
+aws:
+  generators:
+  - EC2Generator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: '{{ resource_id_1 }}'
+      instance_type:
+        inst_type: m5.2xlarge
+        physical_cores: 2
+        vcpu: '8'
+        memory: 32 GiB
+        storage: EBS Only
+        family: General Purpose
+        cost: 0.384
+        rate: 0.384
+expected_outcome:
+  resource_id_matched: true
+  tag_matched: false
+  min_namespaces: 2
+  attributed_cost: 9.216

@@ -1,0 +1,68 @@
+# Scenario 23: Generic Pod Labels Matching
+# Purpose: Validate AWS resources matched via GENERIC tags (not openshift_*)
+#          against pod_labels
+# Trino Reference: 2_summarize_data_by_cluster.sql line 642
+#                  any_match(..., x->strpos(pod_labels, x) != 0)
+# Business Case: Customers use custom labels (app, tier, env) for attribution
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+ocp:
+  clusters:
+    - cluster_id: 00000000-0000-0000-0000-000000000001
+      cluster_alias: production-cluster
+      generators:
+      - OCPGenerator:
+          start_date: 2025-10-01
+          end_date: 2025-10-02
+          nodes:
+            - node_name: web-node-01
+              resource_id: '{{ resource_id_23 }}'  # Different ID to force tag match
+              cpu_cores: 8
+              memory_gig: 32
+              namespaces:
+                frontend:
+                  pods:
+                    - pod: null
+                      pod_name: web-frontend-01
+                      cpu_request: 4
+                      mem_request_gig: 16
+                      cpu_limit: 8
+                      mem_limit_gig: 32
+                      pod_seconds: 3600
+                      cpu_usage:
+                        full_period: 6
+                      mem_usage_gig:
+                        full_period: 24
+                      # KEY: Generic pod labels (NO openshift_* tags)
+                      pod_labels: app:frontend|tier:web|environment:production
+
+aws:
+  generators:
+  - EC2Generator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      resource_id: '{{ resource_id_24 }}'  # Different ID to force tag match
+      instance_type:
+        inst_type: m5.2xlarge
+        physical_cores: 4
+        vcpu: '8'
+        memory: 32 GiB
+        storage: EBS Only
+        family: General Purpose
+        cost: 0.20
+        rate: 0.20
+      # KEY: ONLY generic tags (NO openshift_cluster, openshift_node)
+      tags:
+        app: frontend           # Matches pod_labels
+        tier: web              # Matches pod_labels
+        environment: production  # Matches pod_labels
+        team: platform
+
+expected_outcome:
+  resource_id_matched: false
+  tag_matched: true
+  matched_tag: app  # Should match via generic pod_labels
+  namespace: frontend
+  attributed_cost: 4.80  # $0.20/hr × 24hr = $4.80

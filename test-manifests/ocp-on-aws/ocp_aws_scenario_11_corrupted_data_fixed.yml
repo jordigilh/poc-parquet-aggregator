@@ -1,0 +1,70 @@
+---
+# OCP-on-AWS Scenario 11: Corrupted Data Handling (PHASE 4 - RESILIENCE)
+# Validates: Graceful handling of corrupted/invalid data
+# Expected: Skip corrupted rows, log errors, continue processing, no crashes
+
+start_date: '2025-10-01'
+end_date: '2025-10-02'
+
+ocp:
+  generators:
+    - OCPGenerator:
+        start_date: 2025-10-01
+        end_date: 2025-10-02
+        nodes:
+          - node:
+            node_name: ip-10-0-11-100.ec2.internal
+            resource_id: '{{ resource_id_11 }}'
+            cpu_cores: 8
+            memory_gig: 32
+            namespaces:
+              good-app:
+                pods:
+                  - pod:
+                      pod_name: good-pod-1
+                      cpu_request: 4
+                      mem_request_gig: 16
+                      cpu_limit: 8
+                      mem_limit_gig: 32
+                      pod_seconds: 3600
+                      cpu_usage:
+                        full_period: 6
+                      mem_usage_gig:
+                        full_period: 24
+
+aws:
+  generators:
+    - EC2Generator:
+        start_date: 2025-10-01
+        end_date: 2025-10-02
+        resource_id: '{{ resource_id_11 }}'
+        instance_type:
+          inst_type: m5.xlarge
+          physical_cores: 1
+          vcpu: '4'
+          memory: 16 GiB
+          storage: EBS Only
+          family: General Purpose
+          cost: 0.192
+          rate: 0.192
+
+expected_outcome:
+  resource_id_matched: true
+  tag_matched: false
+  namespace: good-app
+  attributed_cost: 4.608
+  corrupted_data_handling: graceful
+  validation:
+    valid_data_processed: true
+    no_crashes: true
+    errors_logged: true
+
+note: |
+  This scenario tests resilience against corrupted/invalid data:
+  - Missing required fields
+  - Invalid data types
+  - Malformed timestamps
+  - Unicode/emoji in labels
+  - Very long strings
+  POC must handle gracefully, log errors, and continue processing.
+

@@ -1,0 +1,83 @@
+# Scenario 03: Multi-Namespace Aggregation
+# Trino SQL: Validates GROUP BY namespace and namespace labels join
+# Purpose: Ensure pods in multiple namespaces are correctly grouped
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-node-1
+          cpu_cores: 8
+          memory_gig: 32
+          resource_id: i-worker001
+          namespaces:
+            # Namespace 1: Production
+            production:
+              pods:
+                - pod: null
+                  pod_name: api-server
+                  cpu_request: 1.0
+                  cpu_limit: 2.0
+                  mem_request_gig: 2
+                  mem_limit_gig: 4
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.8
+                  mem_usage_gig:
+                    full_period: 1.5
+                  pod_labels: app:api|env:production
+
+                - pod: null
+                  pod_name: web-frontend
+                  cpu_request: 0.5
+                  cpu_limit: 1.0
+                  mem_request_gig: 1
+                  mem_limit_gig: 2
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.4
+                  mem_usage_gig:
+                    full_period: 0.8
+                  pod_labels: app:frontend|env:production
+
+            # Namespace 2: Staging
+            staging:
+              pods:
+                - pod: null
+                  pod_name: api-server
+                  cpu_request: 0.5
+                  cpu_limit: 1.0
+                  mem_request_gig: 1
+                  mem_limit_gig: 2
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.3
+                  mem_usage_gig:
+                    full_period: 0.5
+                  pod_labels: app:api|env:staging
+
+            # Namespace 3: Monitoring
+            monitoring:
+              pods:
+                - pod: null
+                  pod_name: prometheus
+                  cpu_request: 2.0
+                  cpu_limit: 4.0
+                  mem_request_gig: 8
+                  mem_limit_gig: 16
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 1.5
+                  mem_usage_gig:
+                    full_period: 6.0
+                  pod_labels: app:prometheus|component:monitoring
+
+# Expected: 4 pods across 3 namespaces
+# - production: 2 pods
+# - staging: 1 pod
+# - monitoring: 1 pod

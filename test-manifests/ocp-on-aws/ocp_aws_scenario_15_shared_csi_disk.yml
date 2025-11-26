@@ -1,0 +1,174 @@
+---
+# OCP-on-AWS Scenario 15: Multi-Cluster Shared CSI Disk
+# Critical: Validates shared EBS volume across multiple clusters
+# Pattern: 2 clusters mount the same EBS volume via CSI handles
+# Expected: Proportional cost splitting, no duplication
+# Real-world scenario: Multiple clusters sharing storage infrastructure
+
+start_date: '2025-10-01'
+end_date: '2025-10-02'
+
+ocp:
+  clusters:
+    # Cluster A: Uses 40 GB of the shared 100 GB disk
+    - cluster_id: cluster-alpha
+      cluster_alias: Alpha
+      generators:
+        - OCPGenerator:
+            start_date: '2025-10-01'
+            end_date: '2025-10-02'
+            nodes:
+              - node:
+                node_name: alpha-node-1
+                resource_id: alpha-node-001
+                cpu_cores: 4
+                memory_gig: 16
+                namespaces:
+                  project-alpha:
+                    pods:
+                      - pod:
+                        pod_name: alpha-pod-1
+                        cpu_request: 2
+                        mem_request_gig: 8
+                        cpu_limit: 4
+                        mem_limit_gig: 16
+                        pod_seconds: 3600
+                        cpu_usage:
+                          full_period: 2
+                        mem_usage_gig:
+                          full_period: 8
+                        labels: label_app:alpha|label_env:prod
+                    volumes:
+                      - volume:
+                        volume_name: shared-pv-alpha
+                        storage_class: sc_shared_ebs
+                        csi_driver: ebs.csi.aws.com
+                        csi_volume_handle: shared_ebs_disk_handle
+                        volume_request_gig: 40
+                        labels: label_storage:shared|label_tier:gold
+                        volume_claims:
+                          - volume_claim:
+                            volume_claim_name: pvc-alpha
+                            pod_name: alpha-pod-1
+                            capacity_gig: 40
+                            labels: label_pvc:alpha
+                            volume_claim_usage_gig:
+                              full_period: 20
+
+    # Cluster B: Uses 30 GB of the same shared 100 GB disk
+    - cluster_id: cluster-beta
+      cluster_alias: Beta
+      generators:
+        - OCPGenerator:
+            start_date: '2025-10-01'
+            end_date: '2025-10-02'
+            nodes:
+              - node:
+                node_name: beta-node-1
+                resource_id: beta-node-001
+                cpu_cores: 2
+                memory_gig: 8
+                namespaces:
+                  project-beta:
+                    pods:
+                      - pod:
+                        pod_name: beta-pod-1
+                        cpu_request: 1
+                        mem_request_gig: 4
+                        cpu_limit: 2
+                        mem_limit_gig: 8
+                        pod_seconds: 3600
+                        cpu_usage:
+                          full_period: 1
+                        mem_usage_gig:
+                          full_period: 4
+                        labels: label_app:beta|label_env:staging
+                    volumes:
+                      - volume:
+                        volume_name: shared-pv-beta
+                        storage_class: sc_shared_ebs
+                        csi_driver: ebs.csi.aws.com
+                        csi_volume_handle: shared_ebs_disk_handle
+                        volume_request_gig: 30
+                        labels: label_storage:shared|label_tier:silver
+                        volume_claims:
+                          - volume_claim:
+                            volume_claim_name: pvc-beta
+                            pod_name: beta-pod-1
+                            capacity_gig: 30
+                            labels: label_pvc:beta
+                            volume_claim_usage_gig:
+                              full_period: 15
+
+aws:
+  generators:
+    # Shared EBS disk (100 GB, $10/day total cost)
+    - EBSGenerator:
+        start_date: '2025-10-01'
+        end_date: '2025-10-02'
+        resource_id: shared_ebs_disk_handle
+        disk_size: 100
+        rate: 0.1  # $0.1 per GB-day = $10/day total
+        tags:
+          resourceTags/user:storageclass: sc_shared_ebs
+          resourceTags/user:shared_disk: "true"
+          resourceTags/user:test_scenario: scenario_15
+
+    # EC2 instances for compute (to ensure storage costs are isolated)
+    - EC2Generator:
+        start_date: '2025-10-01'
+        end_date: '2025-10-02'
+        resource_id: alpha-node-001
+        instance_type:
+          inst_type: t3.medium
+          cost: 0.0416  # $1.00/day
+          rate: 0.0416
+        tags:
+          openshift_cluster: cluster-alpha
+          openshift_node: alpha-node-1
+
+    - EC2Generator:
+        start_date: '2025-10-01'
+        end_date: '2025-10-02'
+        resource_id: beta-node-001
+        instance_type:
+          inst_type: t3.small
+          cost: 0.0208  # $0.50/day
+          rate: 0.0208
+        tags:
+          openshift_cluster: cluster-beta
+          openshift_node: beta-node-1
+
+expected_outcome:
+  # EBS cost breakdown:
+  # Total EBS cost: 100 GB * $0.1/GB-day * 1 day = $10.00
+  # Cluster Alpha (40 GB): (40/100) * $10 = $4.00
+  # Cluster Beta (30 GB):  (30/100) * $10 = $3.00
+  # Unattributed (30 GB):  (30/100) * $10 = $3.00
+  #   - Split equally between 2 clusters: $1.50 per cluster
+
+  total_ebs_cost: 10.00
+
+  cluster_alpha:
+    project_alpha_attributed: 4.00  # Proportional to PVC capacity
+    storage_unattributed: 1.50      # Share of unattributed (30 GB / 2 clusters)
+    total_storage_cost: 5.50
+    # Compute costs are separate
+    compute_cost: 1.00
+    total_cost: 6.50
+
+  cluster_beta:
+    project_beta_attributed: 3.00   # Proportional to PVC capacity
+    storage_unattributed: 1.50      # Share of unattributed (30 GB / 2 clusters)
+    total_storage_cost: 4.50
+    # Compute costs are separate
+    compute_cost: 0.50
+    total_cost: 5.00
+
+  # CRITICAL: Total should equal AWS cost (no duplication)
+  total_cost: 11.50  # $10 EBS + $1.50 compute
+
+  # Validation checks
+  no_cost_duplication: true  # EBS cost must NOT appear twice
+  cross_cluster_aggregation: true  # PVC capacities must be summed across clusters
+

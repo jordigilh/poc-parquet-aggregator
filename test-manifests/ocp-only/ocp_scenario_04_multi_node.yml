@@ -1,0 +1,90 @@
+# Scenario 04: Multi-Node Aggregation
+# Trino SQL: Validates node capacity calculation and multi-node grouping
+# Purpose: Ensure multiple nodes have correct capacity calculations
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  # Worker node 1
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-1
+          cpu_cores: 4
+          memory_gig: 16
+          resource_id: i-worker001
+          namespaces:
+            default:
+              pods:
+                - pod: null
+                  pod_name: app-worker1
+                  cpu_request: 1.0
+                  cpu_limit: 2.0
+                  mem_request_gig: 4
+                  mem_limit_gig: 8
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.8
+                  mem_usage_gig:
+                    full_period: 3.0
+                  pod_labels: app:app|node:worker-1
+
+  # Worker node 2 (high memory)
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-2
+          cpu_cores: 8
+          memory_gig: 64
+          resource_id: i-worker002
+          namespaces:
+            default:
+              pods:
+                - pod: null
+                  pod_name: app-worker2
+                  cpu_request: 2.0
+                  cpu_limit: 4.0
+                  mem_request_gig: 16
+                  mem_limit_gig: 32
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 1.5
+                  mem_usage_gig:
+                    full_period: 12.0
+                  pod_labels: app:app|node:worker-2
+
+  # Infra node
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: infra-1
+          cpu_cores: 4
+          memory_gig: 32
+          resource_id: i-infra001
+          namespaces:
+            monitoring:
+              pods:
+                - pod: null
+                  pod_name: prometheus
+                  cpu_request: 1.0
+                  cpu_limit: 2.0
+                  mem_request_gig: 8
+                  mem_limit_gig: 16
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.8
+                  mem_usage_gig:
+                    full_period: 6.0
+                  pod_labels: app:prometheus
+
+# Expected:
+# worker-1: 4 cores, 16 GB, 96 core-hours, 384 GB-hours
+# worker-2: 8 cores, 64 GB, 192 core-hours, 1536 GB-hours
+# infra-1: 4 cores, 32 GB, 96 core-hours, 768 GB-hours

@@ -1,292 +1,317 @@
-# POC: OCP Parquet Aggregator
+# POC: Parquet Aggregator for Cost Management
 
-> **📢 LATEST UPDATE (November 21, 2024)**: Overnight work complete! All Phase 2 enhancements finished, NaN regression fixed, 18/18 IQE tests passing. **[READ START_HERE.md](START_HERE.md) for full summary.**
+> **Replace Trino + Hive with Python-based Parquet aggregation for on-prem deployments**
+
+[![CI](https://github.com/insights-onprem/poc-parquet-aggregator/actions/workflows/ci.yml/badge.svg)](https://github.com/insights-onprem/poc-parquet-aggregator/actions/workflows/ci.yml)
+[![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)](docs/architecture/ARCHITECTURE.md)
+[![Tests](https://img.shields.io/badge/Tests-23%2F23%20Passing-brightgreen)](docs/MATCHING_LABELS.md)
+[![OCP](https://img.shields.io/badge/OCP-✓%20Supported-blue)](docs/benchmarks/OCP_BENCHMARK_RESULTS.md)
+[![OCP--on--AWS](https://img.shields.io/badge/OCP--on--AWS-✓%20Supported-blue)](docs/benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md)
+
+---
 
 ## Overview
 
-This POC validates the feasibility of replacing Trino + Hive with custom Python code that:
-- Reads OCP Parquet files directly from S3/MinIO
-- Performs daily aggregation logic (replicating Trino SQL)
-- Writes summary results to PostgreSQL
+This POC demonstrates replacing **Trino + Hive** with a custom Python aggregation layer that:
 
-**Goal**: Eliminate Trino + Hive dependencies for on-prem Cost Management deployments.
+- ✅ Reads Parquet files directly from S3/MinIO using PyArrow
+- ✅ Performs all aggregation logic in Python/Pandas
+- ✅ Writes results directly to PostgreSQL
+- ✅ Achieves **100% Trino parity** (23/23 E2E test scenarios passing)
+
+### Supported Modes
+
+| Mode | Description | Status |
+|------|-------------|--------|
+| **OCP-only** | OpenShift pod/storage aggregation | ✅ Production Ready |
+| **OCP-on-AWS** | OCP + AWS cost attribution | ✅ Production Ready |
+
+---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Current (Trino + Hive)                   │
-│                                                             │
-│  CSV → Parquet → Trino SQL (667 lines) → PostgreSQL        │
-│                                                             │
-│  Dependencies: Trino, Hive Metastore, S3 connector         │
-│  Complexity: High (3 services, Java/JVM, schema management) │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           Before: Trino + Hive                          │
+│                                                                         │
+│   S3 ◄──► Trino ◄──► Hive Metastore ◄──► Metastore DB (PostgreSQL)     │
+│              │                                                          │
+│              ▼                                                          │
+│           MASU ──► PostgreSQL (reporting tables)                        │
+└─────────────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────┐
-│                   POC (Parquet + Code)                      │
-│                                                             │
-│  CSV → Parquet → Python Aggregator → PostgreSQL            │
-│                                                             │
-│  Dependencies: PyArrow, s3fs, psycopg2                     │
-│  Complexity: Low (single Python module, no JVM)            │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         After: POC Aggregator                           │
+│                                                                         │
+│   S3/MinIO ──► POC Aggregator (Python) ──► PostgreSQL                  │
+│                      │                                                  │
+│                      ├── PyArrow (Parquet reading)                     │
+│                      ├── Pandas (Aggregation)                          │
+│                      └── psycopg2 (DB writes)                          │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Success Criteria
+### Key Benefits
 
-### Performance (Target: 10 seconds for typical cluster)
+- **Fewer components**: 3 vs 6 (removes Trino, Hive Metastore, Metastore DB)
+- **Simpler operations**: Single Python process instead of distributed JVM services
+- **Direct writes**: S3 → Aggregator → PostgreSQL (no intermediate S3 writes)
 
-| Metric | Target | Measured |
-|--------|--------|----------|
-| Processing time (1 month, 50 nodes) | < 60s | TBD |
-| Peak memory usage | < 2 GB | TBD |
-| Rows processed | ~1M | TBD |
-| Summary rows generated | ~10K | TBD |
+---
 
-### Correctness (Must match Trino output within 0.01%)
+## Quick Start
 
-| Test Case | Status | Notes |
-|-----------|--------|-------|
-| CPU aggregation (pod_usage_cpu_core_hours) | ⏳ | Sum must match Trino |
-| Memory aggregation (pod_usage_memory_gigabyte_hours) | ⏳ | Sum must match Trino |
-| Request metrics (pod_request_*) | ⏳ | Sum must match Trino |
-| Effective usage (pod_effective_usage_*) | ⏳ | Sum must match Trino |
-| Capacity calculations (node/cluster) | ⏳ | Max must match Trino |
-| Label filtering (enabled tags only) | ⏳ | Must match PostgreSQL enabled keys |
-| Label merging (node + namespace + pod) | ⏳ | Must match Trino map_concat logic |
-| Date filtering (start_date to end_date) | ⏳ | Must match Trino date range |
+### Prerequisites
 
-### Code Quality
+- Python 3.12+
+- Docker/Podman (for MinIO + PostgreSQL)
+- `pip install -r requirements.txt`
 
-- ✅ Modular, testable design
-- ✅ Comprehensive unit tests
-- ✅ Clear error handling
-- ✅ Performance instrumentation
+### 1. Start Infrastructure
+
+```bash
+podman-compose up -d
+```
+
+### 2. Run OCP Aggregation
+
+```bash
+# Required - must match S3 folder structure: data/{ORG_ID}/OCP/source={UUID}/...
+export OCP_PROVIDER_UUID="00000000-0000-0000-0000-000000000001"
+export OCP_CLUSTER_ID="my-cluster"
+
+# S3/MinIO connection
+export S3_ENDPOINT="http://localhost:9000"
+export S3_ACCESS_KEY="minioadmin"
+export S3_SECRET_KEY="minioadmin"
+
+# PostgreSQL
+export POSTGRES_PASSWORD="koku123"
+
+# Optional (have defaults)
+export POC_YEAR=2025
+export POC_MONTH=01
+
+python -m src.main
+```
+
+### 3. Run OCP-on-AWS Aggregation
+
+```bash
+# Same as above, plus AWS provider (must match S3 folder: data/{ORG_ID}/AWS/source={UUID}/...)
+export AWS_PROVIDER_UUID="00000000-0000-0000-0000-000000000002"
+
+python -m src.main
+```
+
+> **Note**: Provider UUIDs must match the folder structure in S3 where Parquet files are stored.
+> The aggregation mode is determined automatically based on whether `AWS_PROVIDER_UUID` is set.
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| **[Architecture](docs/architecture/ARCHITECTURE.md)** | Technical architecture overview |
+| **[Matching Labels](docs/MATCHING_LABELS.md)** | Trino vs POC feature parity reference |
+| **[Benchmark Guide](docs/guides/BENCHMARK_HOWTO.md)** | How to run benchmarks |
+| **[OCP Benchmark Plan](docs/benchmarks/OCP_BENCHMARK_PLAN.md)** | OCP-only benchmark methodology |
+| **[OCP-on-AWS Benchmark Plan](docs/benchmarks/OCP_ON_AWS_BENCHMARK_PLAN.md)** | OCP-on-AWS benchmark methodology |
+| **[OCP-on-AWS Benchmark Results](docs/benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md)** | Performance results |
+| **[Developer Quickstart](docs/guides/DEVELOPER_QUICKSTART.md)** | Getting started guide |
+
+### Additional Resources
+
+```
+docs/
+├── architecture/       # System architecture
+├── benchmarks/         # Performance benchmarks
+├── analysis/           # Technical analysis docs
+├── guides/             # How-to guides
+└── ocp_on_aws/        # OCP-on-AWS specific docs
+```
+
+---
+
+## Benchmark Results
+
+### OCP-on-AWS Performance (In-Memory, Industry Standard)
+
+Results from 3 runs per scale, reporting median ± stddev:
+
+| Output Rows | Time (s) | Memory (MB) | Throughput |
+|-------------|----------|-------------|------------|
+| 6,720 | 3.52 ±0.01 | 224 ±16 | 1,909 rows/s |
+| 33,600 | 12.74 ±0.07 | 470 ±11 | 2,637 rows/s |
+| 166,656 | 59.67 ±0.38 | 1,748 ±33 | 2,792 rows/s |
+| 333,312 | 120.97 ±0.22 | 3,304 ±107 | 2,755 rows/s |
+| 499,968 | 184.10 ±0.34 | 4,924 ±22 | 2,715 rows/s |
+| 666,624 | 249.18 ±0.78 | 6,215 ±27 | 2,675 rows/s |
+
+> **Methodology**: 3 runs per scale, continuous 100ms memory sampling.
+
+**Memory Scaling**: ~9 MB per 1K output rows (linear)
+
+### OCP-Only Performance (In-Memory)
+
+| Output Rows | Time (s) | Memory (MB) | Throughput |
+|-------------|----------|-------------|------------|
+| 420 | 2.52 ±0.06 | 253 ±1 | 167 rows/s |
+| 2,085 | 8.13 ±0.07 | 502 ±3 | 257 rows/s |
+| 10,430 | 37.17 ±0.03 | 1,969 ±17 | 281 rows/s |
+| 20,850 | 72.37 ±0.19 | 3,729 ±69 | 288 rows/s |
+| 41,650 | 139.19 ±0.77 | 7,184 ±29 | 299 rows/s |
+
+**Memory Scaling**: ~170 MB per 1K output rows (linear)
+
+See [OCP_ON_AWS_BENCHMARK_RESULTS.md](docs/benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md) and [OCP_BENCHMARK_RESULTS.md](docs/benchmarks/OCP_BENCHMARK_RESULTS.md) for details.
+
+---
+
+## Test Coverage
+
+### E2E Test Scenarios: 23/23 Passing ✅
+
+| Category | Scenarios | Status |
+|----------|-----------|--------|
+| Basic Attribution | 1-4 | ✅ Pass |
+| Multi-Cluster | 5-8 | ✅ Pass |
+| Tag Matching | 9-12 | ✅ Pass |
+| Network Costs | 13-15 | ✅ Pass |
+| Storage Attribution | 16-22 | ✅ Pass |
+| Edge Cases | 23 | ✅ Pass |
+
+See [MATCHING_LABELS.md](docs/MATCHING_LABELS.md) for detailed test mapping.
+
+---
+
+## Configuration
+
+```yaml
+# config/config.yaml
+cost:
+  distribution:
+    method: cpu  # cpu, memory, or weighted
+
+performance:
+  max_workers: 4
+  use_streaming: false  # Enable for large OCP-only datasets
+  use_bulk_copy: true   # Faster PostgreSQL writes
+```
+
+---
+
+## Running Tests
+
+### Unit Tests (no infrastructure needed)
+
+```bash
+# All unit tests
+pytest tests/ -v
+
+# Specific component tests
+pytest tests/test_cost_attributor.py -v      # Cost attribution logic
+pytest tests/test_resource_matcher.py -v     # EC2/EBS matching
+pytest tests/test_tag_matcher.py -v          # OpenShift tag matching
+pytest tests/test_network_cost_handler.py -v # Network cost detection
+```
+
+### Integration Tests (requires MinIO + PostgreSQL)
+
+```bash
+# Start infrastructure first
+podman-compose up -d
+
+# OCP-on-AWS integration tests
+pytest tests/test_ocp_aws_integration.py -v
+
+# Storage integration tests
+pytest tests/test_storage_integration.py -v
+```
+
+### E2E Tests (full pipeline validation)
+
+```bash
+# OCP-on-AWS E2E scenarios (23 scenarios)
+./scripts/run_ocp_aws_scenario_tests.sh --all
+
+# Run specific scenario
+./scripts/run_ocp_aws_scenario_tests.sh --scenario 1
+
+# OCP-only tests
+./scripts/run_ocp_tests.sh
+```
+
+### Benchmarks
+
+```bash
+# OCP-on-AWS benchmarks (multiple scales)
+./scripts/run_ocp_aws_benchmarks.sh --all
+
+# OCP-only benchmark
+./scripts/run_ocp_benchmarks.sh
+```
+
+---
 
 ## Project Structure
 
 ```
 poc-parquet-aggregator/
-├── README.md                    # This file
-├── requirements.txt             # Python dependencies
-├── config/
-│   └── config.yaml             # Configuration (S3, PostgreSQL, etc.)
 ├── src/
-│   ├── __init__.py
 │   ├── main.py                 # Entry point
-│   ├── config_loader.py        # Configuration management
-│   ├── parquet_reader.py       # S3/Parquet reading (PyArrow + s3fs)
-│   ├── aggregator_pod.py       # Pod aggregation logic
-│   ├── aggregator_storage.py  # Storage aggregation logic (Phase 2)
-│   ├── aggregator_unallocated.py  # Unallocated capacity (Phase 2)
-│   ├── db_writer.py            # PostgreSQL writer
-│   ├── validator.py            # Correctness validation vs Trino
-│   └── utils.py                # Helper functions
-├── tests/
-│   ├── __init__.py
-│   ├── test_parquet_reader.py
-│   ├── test_aggregator_pod.py
-│   ├── test_db_writer.py
-│   └── test_integration.py
-└── docs/
-    ├── TRINO_SQL_ANALYSIS.md   # Detailed SQL breakdown
-    ├── AGGREGATION_LOGIC.md    # Aggregation algorithm explained
-    └── PERFORMANCE_RESULTS.md  # Benchmark results
+│   ├── aggregator_pod.py       # OCP pod aggregation
+│   ├── aggregator_ocp_aws.py   # OCP-on-AWS aggregation
+│   ├── cost_attributor.py      # Cost attribution logic
+│   ├── resource_matcher.py     # EC2/EBS matching
+│   ├── tag_matcher.py          # OpenShift tag matching
+│   ├── parquet_reader.py       # S3/Parquet reading
+│   └── db_writer.py            # PostgreSQL writer
+├── tests/                       # Unit and integration tests
+├── scripts/                     # Utility scripts
+├── config/                      # Configuration files
+└── docs/                        # Documentation
 ```
 
-## POC Phases
+---
 
-### Phase 1: Core Pod Aggregation (Current - Week 1)
+## Contributing
 
-**Scope**: Replicate lines 260-316 of Trino SQL (Pod usage aggregation)
-
-- [x] Set up POC structure
-- [ ] Read `openshift_pod_usage_line_items_daily` Parquet from S3
-- [ ] Filter enabled tags from PostgreSQL
-- [ ] Aggregate pod CPU/memory usage by day + namespace + node
-- [ ] Calculate node and cluster capacity
-- [ ] Merge labels (node + namespace + pod)
-- [ ] Write to PostgreSQL summary table
-- [ ] Validate against Trino results
-
-**Deliverable**: Working pod aggregation with performance benchmarks
-
-### Phase 2: Storage Aggregation (Week 2)
-
-**Scope**: Replicate lines 384-446 of Trino SQL (Storage usage aggregation)
-
-- [ ] Read `openshift_storage_usage_line_items_daily` Parquet
-- [ ] Join with pod data to determine node
-- [ ] Calculate PVC capacity and usage
-- [ ] Handle shared volumes (node count)
-- [ ] Merge storage labels
-
-**Deliverable**: Complete storage aggregation
-
-### Phase 3: Unallocated Capacity (Week 2)
-
-**Scope**: Replicate lines 491-581 of Trino SQL (Unallocated capacity calculation)
-
-- [ ] Calculate unallocated CPU/memory per node
-- [ ] Classify by node role (Platform vs Worker)
-- [ ] Generate unallocated records
-
-**Deliverable**: Full OCP aggregation parity with Trino
-
-### Phase 4: Optimization & Production Readiness (Week 3)
-
-- [ ] Parallel processing (multi-day, multi-file)
-- [ ] Memory optimization (streaming aggregation)
-- [ ] Error handling and retry logic
-- [ ] Logging and monitoring
-- [ ] Integration with MASU
-
-**Deliverable**: Production-ready aggregator
-
-## Installation
+### Before Committing
 
 ```bash
-cd poc-parquet-aggregator
-pip install -r requirements.txt
-```
-
-## Configuration
-
-Copy and edit `config/config.yaml`:
-
-```yaml
-s3:
-  endpoint: "https://s3-openshift-storage.apps.cluster.example.com"
-  access_key: "..."
-  secret_key: "..."
-  bucket: "cost-management"
-
-postgresql:
-  host: "postgresql.cost-management.svc"
-  database: "koku"
-  schema: "org1234567"
-  user: "koku"
-  password: "..."
-
-ocp:
-  provider_uuid: "..."
-  cluster_id: "..."
-  year: "2025"
-  month: "11"
-```
-
-## Usage
-
-### Run POC Aggregation
-
-```bash
-python -m src.main
-```
-
-### Validate Against Trino
-
-```bash
-python -m src.main --validate
-```
-
-This will:
-1. Run the Parquet aggregator
-2. Run the equivalent Trino SQL query
-3. Compare results row-by-row
-4. Report discrepancies and statistics
-
-### Run Tests
-
-```bash
+# 1. Run unit tests (fast, no infrastructure needed)
 pytest tests/ -v
+
+# 2. Run OCP-only tests (if infrastructure available)
+./scripts/run_ocp_tests.sh
+
+# 3. Run E2E tests for any changed OCP-on-AWS functionality
+./scripts/run_ocp_aws_scenario_tests.sh --all
 ```
 
-## Performance Benchmarks
+### Code Style
 
-### Test Environment
+- Python 3.12+ required
+- Follow existing patterns in the codebase
+- Update documentation for new features
 
-- **Cluster**: 50 nodes, 500 pods
-- **Data**: 1 month (30 days)
-- **Input**: ~1M Parquet rows
-- **Output**: ~10K summary rows
+### CI Pipeline
 
-### Results
+GitHub Actions runs automatically on push/PR:
 
-| Phase | Time (s) | Memory (MB) | Status |
-|-------|----------|-------------|--------|
-| Read Parquet | TBD | TBD | ⏳ |
-| Filter tags | TBD | TBD | ⏳ |
-| Aggregate | TBD | TBD | ⏳ |
-| Write PostgreSQL | TBD | TBD | ⏳ |
-| **Total** | **TBD** | **TBD** | **⏳** |
+| Job | Description |
+|-----|-------------|
+| **Lint** | Black, isort, flake8 checks |
+| **Build** | Verify imports and dependencies |
+| **Unit Tests** | Fast tests (no infrastructure) |
+| **Integration Tests** | Tests with MinIO + PostgreSQL |
+| **E2E OCP** | OCP-only end-to-end tests |
+| **E2E OCP-on-AWS** | OCP-on-AWS end-to-end tests |
 
-## Validation Results
+---
 
-### Correctness
+## License
 
-| Metric | Trino | Parquet Aggregator | Diff | Status |
-|--------|-------|-------------------|------|--------|
-| Total CPU hours | TBD | TBD | TBD | ⏳ |
-| Total Memory GB-hours | TBD | TBD | TBD | ⏳ |
-| Unique namespaces | TBD | TBD | TBD | ⏳ |
-| Unique nodes | TBD | TBD | TBD | ⏳ |
-
-### Row-by-Row Comparison
-
-- **Matching rows**: TBD
-- **Extra in Trino**: TBD
-- **Extra in Parquet**: TBD
-- **Value differences**: TBD
-
-## Risks & Mitigation
-
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Performance slower than expected | Medium | High | Use PyArrow zero-copy, parallel processing |
-| Complex SQL logic hard to replicate | Medium | High | Break into small, testable functions |
-| Floating-point precision issues | Low | Medium | Use Decimal, allow 0.01% tolerance |
-| Memory exhaustion on large clusters | Low | High | Stream processing, chunked reads |
-
-## Decision Criteria
-
-### Go Decision (Proceed to Full Implementation)
-
-- ✅ Performance < 60s for typical cluster
-- ✅ Correctness within 0.01% of Trino
-- ✅ Memory < 2 GB peak usage
-- ✅ Code is clear and maintainable
-
-**Estimated Timeline**: 24-35 weeks for full implementation (all providers)
-
-### No-Go Decision (Fall back to Option A: Intermediate PostgreSQL)
-
-- ❌ Performance > 120s (2x target)
-- ❌ Correctness issues (> 0.1% difference)
-- ❌ Memory > 4 GB (unsustainable)
-- ❌ Code complexity too high
-
-## Next Steps
-
-1. **Complete Phase 1** (Pod aggregation)
-2. **Measure performance** on real OCP data
-3. **Validate correctness** against Trino
-4. **Assess maintainability** (code review with team)
-5. **Decision Point**: Go / No-Go for full implementation
-
-## Timeline
-
-- **Week 1**: Phase 1 - Pod aggregation + validation
-- **Week 2**: Phase 2-3 - Storage + unallocated capacity
-- **Week 3**: Phase 4 - Optimization + production readiness
-- **Week 4**: Final assessment + decision
-
-## Contact / Questions
-
-This POC is part of the Trino + Hive removal initiative for Cost Management on-prem deployments.
-
-**Related Documents**:
-- `docs/migration/TRINO-REPLACEMENT-OPTIONS.md` - Architecture options analysis
-- `docs/migration/IMPLEMENTATION-PLAN.md` - Full migration plan
-- `koku/masu/database/trino_sql/reporting_ocpusagelineitem_daily_summary.sql` - Original Trino SQL (667 lines)
-
+Apache License 2.0 - See [LICENSE](LICENSE) for details.

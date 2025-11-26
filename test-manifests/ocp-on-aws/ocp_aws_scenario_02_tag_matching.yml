@@ -1,0 +1,52 @@
+start_date: '2025-10-01'
+end_date: '2025-10-02'
+ocp:
+  generators:
+  - OCPGenerator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      nodes:
+      - node: null
+        node_name: ip-10-0-2-100.ec2.internal
+        cpu_cores: 8
+        memory_gig: 32
+        node_labels: openshift_node:ip-10-0-2-100.ec2.internal|openshift_cluster:test-cluster-001
+        namespaces:
+          frontend:
+            pods:
+            - pod: null
+              pod_name: web-1
+              cpu_request: 4
+              mem_request_gig: 8
+              cpu_limit: 8
+              mem_limit_gig: 16
+              pod_seconds: 3600
+              cpu_usage:
+                full_period: 6
+              mem_usage_gig:
+                full_period: 12
+aws:
+  generators:
+  - EC2Generator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: '{{ resource_id_2 }}'
+      instance_type:
+        inst_type: m5.xlarge
+        physical_cores: 1
+        vcpu: '4'
+        memory: 16 GiB
+        storage: EBS Only
+        family: General Purpose
+        cost: 0.192
+        rate: 0.192
+      tags:
+        openshift_cluster: test-cluster-001
+        openshift_node: ip-10-0-2-100.ec2.internal
+        environment: production
+expected_outcome:
+  resource_id_matched: false
+  tag_matched: true
+  matched_tag: openshift_node
+  namespace: frontend
+  attributed_cost: 4.608

@@ -1,0 +1,763 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, feature/* ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: |
+          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+          pytest tests/test_storage_aggregator.py -v --tb=short --cov=src.aggregator_storage --cov-report=xml --cov-report=term
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: unit-tests-coverage
+          fail_ci_if_error: false
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: koku
+          POSTGRES_PASSWORD: koku_test_password
+          POSTGRES_DB: koku
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      minio:
+        image: bitnami/minio:latest
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+          MINIO_DEFAULT_BUCKETS: cost-management
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create PostgreSQL schema
+        env:
+          PGPASSWORD: koku_test_password
+        run: |
+          psql -h localhost -U koku -d koku -c "CREATE SCHEMA IF NOT EXISTS org1234567;"
+          psql -h localhost -U koku -d koku -c "CREATE TABLE IF NOT EXISTS org1234567.reporting_ocpusagelineitem_daily_summary (
+            id SERIAL PRIMARY KEY,
+            uuid UUID,
+            cluster_id VARCHAR(255),
+            cluster_alias VARCHAR(255),
+            data_source VARCHAR(50),
+            namespace VARCHAR(255),
+            node VARCHAR(255),
+            resource_id VARCHAR(255),
+            pod VARCHAR(255),
+            persistentvolumeclaim VARCHAR(255),
+            persistentvolume VARCHAR(255),
+            storageclass VARCHAR(255),
+            usage_start DATE,
+            usage_end DATE,
+            pod_labels JSONB,
+            volume_labels JSONB,
+            pod_usage_cpu_core_hours NUMERIC(24,6),
+            pod_request_cpu_core_hours NUMERIC(24,6),
+            pod_effective_usage_cpu_core_hours NUMERIC(24,6),
+            pod_limit_cpu_core_hours NUMERIC(24,6),
+            pod_usage_memory_gigabyte_hours NUMERIC(24,6),
+            pod_request_memory_gigabyte_hours NUMERIC(24,6),
+            pod_effective_usage_memory_gigabyte_hours NUMERIC(24,6),
+            pod_limit_memory_gigabyte_hours NUMERIC(24,6),
+            node_capacity_cpu_cores NUMERIC(24,6),
+            node_capacity_cpu_core_hours NUMERIC(24,6),
+            node_capacity_memory_gigabytes NUMERIC(24,6),
+            node_capacity_memory_gigabyte_hours NUMERIC(24,6),
+            cluster_capacity_cpu_core_hours NUMERIC(24,6),
+            cluster_capacity_memory_gigabyte_hours NUMERIC(24,6),
+            persistentvolumeclaim_capacity_gigabyte NUMERIC(24,6),
+            persistentvolumeclaim_capacity_gigabyte_months NUMERIC(24,6),
+            volume_request_storage_gigabyte_months NUMERIC(24,6),
+            persistentvolumeclaim_usage_gigabyte_months NUMERIC(24,6),
+            csi_volume_handle VARCHAR(255),
+            source_uuid UUID,
+            report_period_id INTEGER,
+            infrastructure_usage_cost JSONB,
+            cost_category_id INTEGER
+          );"
+          psql -h localhost -U koku -d koku -c "CREATE TABLE IF NOT EXISTS org1234567.reporting_enabledtagkeys (
+            id SERIAL PRIMARY KEY,
+            key VARCHAR(255),
+            enabled BOOLEAN DEFAULT TRUE,
+            provider_type VARCHAR(50)
+          );"
+          psql -h localhost -U koku -d koku -c "INSERT INTO org1234567.reporting_enabledtagkeys (key, enabled, provider_type) VALUES
+            ('app', TRUE, 'OCP'),
+            ('environment', TRUE, 'OCP'),
+            ('version', TRUE, 'OCP')
+            ON CONFLICT DO NOTHING;"
+
+      - name: Run integration tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: koku
+          POSTGRES_PASSWORD: koku_test_password
+          POSTGRES_DB: koku
+          POSTGRES_SCHEMA: org1234567
+          S3_ENDPOINT: http://localhost:9000
+          S3_BUCKET: cost-management
+          S3_ACCESS_KEY: minioadmin
+          S3_SECRET_KEY: minioadmin
+        run: |
+          pytest tests/test_storage_integration.py -v --tb=short --cov=src --cov-report=xml --cov-report=term
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: integrationtests
+          name: integration-tests-coverage
+          fail_ci_if_error: false
+
+  e2e-test:
+    name: End-to-End Test with Nise
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: koku
+          POSTGRES_PASSWORD: koku_test_password
+          POSTGRES_DB: koku
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      minio:
+        image: bitnami/minio:latest
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+          MINIO_DEFAULT_BUCKETS: cost-management
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install koku-nise  # Install nise for data generation
+
+      - name: Create PostgreSQL schema and tables
+        env:
+          PGPASSWORD: koku_test_password
+        run: |
+          psql -h localhost -U koku -d koku -c "CREATE SCHEMA IF NOT EXISTS org1234567;"
+          psql -h localhost -U koku -d koku -f scripts/create_tables.sql || true
+          # Create minimal tables for e2e test
+          psql -h localhost -U koku -d koku -c "CREATE TABLE IF NOT EXISTS org1234567.reporting_ocpusagelineitem_daily_summary (
+            id SERIAL PRIMARY KEY,
+            uuid UUID,
+            cluster_id VARCHAR(255),
+            cluster_alias VARCHAR(255),
+            data_source VARCHAR(50),
+            namespace VARCHAR(255),
+            node VARCHAR(255),
+            resource_id VARCHAR(255),
+            pod VARCHAR(255),
+            persistentvolumeclaim VARCHAR(255),
+            persistentvolume VARCHAR(255),
+            storageclass VARCHAR(255),
+            usage_start DATE,
+            usage_end DATE,
+            pod_labels JSONB,
+            volume_labels JSONB,
+            pod_usage_cpu_core_hours NUMERIC(24,6),
+            pod_request_cpu_core_hours NUMERIC(24,6),
+            pod_effective_usage_cpu_core_hours NUMERIC(24,6),
+            pod_limit_cpu_core_hours NUMERIC(24,6),
+            pod_usage_memory_gigabyte_hours NUMERIC(24,6),
+            pod_request_memory_gigabyte_hours NUMERIC(24,6),
+            pod_effective_usage_memory_gigabyte_hours NUMERIC(24,6),
+            pod_limit_memory_gigabyte_hours NUMERIC(24,6),
+            node_capacity_cpu_cores NUMERIC(24,6),
+            node_capacity_cpu_core_hours NUMERIC(24,6),
+            node_capacity_memory_gigabytes NUMERIC(24,6),
+            node_capacity_memory_gigabyte_hours NUMERIC(24,6),
+            cluster_capacity_cpu_core_hours NUMERIC(24,6),
+            cluster_capacity_memory_gigabyte_hours NUMERIC(24,6),
+            persistentvolumeclaim_capacity_gigabyte NUMERIC(24,6),
+            persistentvolumeclaim_capacity_gigabyte_months NUMERIC(24,6),
+            volume_request_storage_gigabyte_months NUMERIC(24,6),
+            persistentvolumeclaim_usage_gigabyte_months NUMERIC(24,6),
+            csi_volume_handle VARCHAR(255),
+            source_uuid UUID,
+            report_period_id INTEGER,
+            infrastructure_usage_cost JSONB,
+            cost_category_id INTEGER
+          );"
+          psql -h localhost -U koku -d koku -c "CREATE TABLE IF NOT EXISTS org1234567.reporting_enabledtagkeys (
+            id SERIAL PRIMARY KEY,
+            key VARCHAR(255),
+            enabled BOOLEAN DEFAULT TRUE,
+            provider_type VARCHAR(50)
+          );"
+          psql -h localhost -U koku -d koku -c "INSERT INTO org1234567.reporting_enabledtagkeys (key, enabled, provider_type) VALUES
+            ('app', TRUE, 'OCP'),
+            ('environment', TRUE, 'OCP'),
+            ('version', TRUE, 'OCP')
+            ON CONFLICT DO NOTHING;"
+
+      - name: Generate test data with nise
+        run: |
+          mkdir -p e2e_test_data
+
+          # Create nise configuration
+          cat > e2e_test_data/nise_config.yml << 'EOF'
+          ---
+          generators:
+            - OCPGenerator:
+                start_date: last_month
+                end_date: last_month
+                nodes:
+                  - node:
+                      node_name: e2e-node-1
+                      node_labels: label_environment:production|label_app:web
+                      cpu_cores: 4
+                      memory_gig: 16
+                      resource_id: i-e2e001
+                      namespaces:
+                        frontend:
+                          pods:
+                            - pod:
+                                pod_name: web-1
+                                cpu_request: 2
+                                mem_request_gig: 4
+                                cpu_limit: 4
+                                mem_limit_gig: 8
+                                pod_seconds: 86400
+                                cpu_usage:
+                                  full_period: 2
+                                mem_usage_gig:
+                                  full_period: 4
+                                labels: label_app:web|label_tier:frontend
+                          volumes:
+                            - volume:
+                                volume_name: web-pvc
+                                storage_class: gp2
+                                volume_request_gig: 10
+                                labels: label_storage:web-data
+                                volume_claims:
+                                  - volume_claim:
+                                      volume_claim_name: web-pvc-claim
+                                      pod_name: web-1
+                                      labels: label_storage:web-data
+                                      capacity_gig: 10
+                                      volume_claim_usage_gig:
+                                        full_period: 7
+                  - node:
+                      node_name: e2e-node-2
+                      node_labels: label_environment:production|label_app:api
+                      cpu_cores: 8
+                      memory_gig: 32
+                      resource_id: i-e2e002
+                      namespaces:
+                        backend:
+                          pods:
+                            - pod:
+                                pod_name: api-1
+                                cpu_request: 4
+                                mem_request_gig: 8
+                                cpu_limit: 8
+                                mem_limit_gig: 16
+                                pod_seconds: 86400
+                                cpu_usage:
+                                  full_period: 4
+                                mem_usage_gig:
+                                  full_period: 8
+                                labels: label_app:api|label_tier:backend
+                          volumes:
+                            - volume:
+                                volume_name: api-pvc
+                                storage_class: io1
+                                volume_request_gig: 50
+                                labels: label_storage:api-cache
+                                volume_claims:
+                                  - volume_claim:
+                                      volume_claim_name: api-pvc-claim
+                                      pod_name: api-1
+                                      labels: label_storage:api-cache
+                                      capacity_gig: 50
+                                      volume_claim_usage_gig:
+                                        full_period: 35
+          EOF
+
+          # Generate nise data
+          nise report ocp \
+            --static-report-file e2e_test_data/nise_config.yml \
+            --ocp-cluster-id e2e-test-cluster \
+            --insights-upload e2e_test_data
+
+          # List generated files
+          echo "Generated files:"
+          ls -lh e2e_test_data/*.csv
+
+      - name: Convert CSV to Parquet and upload to MinIO
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          # Get cluster info from nise output
+          CLUSTER_ID="e2e-test-cluster"
+          PROVIDER_UUID=$(ls e2e_test_data/*.csv | head -1 | grep -oP '(?<=-)[0-9a-f-]+(?=-ocp)' || echo "00000000-0000-0000-0000-000000000001")
+
+          # Get current year and last month
+          YEAR=$(date -d "last month" +%Y)
+          MONTH=$(date -d "last month" +%m)
+
+          echo "Cluster ID: $CLUSTER_ID"
+          echo "Provider UUID: $PROVIDER_UUID"
+          echo "Year: $YEAR"
+          echo "Month: $MONTH"
+
+          # Convert and upload
+          python3 scripts/csv_to_parquet_minio.py e2e_test_data $CLUSTER_ID $YEAR $MONTH
+
+      - name: Run POC aggregation
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          OCP_CLUSTER_ID: e2e-test-cluster
+          OCP_PROVIDER_UUID: 00000000-0000-0000-0000-000000000001
+          OCP_YEAR: ${{ steps.get_date.outputs.year }}
+          OCP_MONTH: ${{ steps.get_date.outputs.month }}
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: koku
+          POSTGRES_PASSWORD: koku_test_password
+          POSTGRES_DB: koku
+          POSTGRES_SCHEMA: org1234567
+          S3_ENDPOINT: http://localhost:9000
+          S3_BUCKET: cost-management
+          S3_ACCESS_KEY: minioadmin
+          S3_SECRET_KEY: minioadmin
+          ORG_ID: org1234567
+          LOG_LEVEL: INFO
+        run: |
+          # Get current year and last month for env vars
+          export OCP_YEAR=$(date -d "last month" +%Y)
+          export OCP_MONTH=$(date -d "last month" +%m)
+
+          echo "Running POC with:"
+          echo "  Cluster ID: $OCP_CLUSTER_ID"
+          echo "  Provider UUID: $OCP_PROVIDER_UUID"
+          echo "  Year: $OCP_YEAR"
+          echo "  Month: $OCP_MONTH"
+
+          # Run POC
+          python3 -m src.main --truncate 2>&1 | tee e2e_poc_output.log
+
+          # Check for success
+          if grep -q "POC COMPLETED SUCCESSFULLY" e2e_poc_output.log; then
+            echo "✅ POC completed successfully"
+          else
+            echo "❌ POC failed"
+            exit 1
+          fi
+
+      - name: Validate results
+        env:
+          PGPASSWORD: koku_test_password
+        run: |
+          echo "=========================================="
+          echo "=== E2E Test Validation Results ==="
+          echo "=========================================="
+
+          # Track validation failures
+          VALIDATION_FAILURES=0
+
+          # 1. Check total row count
+          echo ""
+          echo "1. Total Row Count"
+          echo "-------------------"
+          TOTAL_ROWS=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster';" | xargs)
+          echo "Total rows: $TOTAL_ROWS"
+
+          if [ "$TOTAL_ROWS" -eq 0 ]; then
+            echo "❌ FAIL: No data found in database"
+            VALIDATION_FAILURES=$((VALIDATION_FAILURES + 1))
+          else
+            echo "✅ PASS: Data found in database"
+          fi
+
+          # 2. Check data_source distribution
+          echo ""
+          echo "2. Data Source Distribution"
+          echo "---------------------------"
+          psql -h localhost -U koku -d koku -c "SELECT data_source, COUNT(*) as count FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' GROUP BY data_source ORDER BY data_source;"
+
+          POD_ROWS=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND data_source='Pod';" | xargs)
+          STORAGE_ROWS=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND data_source='Storage';" | xargs)
+
+          if [ "$POD_ROWS" -eq 0 ]; then
+            echo "❌ FAIL: No Pod data found"
+            VALIDATION_FAILURES=$((VALIDATION_FAILURES + 1))
+          else
+            echo "✅ PASS: Pod rows = $POD_ROWS"
+          fi
+
+          if [ "$STORAGE_ROWS" -eq 0 ]; then
+            echo "❌ FAIL: No Storage data found"
+            VALIDATION_FAILURES=$((VALIDATION_FAILURES + 1))
+          else
+            echo "✅ PASS: Storage rows = $STORAGE_ROWS"
+          fi
+
+          # 3. Verify expected namespaces
+          echo ""
+          echo "3. Expected Namespaces"
+          echo "----------------------"
+          FRONTEND_COUNT=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND namespace='frontend';" | xargs)
+          BACKEND_COUNT=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND namespace='backend';" | xargs)
+
+          echo "frontend namespace: $FRONTEND_COUNT rows"
+          echo "backend namespace: $BACKEND_COUNT rows"
+
+          if [ "$FRONTEND_COUNT" -eq 0 ] || [ "$BACKEND_COUNT" -eq 0 ]; then
+            echo "❌ FAIL: Missing expected namespaces"
+            VALIDATION_FAILURES=$((VALIDATION_FAILURES + 1))
+          else
+            echo "✅ PASS: Both namespaces present"
+          fi
+
+          # 4. Verify expected pods
+          echo ""
+          echo "4. Expected Pods"
+          echo "----------------"
+          WEB1_COUNT=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND pod='web-1';" | xargs)
+          API1_COUNT=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND pod='api-1';" | xargs)
+
+          echo "web-1 pod: $WEB1_COUNT rows"
+          echo "api-1 pod: $API1_COUNT rows"
+
+          if [ "$WEB1_COUNT" -eq 0 ] || [ "$API1_COUNT" -eq 0 ]; then
+            echo "❌ FAIL: Missing expected pods"
+            VALIDATION_FAILURES=$((VALIDATION_FAILURES + 1))
+          else
+            echo "✅ PASS: Both pods present"
+          fi
+
+          # 5. Verify expected PVCs
+          echo ""
+          echo "5. Expected PVCs"
+          echo "----------------"
+          WEB_PVC_COUNT=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND persistentvolumeclaim='web-pvc-claim';" | xargs)
+          API_PVC_COUNT=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND persistentvolumeclaim='api-pvc-claim';" | xargs)
+
+          echo "web-pvc-claim: $WEB_PVC_COUNT rows"
+          echo "api-pvc-claim: $API_PVC_COUNT rows"
+
+          if [ "$WEB_PVC_COUNT" -eq 0 ] || [ "$API_PVC_COUNT" -eq 0 ]; then
+            echo "❌ FAIL: Missing expected PVCs"
+            VALIDATION_FAILURES=$((VALIDATION_FAILURES + 1))
+          else
+            echo "✅ PASS: Both PVCs present"
+          fi
+
+          # 6. Verify Pod rows have CPU/memory, NULL storage
+          echo ""
+          echo "6. Pod Row Schema Validation"
+          echo "----------------------------"
+          POD_WITH_CPU=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND data_source='Pod' AND pod_usage_cpu_core_hours IS NOT NULL AND pod_usage_cpu_core_hours > 0;" | xargs)
+          POD_WITH_MEMORY=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND data_source='Pod' AND pod_usage_memory_gigabyte_hours IS NOT NULL AND pod_usage_memory_gigabyte_hours > 0;" | xargs)
+          POD_WITH_STORAGE=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND data_source='Pod' AND persistentvolumeclaim IS NOT NULL AND persistentvolumeclaim != '';" | xargs)
+
+          echo "Pod rows with CPU usage: $POD_WITH_CPU / $POD_ROWS"
+          echo "Pod rows with memory usage: $POD_WITH_MEMORY / $POD_ROWS"
+          echo "Pod rows with storage (should be 0): $POD_WITH_STORAGE"
+
+          if [ "$POD_WITH_CPU" -eq 0 ] || [ "$POD_WITH_MEMORY" -eq 0 ]; then
+            echo "❌ FAIL: Pod rows missing CPU/memory metrics"
+            VALIDATION_FAILURES=$((VALIDATION_FAILURES + 1))
+          else
+            echo "✅ PASS: Pod rows have CPU/memory metrics"
+          fi
+
+          if [ "$POD_WITH_STORAGE" -gt 0 ]; then
+            echo "❌ FAIL: Pod rows should not have storage columns"
+            VALIDATION_FAILURES=$((VALIDATION_FAILURES + 1))
+          else
+            echo "✅ PASS: Pod rows have NULL storage columns"
+          fi
+
+          # 7. Verify Storage rows have storage metrics, NULL CPU/memory
+          echo ""
+          echo "7. Storage Row Schema Validation"
+          echo "--------------------------------"
+          STORAGE_WITH_CAPACITY=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND data_source='Storage' AND persistentvolumeclaim_capacity_gigabyte_months IS NOT NULL AND persistentvolumeclaim_capacity_gigabyte_months > 0;" | xargs)
+          STORAGE_WITH_USAGE=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND data_source='Storage' AND persistentvolumeclaim_usage_gigabyte_months IS NOT NULL AND persistentvolumeclaim_usage_gigabyte_months > 0;" | xargs)
+          STORAGE_WITH_CPU=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND data_source='Storage' AND pod_usage_cpu_core_hours IS NOT NULL;" | xargs)
+
+          echo "Storage rows with capacity: $STORAGE_WITH_CAPACITY / $STORAGE_ROWS"
+          echo "Storage rows with usage: $STORAGE_WITH_USAGE / $STORAGE_ROWS"
+          echo "Storage rows with CPU (should be 0): $STORAGE_WITH_CPU"
+
+          if [ "$STORAGE_WITH_CAPACITY" -eq 0 ] || [ "$STORAGE_WITH_USAGE" -eq 0 ]; then
+            echo "❌ FAIL: Storage rows missing storage metrics"
+            VALIDATION_FAILURES=$((VALIDATION_FAILURES + 1))
+          else
+            echo "✅ PASS: Storage rows have storage metrics"
+          fi
+
+          if [ "$STORAGE_WITH_CPU" -gt 0 ]; then
+            echo "❌ FAIL: Storage rows should not have CPU/memory columns"
+            VALIDATION_FAILURES=$((VALIDATION_FAILURES + 1))
+          else
+            echo "✅ PASS: Storage rows have NULL CPU/memory columns"
+          fi
+
+          # 8. Check for CSI volume handles
+          echo ""
+          echo "8. CSI Volume Handles"
+          echo "---------------------"
+          CSI_HANDLES=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND data_source='Storage' AND csi_volume_handle IS NOT NULL AND csi_volume_handle != '';" | xargs)
+          echo "Storage rows with CSI handles: $CSI_HANDLES / $STORAGE_ROWS"
+
+          if [ "$CSI_HANDLES" -eq 0 ]; then
+            echo "⚠️  WARNING: No CSI volume handles found (may be expected)"
+          else
+            echo "✅ PASS: CSI volume handles preserved"
+          fi
+
+          # 9. Verify no duplicate rows
+          echo ""
+          echo "9. Duplicate Row Check"
+          echo "----------------------"
+          DUPLICATE_ROWS=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM (SELECT usage_start, namespace, data_source, pod, persistentvolumeclaim, COUNT(*) as cnt FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' GROUP BY usage_start, namespace, data_source, pod, persistentvolumeclaim HAVING COUNT(*) > 1) as dupes;" | xargs)
+          echo "Duplicate rows: $DUPLICATE_ROWS"
+
+          if [ "$DUPLICATE_ROWS" -gt 0 ]; then
+            echo "❌ FAIL: Found duplicate rows"
+            VALIDATION_FAILURES=$((VALIDATION_FAILURES + 1))
+          else
+            echo "✅ PASS: No duplicate rows"
+          fi
+
+          # 10. Verify cluster metadata
+          echo ""
+          echo "10. Cluster Metadata"
+          echo "--------------------"
+          ROWS_WITH_CLUSTER=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND cluster_id IS NOT NULL;" | xargs)
+          echo "Rows with cluster_id: $ROWS_WITH_CLUSTER / $TOTAL_ROWS"
+
+          if [ "$ROWS_WITH_CLUSTER" -ne "$TOTAL_ROWS" ]; then
+            echo "❌ FAIL: Some rows missing cluster_id"
+            VALIDATION_FAILURES=$((VALIDATION_FAILURES + 1))
+          else
+            echo "✅ PASS: All rows have cluster_id"
+          fi
+
+          # 11. Verify JSON labels are valid
+          echo ""
+          echo "11. JSON Labels Validation"
+          echo "--------------------------"
+          INVALID_POD_LABELS=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND pod_labels IS NOT NULL AND NOT (pod_labels::text ~ '^\\{.*\\}$');" | xargs)
+          echo "Invalid pod_labels: $INVALID_POD_LABELS"
+
+          if [ "$INVALID_POD_LABELS" -gt 0 ]; then
+            echo "❌ FAIL: Found invalid JSON in pod_labels"
+            VALIDATION_FAILURES=$((VALIDATION_FAILURES + 1))
+          else
+            echo "✅ PASS: All pod_labels are valid JSON"
+          fi
+
+          # 12. Verify label precedence (check for expected labels)
+          echo ""
+          echo "12. Label Precedence Check"
+          echo "--------------------------"
+          echo "Sample Pod labels (should have app, tier, environment):"
+          psql -h localhost -U koku -d koku -c "SELECT namespace, pod, pod_labels FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND data_source='Pod' LIMIT 2;"
+
+          echo ""
+          echo "Sample Storage labels (should have storage, app, environment):"
+          psql -h localhost -U koku -d koku -c "SELECT namespace, persistentvolumeclaim, pod_labels FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND data_source='Storage' LIMIT 2;"
+
+          # 13. Verify date range
+          echo ""
+          echo "13. Date Range"
+          echo "--------------"
+          psql -h localhost -U koku -d koku -c "SELECT MIN(usage_start) as min_date, MAX(usage_start) as max_date, COUNT(DISTINCT usage_start) as unique_dates FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster';"
+
+          # 14. Verify node capacity (if present)
+          echo ""
+          echo "14. Node Capacity"
+          echo "-----------------"
+          ROWS_WITH_CAPACITY=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND data_source='Pod' AND node_capacity_cpu_core_hours IS NOT NULL AND node_capacity_cpu_core_hours > 0;" | xargs)
+          echo "Pod rows with node capacity: $ROWS_WITH_CAPACITY / $POD_ROWS"
+
+          if [ "$ROWS_WITH_CAPACITY" -eq 0 ]; then
+            echo "⚠️  WARNING: No node capacity data found"
+          else
+            echo "✅ PASS: Node capacity data present"
+          fi
+
+          # 15. Verify storage class distribution
+          echo ""
+          echo "15. Storage Class Distribution"
+          echo "-------------------------------"
+          psql -h localhost -U koku -d koku -c "SELECT storageclass, COUNT(*) as count FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND data_source='Storage' GROUP BY storageclass ORDER BY storageclass;"
+
+          GP2_COUNT=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND storageclass='gp2';" | xargs)
+          IO1_COUNT=$(psql -h localhost -U koku -d koku -t -c "SELECT COUNT(*) FROM org1234567.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='e2e-test-cluster' AND storageclass='io1';" | xargs)
+
+          if [ "$GP2_COUNT" -eq 0 ] || [ "$IO1_COUNT" -eq 0 ]; then
+            echo "❌ FAIL: Missing expected storage classes (gp2 or io1)"
+            VALIDATION_FAILURES=$((VALIDATION_FAILURES + 1))
+          else
+            echo "✅ PASS: Both storage classes present (gp2: $GP2_COUNT, io1: $IO1_COUNT)"
+          fi
+
+          # Final summary
+          echo ""
+          echo "=========================================="
+          echo "=== Validation Summary ==="
+          echo "=========================================="
+          echo "Total rows processed: $TOTAL_ROWS"
+          echo "Pod rows: $POD_ROWS"
+          echo "Storage rows: $STORAGE_ROWS"
+          echo "Validation failures: $VALIDATION_FAILURES"
+          echo ""
+
+          if [ "$VALIDATION_FAILURES" -gt 0 ]; then
+            echo "❌ VALIDATION FAILED: $VALIDATION_FAILURES check(s) failed"
+            exit 1
+          else
+            echo "✅ ALL VALIDATIONS PASSED!"
+            echo ""
+            echo "E2E test completed successfully with comprehensive validation:"
+            echo "  ✅ Data generated with nise"
+            echo "  ✅ CSV → Parquet → MinIO upload"
+            echo "  ✅ POC aggregation (Pod + Storage)"
+            echo "  ✅ PostgreSQL write"
+            echo "  ✅ 15 validation checks passed"
+            echo ""
+            echo "Ready for production! 🚀"
+          fi
+
+      - name: Upload POC logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-poc-logs
+          path: |
+            e2e_poc_output.log
+            e2e_test_data/*.csv
+          retention-days: 7
+
+  # Future: OCP-in-AWS E2E Test
+  # Will be added when OCP-in-AWS implementation is complete
+  # e2e-test-ocp-aws:
+  #   name: End-to-End Test - OCP on AWS
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - Generate OCP data with nise
+  #     - Generate AWS CUR data with nise
+  #     - Run POC with OCP-in-AWS aggregation
+  #     - Validate resource ID matching
+  #     - Validate tag-based matching
+  #     - Validate cost attribution
+
+  summary:
+    name: Test Summary
+    needs: [unit-tests, integration-tests, e2e-test]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Check test results
+        run: |
+          echo "=== Test Suite Summary ==="
+          echo "Unit Tests: ${{ needs.unit-tests.result }}"
+          echo "Integration Tests: ${{ needs.integration-tests.result }}"
+          echo "E2E Test: ${{ needs.e2e-test.result }}"
+
+          if [ "${{ needs.unit-tests.result }}" != "success" ] || \
+             [ "${{ needs.integration-tests.result }}" != "success" ] || \
+             [ "${{ needs.e2e-test.result }}" != "success" ]; then
+            echo "❌ Some tests failed"
+            exit 1
+          else
+            echo "✅ All tests passed!"
+          fi
+

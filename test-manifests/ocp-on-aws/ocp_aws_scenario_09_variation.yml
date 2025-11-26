@@ -1,0 +1,45 @@
+start_date: '2025-10-01'
+end_date: '2025-10-02'
+ocp:
+  generators:
+  - OCPGenerator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      nodes:
+      - node: null
+        node_name: ip-10-0-9-100.ec2.internal
+        resource_id: '{{ resource_id_9 }}'
+        cpu_cores: 4
+        memory_gig: 16
+        namespaces:
+          backend:
+            pods:
+            - pod: null
+              pod_name: app-9
+              cpu_request: 2
+              mem_request_gig: 4
+              cpu_limit: 4
+              mem_limit_gig: 8
+              pod_seconds: 3600
+              cpu_usage:
+                full_period: 2
+              mem_usage_gig:
+                full_period: 6
+aws:
+  generators:
+  - EC2Generator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: '{{ resource_id_9 }}'
+      instance_type:
+        inst_type: m5.large
+        physical_cores: 0.5
+        vcpu: '2'
+        memory: 8 GiB
+        storage: EBS Only
+        family: General Purpose
+        cost: 0.67
+        rate: 0.67
+expected_outcome:
+  resource_id_matched: true
+  attributed_cost: 16.08

@@ -1,0 +1,101 @@
+---
+# OCP-on-AWS Scenario 6: Multi-Cluster Support
+# Validates: Multiple OCP clusters in same AWS account, proper isolation
+# Expected: No cross-contamination, costs correctly attributed per cluster
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+ocp:
+  clusters:
+    - cluster_id: prod-cluster
+      cluster_alias: Production
+      generators:
+        - OCPGenerator:
+            start_date: 2025-10-01
+            end_date: 2025-10-02
+            nodes:
+              - node:
+                node_name: ip-10-0-6-100.ec2.internal
+                resource_id: i-prod0001
+                cpu_cores: 8
+                memory_gig: 32
+                namespaces:
+                prod-app:
+                pods:
+                        - pod:
+                          pod_name: prod-api-1
+                          cpu_request: 4
+                          mem_request_gig: 16
+                          cpu_limit: 8
+                          mem_limit_gig: 32
+                          pod_seconds: 3600
+                          cpu_usage:
+                          full_period: 6
+                          mem_usage_gig:
+                          full_period: 24
+
+    - cluster_id: staging-cluster
+      cluster_alias: Staging
+      generators:
+        - OCPGenerator:
+            start_date: 2025-10-01
+            end_date: 2025-10-02
+            nodes:
+              - node:
+                node_name: ip-10-0-6-200.ec2.internal
+                resource_id: i-staging0001
+                cpu_cores: 4
+                memory_gig: 16
+                namespaces:
+                staging-app:
+                pods:
+                        - pod:
+                          pod_name: staging-api-1
+                          cpu_request: 2
+                          mem_request_gig: 8
+                          cpu_limit: 4
+                          mem_limit_gig: 16
+                          pod_seconds: 3600
+                          cpu_usage:
+                          full_period: 3
+                          mem_usage_gig:
+                          full_period: 12
+
+aws:
+  generators:
+    - EC2Generator:
+        start_date: 2025-10-01
+        end_date: 2025-10-02
+        resource_id: '{{ resource_id_6a }}'
+        instance_type:
+          inst_type: c5.xlarge
+          cost: 0.170
+          rate: 0.170
+        tags:
+          openshift_cluster: prod-cluster
+          environment: production
+    - EC2Generator:
+        start_date: 2025-10-01
+        end_date: 2025-10-02
+        resource_id: '{{ resource_id_6b }}'
+        instance_type:
+          inst_type: c5.xlarge
+          cost: 0.170
+          rate: 0.170
+        tags:
+          openshift_cluster: staging-cluster
+          environment: staging
+
+expected_outcome:
+  clusters:
+    prod-cluster:
+      cost: 4.08
+      namespace: prod-app
+      no_staging_data: true
+    staging-cluster:
+      cost: 4.08
+      namespace: staging-app
+      no_prod_data: true
+  total_cost: 8.16
+

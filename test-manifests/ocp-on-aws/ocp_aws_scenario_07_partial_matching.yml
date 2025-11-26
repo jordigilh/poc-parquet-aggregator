@@ -1,0 +1,154 @@
+---
+# OCP-on-AWS Scenario 7: Partial Matching (CRITICAL EDGE CASE)
+# Validates: Mixed matching - some by resource_id, some by tag, some unmatched
+# Expected: All costs tracked, no data loss, proper handling of unmatched
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+ocp:
+  generators:
+    - OCPGenerator:
+        start_date: 2025-10-01
+        end_date: 2025-10-02
+        nodes:
+          # Node 1: Matches by resource_id
+          - node:
+            node_name: ip-10-0-7-100.ec2.internal
+            resource_id: matched-by-id  # nise adds "i-" prefix automatically
+            cpu_cores: 4
+            memory_gig: 16
+            namespaces:
+            app-with-id:
+            pods:
+                    - pod:
+                      pod_name: pod-1
+                      cpu_request: 2
+                      mem_request_gig: 8
+                      cpu_limit: 4
+                      mem_limit_gig: 16
+                      pod_seconds: 3600
+                      cpu_usage:
+                      full_period: 3
+                      mem_usage_gig:
+                      full_period: 12
+
+          # Node 2: Matches by tag (no resource_id)
+          - node:
+            node_name: ip-10-0-7-200.ec2.internal
+            cpu_cores: 8
+            memory_gig: 32
+            namespaces:
+            app-with-tag:
+            pods:
+                    - pod:
+                      pod_name: pod-2
+                      cpu_request: 4
+                      mem_request_gig: 16
+                      cpu_limit: 8
+                      mem_limit_gig: 32
+                      pod_seconds: 3600
+                      cpu_usage:
+                      full_period: 6
+                      mem_usage_gig:
+                      full_period: 24
+
+          # Node 3: No match (orphaned OCP node)
+          - node:
+            node_name: ip-10-0-7-300.ec2.internal
+            cpu_cores: 2
+            memory_gig: 8
+            namespaces:
+            orphaned-app:
+            pods:
+                    - pod:
+                      pod_name: pod-3
+                      cpu_request: 1
+                      mem_request_gig: 4
+                      cpu_limit: 2
+                      mem_limit_gig: 8
+                      pod_seconds: 3600
+                      cpu_usage:
+                      full_period: 1.5
+                      mem_usage_gig:
+                      full_period: 6
+
+aws:
+  generators:
+    # AWS 1: Matches OCP node 1 by resource_id
+    - EC2Generator:
+        start_date: 2025-10-01
+        end_date: 2025-10-02
+        resource_id: matched-by-id  # nise adds "i-" prefix → i-matched-by-id
+        instance_type:
+          inst_type: t3.medium
+          cost: 0.208
+          rate: 0.208
+        tags:
+          environment: production
+
+    # AWS 2: Matches OCP node 2 by tag
+    - EC2Generator:
+        start_date: 2025-10-01
+        end_date: 2025-10-02
+        resource_id: matched-by-tag  # nise adds "i-" prefix → i-matched-by-tag
+        instance_type:
+          inst_type: t3.large
+          cost: 0.3125
+          rate: 0.3125
+        tags:
+          openshift_cluster: test-cluster-001
+          openshift_node: ip-10-0-7-200.ec2.internal
+          environment: production
+
+    # AWS 3: No OCP match (orphaned AWS instance)
+    - EC2Generator:
+        start_date: 2025-10-01
+        end_date: 2025-10-02
+        resource_id: orphaned-aws  # nise adds "i-" prefix → i-orphaned-aws
+        instance_type:
+          inst_type: t3.small
+          cost: 0.104
+          rate: 0.104
+        tags:
+          environment: production
+          note: "No matching OCP node"
+
+expected_outcome:
+  attributed_cost: 12.492  # Sum of matched costs: 4.992 + 7.50
+
+  matched_by_resource_id:
+    resource_id: i-matched-by-id
+    namespace: app-with-id
+    cost: 4.992  # 0.208/hr * 24hrs
+    matched: true
+    match_type: resource_id
+
+  matched_by_tag:
+    resource_id: i-matched-by-tag
+    namespace: app-with-tag
+    cost: 7.50  # 0.3125/hr * 24hrs
+    matched: true
+    match_type: tag
+
+  orphaned_aws:
+    resource_id: i-orphaned-aws
+    cost: 2.496  # 0.104/hr * 24hrs
+    matched: false
+    handling: tracked_as_unmatched
+    note: "AWS cost without OCP match must not be lost"
+
+  orphaned_ocp:
+    node: ip-10-0-7-300.ec2.internal
+    namespace: orphaned-app
+    cpu_usage: 1.5
+    memory_usage: 6
+    cost: 0  # No AWS cost to attribute
+    handling: tracked_in_ocp_summary
+
+  validation:
+    total_aws_cost: 14.988  # 4.992 + 7.50 + 2.496
+    attributed_cost: 12.492  # 4.992 + 7.50
+    unmatched_cost: 2.496  # Must not be lost!
+    all_costs_accounted: true
+

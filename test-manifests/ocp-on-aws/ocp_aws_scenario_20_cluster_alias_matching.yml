@@ -1,0 +1,64 @@
+# Scenario 20: Cluster Alias Matching
+# Purpose: Validate AWS resources tagged with openshift_cluster=<cluster_alias>
+#          (not cluster_id) are correctly attributed
+# Trino Reference: 2_summarize_data_by_cluster.sql line 639
+# Business Case: Customers tag AWS resources with human-readable cluster aliases
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+ocp:
+  clusters:
+    - cluster_id: 00000000-0000-0000-0000-000000000001
+      cluster_alias: production
+      generators:
+      - OCPGenerator:
+          start_date: 2025-10-01
+          end_date: 2025-10-02
+          nodes:
+          - node: null
+            node_name: prod-node-01
+            resource_id: '{{ resource_id_20 }}'
+            cpu_cores: 4
+            memory_gig: 16
+            namespaces:
+              app-prod:
+                pods:
+                - pod: null
+                  pod_name: frontend-prod
+                  cpu_request: 2
+                  mem_request_gig: 4
+                  cpu_limit: 4
+                  mem_limit_gig: 8
+                  pod_seconds: 3600
+                  cpu_usage:
+                    full_period: 2
+                  mem_usage_gig:
+                    full_period: 4
+                  pod_labels: app:frontend|environment:production
+
+aws:
+  generators:
+  - EC2Generator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      resource_id: '{{ resource_id_21 }}'  # Different ID to force tag match
+      instance_type:
+        inst_type: m5.large
+        physical_cores: 0.5
+        vcpu: '2'
+        memory: 8 GiB
+        storage: EBS Only
+        family: General Purpose
+        cost: 0.10
+        rate: 0.10
+      tags:
+        openshift_cluster: production  # Matches cluster_alias (not cluster_id)
+        environment: production
+
+expected_outcome:
+  resource_id_matched: false
+  tag_matched: true
+  matched_tag: openshift_cluster
+  namespace: app-prod
+  attributed_cost: 2.40  # $0.10/hr * 24hr = $2.40

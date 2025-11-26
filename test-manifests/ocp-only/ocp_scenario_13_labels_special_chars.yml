@@ -1,0 +1,35 @@
+# Scenario 13: Pod Labels - Special Characters
+# Trino SQL: Label handling with special characters
+# Purpose: Validate graceful handling of unicode, emoji, special characters
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-1
+          cpu_cores: 4
+          memory_gig: 16
+          resource_id: i-worker001
+          namespaces:
+            special-labels:
+              pods:
+                # Pod with various special character labels
+                - pod: null
+                  pod_name: special-pod
+                  cpu_request: 0.5
+                  mem_request_gig: 1
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.3
+                  mem_usage_gig:
+                    full_period: 0.8
+                  # Labels with special characters (escaped for YAML)
+                  pod_labels: app:my-app-v1.2.3|team:devops+sre|region:us-east-1
+
+# Expected: Labels are correctly parsed and stored as JSON
+# Special characters should be handled without errors

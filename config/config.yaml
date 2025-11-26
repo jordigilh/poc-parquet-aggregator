@@ -1,8 +1,9 @@
+organization:
+  org_id: ${ORG_ID:-org1234567}
 features:
   cost_category: true
   pod_aggregation: true
-  storage_aggregation: false
-  unallocated_capacity: false
+  storage_aggregation: true
 logging:
   format: console
   level: ${LOG_LEVEL:-INFO}
@@ -17,13 +18,42 @@ ocp:
   parquet_path_pod: data/${ORG_ID}/OCP/source={provider_uuid}/year={year}/month={month}/*/openshift_pod_usage_line_items
   parquet_path_pod_hourly: data/${ORG_ID}/OCP/source={provider_uuid}/year={year}/month={month}/*/openshift_pod_usage_line_items
   parquet_path_storage: data/${ORG_ID}/OCP/source={provider_uuid}/year={year}/month={month}/*/openshift_storage_usage_line_items
+  parquet_path_storage_usage_daily: data/${ORG_ID}/OCP/source={provider_uuid}/year={year}/month={month}/*/openshift_storage_usage_line_items_daily
   provider_uuid: ${OCP_PROVIDER_UUID}
   report_period_id: 1
   start_date: ${OCP_START_DATE:-2025-11-01}
   year: ${OCP_YEAR:-2025}
+aws:
+  parquet_path_line_items: data/${ORG_ID}/AWS/source={provider_uuid}/year={year}/month={month}/*
+  provider_uuid: ${AWS_PROVIDER_UUID:-}
+cost:
+  markup: 0.10  # 10% markup
+  distribution:
+    # Options: cpu, memory, weighted
+    # Default: cpu (Trino-compatible) - change to 'weighted' after dev team approval
+    method: ${COST_DISTRIBUTION_METHOD:-cpu}
+    weights:
+      aws:
+        cpu_weight: 0.73     # AWS M5 family (derived from pricing)
+        memory_weight: 0.27
+      azure:
+        cpu_weight: 0.73     # Azure D-series
+        memory_weight: 0.27
+      gcp:
+        cpu_weight: 0.72     # GCP n1-standard
+        memory_weight: 0.28
+      default:
+        cpu_weight: 0.73     # Fallback
+        memory_weight: 0.27
+  # Resource types to match (for filtering)
+  resource_types:
+    - AmazonEC2       # EC2 instances (nodes)
+    - AmazonEBS       # EBS volumes (storage)
+    - AmazonRDS       # RDS databases
+    - AmazonElastiCache  # ElastiCache
+    - AmazonVPC       # Network costs
 performance:
   cache_enabled_tags: true
-  chunk_size: 100000
   column_filtering: true
   db_batch_size: 1000
   delete_intermediate_dfs: true
@@ -31,16 +61,24 @@ performance:
   max_workers: 4
   parallel_chunks: true
   parallel_readers: 4
-  streaming_threshold_rows: 50000
   use_arrow_compute: true
   use_bulk_copy: true
   use_categorical: true
-  use_streaming: true
+  # ============================================================================
+  # STREAMING MODE (Not Recommended)
+  # See docs/benchmarks/OCP_BENCHMARK_PLAN.md "Why Not Streaming?" for details
+  # Streaming adds processing overhead with minimal memory benefit.
+  # For OCP-on-AWS, JOIN requires full AWS data in memory regardless.
+  # ============================================================================
+  use_streaming: ${USE_STREAMING:-false}  # false=in-memory (recommended)
+  chunk_size: ${CHUNK_SIZE:-100000}       # Only used when use_streaming=true
+  streaming_threshold_rows: 50000         # Auto threshold (when use_streaming=auto)
+  incremental_db_writes: ${INCREMENTAL_DB_WRITES:-false}  # Only with streaming
 postgresql:
   database: ${POSTGRES_DB:-koku}
   host: ${POSTGRES_HOST:-postgresql.cost-management.svc.cluster.local}
   password: ${POSTGRES_PASSWORD}
-  port: 5432
+  port: ${POSTGRES_PORT:-5432}
   schema: ${POSTGRES_SCHEMA:-org1234567}
   user: ${POSTGRES_USER:-koku}
 s3:

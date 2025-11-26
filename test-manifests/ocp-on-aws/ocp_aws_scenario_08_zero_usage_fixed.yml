@@ -1,0 +1,80 @@
+---
+# OCP-on-AWS Scenario 8: Zero Usage Pods (CRITICAL EDGE CASE)
+# Validates: Pods with zero CPU/memory usage, no division by zero errors
+# Expected: Graceful handling, zero cost attribution, no crashes
+
+start_date: '2025-10-01'
+end_date: '2025-10-02'
+
+ocp:
+  generators:
+    - OCPGenerator:
+        start_date: 2025-10-01
+        end_date: 2025-10-02
+        nodes:
+          - node:
+            node_name: ip-10-0-8-100.ec2.internal
+            resource_id: '{{ resource_id_8 }}'
+            cpu_cores: 16
+            memory_gig: 64
+            namespaces:
+              active-app:
+                pods:
+                  - pod:
+                      pod_name: active-pod-1
+                      cpu_request: 4
+                      mem_request_gig: 16
+                      cpu_limit: 8
+                      mem_limit_gig: 32
+                      pod_seconds: 3600
+                      cpu_usage:
+                        full_period: 6
+                      mem_usage_gig:
+                        full_period: 24
+              idle-app:
+                pods:
+                  - pod:
+                      pod_name: idle-pod-1
+                      cpu_request: 2
+                      mem_request_gig: 8
+                      cpu_limit: 4
+                      mem_limit_gig: 16
+                      pod_seconds: 3600
+                      cpu_usage:
+                        full_period: 0
+                      mem_usage_gig:
+                        full_period: 0
+
+aws:
+  generators:
+    - EC2Generator:
+        start_date: 2025-10-01
+        end_date: 2025-10-02
+        resource_id: '{{ resource_id_8 }}'
+        instance_type:
+          inst_type: r5.xlarge
+          physical_cores: 2
+          vcpu: '4'
+          memory: 32 GiB
+          storage: EBS Only
+          family: Memory Optimized
+          cost: 0.252
+          rate: 0.252
+
+expected_outcome:
+  resource_id_matched: true
+  tag_matched: false
+  min_namespaces: 2
+  attributed_cost: 6.048
+  zero_usage_handling: graceful
+  no_division_by_zero: true
+  validation:
+    active_app_gets_cost: true
+    idle_app_gets_zero_cost: true
+    no_crashes: true
+
+note: |
+  This scenario tests critical edge case: pods with zero CPU/memory usage.
+  Common in production (idle pods, init containers after completion).
+  Must handle gracefully without division by zero errors.
+

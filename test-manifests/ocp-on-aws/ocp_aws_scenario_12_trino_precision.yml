@@ -1,0 +1,84 @@
+---
+# OCP-on-AWS Scenario 12: Trino Precision & Edge Cases (PHASE 4 - RESILIENCE)
+# Validates: Floating-point precision, rounding, NULL handling match Trino
+# Expected: Results within tolerance of Trino, proper NULL handling
+
+start_date: '2025-10-01'
+end_date: '2025-10-02'
+
+ocp:
+  generators:
+    - OCPGenerator:
+        start_date: 2025-10-01
+        end_date: 2025-10-02
+        nodes:
+          - node:
+            node_name: ip-10-0-12-100.ec2.internal
+            resource_id: '{{ resource_id_12 }}'
+            cpu_cores: 7
+            memory_gig: 13
+            namespaces:
+              app-a:
+                pods:
+                  - pod:
+                      pod_name: pod-a
+                      cpu_request: 1.5
+                      mem_request_gig: 3.7
+                      cpu_limit: 3
+                      mem_limit_gig: 8
+                      pod_seconds: 3600
+                      cpu_usage:
+                        full_period: 2.333333
+                      mem_usage_gig:
+                        full_period: 5.666666
+              app-b:
+                pods:
+                  - pod:
+                      pod_name: pod-b
+                      cpu_request: 2.7
+                      mem_request_gig: 4.3
+                      cpu_limit: 5
+                      mem_limit_gig: 10
+                      pod_seconds: 3600
+                      cpu_usage:
+                        full_period: 3.141592
+                      mem_usage_gig:
+                        full_period: 2.718281
+
+aws:
+  generators:
+    - EC2Generator:
+        start_date: 2025-10-01
+        end_date: 2025-10-02
+        resource_id: '{{ resource_id_12 }}'
+        instance_type:
+          inst_type: c5.2xlarge
+          physical_cores: 4
+          vcpu: '8'
+          memory: 16 GiB
+          storage: EBS Only
+          family: Compute Optimized
+          cost: 0.340
+          rate: 0.340
+
+expected_outcome:
+  resource_id_matched: true
+  tag_matched: false
+  min_namespaces: 2
+  attributed_cost: 8.16
+  precision_handling: correct
+  validation:
+    fractional_cpu_handled: true
+    fractional_memory_handled: true
+    repeating_decimals_handled: true
+    precision_within_tolerance: true
+    no_rounding_errors: true
+
+note: |
+  This scenario tests numerical precision:
+  - Fractional CPU (1.5, 2.7, etc.)
+  - Fractional memory (3.7, 4.3, etc.)
+  - Repeating decimals (2.333333, 3.141592, 2.718281)
+  - Odd-numbered capacity (7 CPU, 13 GB)
+  - Must match Trino's precision and rounding behavior
+

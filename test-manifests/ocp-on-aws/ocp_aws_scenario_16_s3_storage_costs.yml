@@ -1,0 +1,171 @@
+# Scenario 16: S3 Storage Costs Attribution
+# Purpose: Validate that S3 (Simple Storage Service) costs are correctly attributed
+#          to OCP pods/namespaces via tag matching
+# Business Case: Organizations using S3 buckets for application data, backups, or logs
+#                that are logically tied to OCP namespaces via tagging
+
+start_date: '2025-10-01'
+end_date: '2025-10-02'
+
+ocp:
+  generators:
+  - OCPGenerator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      nodes:
+      # Node 1: Storage-heavy workload
+      - node_name: ip-10-0-2-10.ec2.internal
+        resource_id: s3-node-01
+        cpu_cores: 2
+        memory_gig: 8
+        namespaces:
+          data-lake:
+            pods:
+            - pod_name: etl-processor
+              cpu_request: 1
+              mem_request_gig: 4
+              cpu_limit: 2
+              mem_limit_gig: 8
+              pod_seconds: 3600
+              cpu_usage:
+                full_period: 1.5
+              mem_usage_gig:
+                full_period: 6
+
+          backup-service:
+            pods:
+            - pod_name: backup-agent
+              cpu_request: 0.5
+              mem_request_gig: 2
+              cpu_limit: 1
+              mem_limit_gig: 4
+              pod_seconds: 3600
+              cpu_usage:
+                full_period: 0.8
+              mem_usage_gig:
+                full_period: 3
+
+      # Node 2: Additional node for EC2 compute costs
+      - node_name: ip-10-0-2-11.ec2.internal
+        resource_id: s3-node-02
+        cpu_cores: 4
+        memory_gig: 16
+        namespaces:
+          analytics:
+            pods:
+            - pod_name: spark-worker
+              cpu_request: 2
+              mem_request_gig: 8
+              cpu_limit: 4
+              mem_limit_gig: 16
+              pod_seconds: 3600
+              cpu_usage:
+                full_period: 3
+              mem_usage_gig:
+                full_period: 12
+
+aws:
+  generators:
+  # EC2 compute costs (baseline infrastructure)
+  - EC2Generator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: s3-node-01
+      instance_type:
+        inst_type: t3.medium
+        physical_cores: 0.5
+        vcpu: '2'
+        memory: 4 GiB
+        storage: EBS Only
+        family: General Purpose
+        cost: 0.0416  # $0.0416/hr = $0.9984/day
+        rate: 0.0416
+      tags:
+        openshift_cluster: my-ocp-cluster
+        openshift_node: ip-10-0-2-10.ec2.internal
+
+  - EC2Generator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: s3-node-02
+      instance_type:
+        inst_type: t3.large
+        physical_cores: 1
+        vcpu: '4'
+        memory: 8 GiB
+        storage: EBS Only
+        family: General Purpose
+        cost: 0.0832  # $0.0832/hr = $1.9968/day
+        rate: 0.0832
+      tags:
+        openshift_cluster: my-ocp-cluster
+        openshift_node: ip-10-0-2-11.ec2.internal
+
+  # S3 storage costs (matched by tags to namespaces)
+  # S3 bucket 1: Data lake storage (tagged to data-lake namespace)
+  - S3Generator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: data-lake-bucket
+      amount: 4.167  # 100 GB-Month / 24 hours = 4.167 GB per hour
+      rate: 0.023    # $0.023 per GB-Month
+      tags:
+        openshift_cluster: my-ocp-cluster
+        openshift_project: data-lake
+        cost_center: analytics
+
+  # S3 bucket 2: Backup storage (tagged to backup-service namespace)
+  - S3Generator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: backup-bucket
+      amount: 20.833  # 500 GB-Month / 24 hours = 20.833 GB per hour
+      rate: 0.021    # $0.021 per GB-Month (cheaper tier)
+      tags:
+        openshift_cluster: my-ocp-cluster
+        openshift_project: backup-service
+        cost_center: operations
+
+  # S3 bucket 3: Analytics data (tagged to analytics namespace)
+  - S3Generator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: analytics-bucket
+      amount: 10.417  # 250 GB-Month / 24 hours = 10.417 GB per hour
+      rate: 0.023    # $0.023 per GB-Month
+      tags:
+        openshift_cluster: my-ocp-cluster
+        openshift_project: analytics
+        cost_center: analytics
+
+expected_outcome:
+  # EC2 costs:
+  # - Node 1 (t3.medium): $0.9984
+  #   - data-lake: CPU ratio 1.5/(1.5+0.8) * 0.9984 = 0.6512
+  #   - backup-service: CPU ratio 0.8/(1.5+0.8) * 0.9984 = 0.3472
+  # - Node 2 (t3.large): $1.9968
+  #   - analytics: 100% = 1.9968
+  #
+  # S3 costs (tag-matched, distributed per hour):
+  # - S3 #1 (data-lake): 100 * 0.023 = $2.30 total → $2.30/24 = $0.0958/hr → $2.30/day
+  # - S3 #2 (backup-service): 500 * 0.021 = $10.50 total → $10.50/24 = $0.4375/hr → $10.50/day
+  # - S3 #3 (analytics): 250 * 0.023 = $5.75 total → $5.75/24 = $0.2396/hr → $5.75/day
+  #
+  # Total costs per namespace:
+  # - data-lake: $0.6512 (EC2) + $2.30 (S3) = $2.9512
+  # - backup-service: $0.3472 (EC2) + $10.50 (S3) = $10.8472
+  # - analytics: $1.9968 (EC2) + $5.75 (S3) = $7.7468
+  #
+  # Grand total: $2.9512 + $10.8472 + $7.7468 = $21.5452
+
+  total_cost: 21.5452
+
+  # Namespace breakdown
+  data_lake_namespace_cost: 2.9512
+  backup_service_namespace_cost: 10.8472
+  analytics_namespace_cost: 7.7468
+
+  # Verify S3-specific attributes
+  product_code: AmazonS3
+  product_family: Storage Snapshot
+

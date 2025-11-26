@@ -1,0 +1,78 @@
+# Scenario 10: Storage Cost Category
+# Trino SQL: Cost category join for storage (lines 406, 428-429)
+# Purpose: Validate cost_category_id is applied to storage rows
+# CRITICAL: Tests Gap 3 - Storage Cost Category
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-1
+          cpu_cores: 8
+          memory_gig: 32
+          resource_id: i-worker001
+          namespaces:
+            # Matches "platform-%" pattern
+            platform-storage:
+              pods:
+                - pod: null
+                  pod_name: storage-pod
+                  cpu_request: 0.5
+                  mem_request_gig: 1
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.3
+                  mem_usage_gig:
+                    full_period: 0.8
+                  pod_labels: app:storage
+
+              volumes:
+                - volume:
+                  volume_name: platform-pvc
+                  storage_class: gp2
+                  volume_request_gig: 50
+                  labels: storage:platform
+                  volume_claims:
+                    - volume_claim:
+                      volume_claim_name: platform-pvc
+                      pod_name: storage-pod
+                      capacity_gig: 50
+                      volume_claim_usage_gig:
+                        full_period: 25
+
+            # No pattern match
+            standalone-app:
+              pods:
+                - pod: null
+                  pod_name: app-pod
+                  cpu_request: 0.5
+                  mem_request_gig: 1
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.3
+                  mem_usage_gig:
+                    full_period: 0.8
+                  pod_labels: app:standalone
+
+              volumes:
+                - volume:
+                  volume_name: app-pvc
+                  storage_class: gp2
+                  volume_request_gig: 20
+                  labels: storage:app
+                  volume_claims:
+                    - volume_claim:
+                      volume_claim_name: app-pvc
+                      pod_name: app-pod
+                      capacity_gig: 20
+                      volume_claim_usage_gig:
+                        full_period: 10
+
+# Expected:
+# platform-storage namespace: cost_category_id = 42 (if pattern exists)
+# standalone-app namespace: cost_category_id = NULL (no match)

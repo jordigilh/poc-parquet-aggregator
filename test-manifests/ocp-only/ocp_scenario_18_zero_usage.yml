@@ -1,0 +1,64 @@
+# Scenario 18: Zero CPU/Memory Usage
+# Trino SQL: Validates no division-by-zero errors
+# Purpose: Pods with zero usage should be handled gracefully
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-1
+          cpu_cores: 8
+          memory_gig: 32
+          resource_id: i-worker001
+          namespaces:
+            test:
+              pods:
+                # Zero CPU usage
+                - pod: null
+                  pod_name: zero-cpu-pod
+                  cpu_request: 1.0
+                  cpu_limit: 2.0
+                  mem_request_gig: 2
+                  mem_limit_gig: 4
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.0
+                  mem_usage_gig:
+                    full_period: 1.0
+                  pod_labels: app:zero-cpu
+
+                # Zero memory usage
+                - pod: null
+                  pod_name: zero-mem-pod
+                  cpu_request: 0.5
+                  cpu_limit: 1.0
+                  mem_request_gig: 4
+                  mem_limit_gig: 8
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.3
+                  mem_usage_gig:
+                    full_period: 0.0
+                  pod_labels: app:zero-mem
+
+                # Very small usage (near zero)
+                - pod: null
+                  pod_name: minimal-pod
+                  cpu_request: 0.1
+                  cpu_limit: 0.5
+                  mem_request_gig: 0.1
+                  mem_limit_gig: 0.5
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.001
+                  mem_usage_gig:
+                    full_period: 0.001
+                  pod_labels: app:minimal
+
+# Expected: No division-by-zero errors
+# Zero values should be 0.0, not NULL

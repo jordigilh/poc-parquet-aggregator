@@ -1,0 +1,87 @@
+# Scenario 08: Shared PV Across Multiple Nodes
+# Trino SQL: cte_shared_volume_node_count (lines 205-212, 410-411)
+# Purpose: Validate storage usage is divided by node_count for shared PVs
+# CRITICAL: Tests Gap 1 - Shared Volume Node Count
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  # Node 1 with shared PV
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-1
+          cpu_cores: 8
+          memory_gig: 32
+          resource_id: i-worker001
+          namespaces:
+            shared-storage:
+              pods:
+                - pod: null
+                  pod_name: app-pod-1
+                  cpu_request: 0.5
+                  mem_request_gig: 1
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.3
+                  mem_usage_gig:
+                    full_period: 0.8
+                  pod_labels: app:shared-app
+
+              volumes:
+                - volume:
+                  volume_name: shared-pvc
+                  storage_class: gp2
+                  volume_request_gig: 100
+                  labels: storage:shared
+                  volume_claims:
+                    - volume_claim:
+                      volume_claim_name: shared-pvc
+                      pod_name: app-pod-1
+                      capacity_gig: 100
+                      volume_claim_usage_gig:
+                        full_period: 30
+
+  # Node 2 with same shared PV
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-2
+          cpu_cores: 8
+          memory_gig: 32
+          resource_id: i-worker002
+          namespaces:
+            shared-storage:
+              pods:
+                - pod: null
+                  pod_name: app-pod-2
+                  cpu_request: 0.5
+                  mem_request_gig: 1
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.3
+                  mem_usage_gig:
+                    full_period: 0.8
+                  pod_labels: app:shared-app
+
+              volumes:
+                - volume:
+                  volume_name: shared-pvc
+                  storage_class: gp2
+                  volume_request_gig: 100
+                  labels: storage:shared
+                  volume_claims:
+                    - volume_claim:
+                      volume_claim_name: shared-pvc
+                      pod_name: app-pod-2
+                      capacity_gig: 100
+                      volume_claim_usage_gig:
+                        full_period: 30
+
+# Expected: Shared PV on 2 nodes - each row's usage divided by 2
+# volume_request = 100 GB / 2 = 50 GB per row

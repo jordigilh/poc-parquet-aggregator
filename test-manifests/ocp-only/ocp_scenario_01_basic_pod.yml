@@ -1,0 +1,42 @@
+# Scenario 01: Basic Pod CPU/Memory Aggregation
+# Trino SQL: reporting_ocpusagelineitem_daily_summary.sql lines 260-316
+#
+# Purpose: Validate basic pod CPU and memory usage/request/limit aggregation
+# This is the foundational test - if this fails, nothing else will work.
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-node-1
+          cpu_cores: 4
+          memory_gig: 16
+          resource_id: i-worker001
+          namespaces:
+            app-namespace:
+              pods:
+                - pod: null
+                  pod_name: frontend-pod
+                  cpu_request: 0.5
+                  cpu_limit: 1.0
+                  mem_request_gig: 1
+                  mem_limit_gig: 2
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.3
+                  mem_usage_gig:
+                    full_period: 0.8
+                  pod_labels: app:frontend|tier:web
+
+# Expected output:
+# - data_source: Pod
+# - namespace: app-namespace
+# - pod: frontend-pod
+# - node: worker-node-1
+# - pod_request_cpu_core_hours: ~12.0 (0.5 cores * 24 hours)
+# - pod_usage_cpu_core_hours: ~7.2 (0.3 cores * 24 hours)

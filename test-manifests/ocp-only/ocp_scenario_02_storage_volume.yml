@@ -1,0 +1,53 @@
+# Scenario 02: Storage Volume Usage
+# Trino SQL: Volume aggregation (lines 327-446)
+# Purpose: Validates PVC usage, request, and capacity aggregation
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-node-1
+          cpu_cores: 4
+          memory_gig: 16
+          resource_id: i-worker001
+          namespaces:
+            database:
+              pods:
+                - pod: null
+                  pod_name: postgres-pod
+                  cpu_request: 1.0
+                  cpu_limit: 2.0
+                  mem_request_gig: 4
+                  mem_limit_gig: 8
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.8
+                  mem_usage_gig:
+                    full_period: 3.0
+                  pod_labels: app:postgres|tier:database
+
+              volumes:
+                - volume:
+                  volume_name: postgres-data-pvc
+                  storage_class: gp2
+                  volume_request_gig: 100
+                  labels: storage:database|backup:enabled
+                  volume_claims:
+                    - volume_claim:
+                      volume_claim_name: postgres-data-pvc
+                      pod_name: postgres-pod
+                      capacity_gig: 100
+                      volume_claim_usage_gig:
+                        full_period: 50
+
+# Expected:
+# - data_source: Storage
+# - namespace: database
+# - persistentvolumeclaim: postgres-data-pvc
+# - persistentvolumeclaim_capacity_gigabyte: 100
+# - persistentvolumeclaim_usage_gigabyte_months: ~1.61 (50 GB / 31 days)

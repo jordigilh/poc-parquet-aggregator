@@ -12,6 +12,7 @@ import s3fs
 from pathlib import Path
 import os
 import sys
+import re
 from datetime import datetime
 
 def main():
@@ -19,8 +20,8 @@ def main():
     MINIO_ENDPOINT = os.getenv('S3_ENDPOINT', 'http://localhost:9000')
     MINIO_ACCESS_KEY = os.getenv('S3_ACCESS_KEY', 'minioadmin')
     MINIO_SECRET_KEY = os.getenv('S3_SECRET_KEY', 'minioadmin')
-    BUCKET = os.getenv('S3_BUCKET', 'cost-management')
-    ORG_ID = '1234567'
+    BUCKET = os.getenv('S3_BUCKET', 'test-bucket')
+    ORG_ID = os.getenv('ORG_ID', 'org1234567')
     PROVIDER_UUID = os.getenv('OCP_PROVIDER_UUID', '00000000-0000-0000-0000-000000000001')
 
     # CSV input directory
@@ -58,30 +59,143 @@ def main():
         print(f"❌ Failed to connect to MinIO: {e}")
         sys.exit(1)
 
-    # Find all OCP CSV files (support both naming patterns and split files)
+    # AWS Provider UUID
+    AWS_PROVIDER_UUID = os.getenv('AWS_PROVIDER_UUID', '00000000-0000-0000-0000-000000000002')
+
+    # Track what was processed
+    processed_providers = []
+
+    # Find all OCP and AWS CSV files (support both naming patterns and split files)
     file_types = {
-        'pod_usage': (['*ocp_pod_usage*.csv', '**/*openshift_report.*.csv'], 'openshift_pod_usage_line_items'),
-        'node_labels': (['*ocp_node_label*.csv', '**/*openshift_node_labels.*.csv'], 'openshift_node_labels_line_items'),
-        'namespace_labels': (['*ocp_namespace_label*.csv', '**/*openshift_namespace_labels.*.csv'], 'openshift_namespace_labels_line_items'),
+        'pod_usage': {
+            'patterns': ['*ocp_pod_usage*.csv', '**/*openshift_report.*.csv'],
+            's3_dir': 'openshift_pod_usage_line_items',
+            'provider': 'OCP',
+            'provider_uuid': PROVIDER_UUID,
+            'date_column': 'interval_start'
+        },
+        'storage': {
+            'patterns': ['*ocp_storage*.csv', '**/*openshift_report.*.csv'],
+            's3_dir': 'openshift_storage_usage_line_items_daily',
+            'provider': 'OCP',
+            'provider_uuid': PROVIDER_UUID,
+            'date_column': 'interval_start'
+        },
+        'node_labels': {
+            'patterns': ['*ocp_node_label*.csv', '**/*openshift_node_labels.*.csv'],
+            's3_dir': 'openshift_node_labels_line_items',
+            'provider': 'OCP',
+            'provider_uuid': PROVIDER_UUID,
+            'date_column': 'interval_start'
+        },
+        'namespace_labels': {
+            'patterns': ['*ocp_namespace_label*.csv', '**/*openshift_namespace_labels.*.csv'],
+            's3_dir': 'openshift_namespace_labels_line_items',
+            'provider': 'OCP',
+            'provider_uuid': PROVIDER_UUID,
+            'date_column': 'interval_start'
+        },
+        'aws_cur': {
+            'patterns': ['October-*.csv', 'November-*.csv', 'December-*.csv',
+                        'January-*.csv', 'February-*.csv', 'March-*.csv',
+                        'April-*.csv', 'May-*.csv', 'June-*.csv',
+                        'July-*.csv', 'August-*.csv', 'September-*.csv'],
+            's3_dir': 'aws_line_items',
+            'provider': 'AWS',
+            'provider_uuid': AWS_PROVIDER_UUID,
+            'date_column': 'lineItem/UsageStartDate'  # AWS CUR uses forward slashes
+        },
     }
 
-    for file_type, (patterns, s3_dir) in file_types.items():
+    for file_type, config in file_types.items():
+        patterns = config['patterns']
+        s3_dir = config['s3_dir']
+        provider = config['provider']
+        provider_uuid = config['provider_uuid']
+        date_column = config['date_column']
+
         csv_files = []
         for pattern in patterns:
-            csv_files.extend(list(CSV_DIR.glob(pattern)))
+            matches = list(CSV_DIR.glob(pattern))
+            # Filter out files based on provider to avoid cross-contamination
+            if provider == 'AWS':
+                # AWS: exclude any files with 'openshift' or 'ocp' in the name
+                matches = [f for f in matches if 'openshift' not in f.name.lower() and 'ocp' not in f.name.lower()]
+            elif provider == 'OCP':
+                # OCP: exclude any files with month names (AWS pattern)
+                month_names = ['january', 'february', 'march', 'april', 'may', 'june',
+                              'july', 'august', 'september', 'october', 'november', 'december']
+                matches = [f for f in matches if not any(month in f.name.lower() for month in month_names)]
+            csv_files.extend(matches)
 
         if not csv_files:
-            print(f"⚠️  No {file_type} CSV files found (patterns: {patterns})")
+            # Don't print warning for AWS files in OCP-only scenarios
+            if provider == 'OCP':
+                print(f"⚠️  No {file_type} CSV files found (patterns: {patterns})")
             continue
 
-        print(f"\n📄 Processing {file_type}: found {len(csv_files)} file(s)")
+        print(f"\n📄 Processing {file_type} ({provider}): found {len(csv_files)} file(s)")
+
+        # Track this provider for summary
+        if provider not in processed_providers:
+            processed_providers.append(provider)
 
         # Combine all CSV files for this type
         all_dfs = []
         for csv_file in csv_files:
             try:
                 df_temp = pd.read_csv(csv_file)
+
                 if len(df_temp) > 0:
+                    # Filter OCP files by type (nise generates multiple report types in one file pattern)
+                    if file_type == 'pod_usage':
+                        # Pod usage files must have pod usage-specific columns
+                        required_cols = ['pod_usage_cpu_core_seconds', 'pod_usage_memory_byte_seconds']
+                        if not all(col in df_temp.columns for col in required_cols):
+                            print(f"   ⚠️  {csv_file.name}: not pod usage (missing required columns), skipping")
+                            continue
+                    elif file_type == 'node_labels':
+                        # Node labels files must have node_labels column
+                        if 'node_labels' not in df_temp.columns:
+                            print(f"   ⚠️  {csv_file.name}: not node labels, skipping")
+                            continue
+                    elif file_type == 'namespace_labels':
+                        # Namespace labels files must have namespace_labels column
+                        if 'namespace_labels' not in df_temp.columns:
+                            print(f"   ⚠️  {csv_file.name}: not namespace labels, skipping")
+                            continue
+                    elif file_type == 'storage':
+                        # Storage files must have persistentvolumeclaim column
+                        if 'persistentvolumeclaim' not in df_temp.columns:
+                            print(f"   ⚠️  {csv_file.name}: not storage, skipping")
+                            continue
+
+                    # For OCP data in multi-cluster scenarios, extract cluster_id from directory path
+                    # Nise generates directory structure: ocp/prod-cluster/YYYY-MM-DD/openshift_pod_usage_line_items.csv
+                    # Extract cluster_id from parent directory and add it as a column if not already present
+                    if provider == 'OCP' and 'cluster_id' not in df_temp.columns:
+                        # Check if file is in a subdirectory of ocp/ (multi-cluster)
+                        # Path example: /tmp/.../ocp/prod-cluster/2025-10-01/openshift_pod_usage_line_items.csv
+                        parts = csv_file.parts
+                        ocp_index = -1
+                        for i, part in enumerate(parts):
+                            if part == 'ocp':
+                                ocp_index = i
+                                break
+
+                        # If ocp/ is found and there's a subdirectory after it, that's the cluster_id
+                        if ocp_index >= 0 and ocp_index + 1 < len(parts):
+                            potential_cluster_id = parts[ocp_index + 1]
+                            # Verify it's not a date directory
+                            # Nise uses patterns: YYYYMMDD-YYYYMMDD or YYYY-MM-DD
+                            is_date_dir = (
+                                re.match(r'^\d{8}-\d{8}$', potential_cluster_id) or  # 20251001-20251101
+                                re.match(r'^\d{4}-\d{2}-\d{2}$', potential_cluster_id)  # 2025-10-01
+                            )
+                            if not is_date_dir:
+                                df_temp['cluster_id'] = potential_cluster_id
+                                print(f"   🔍 Detected cluster_id '{potential_cluster_id}' from directory path")
+
                     all_dfs.append(df_temp)
                     print(f"   ✓ {csv_file.name}: {len(df_temp)} rows")
                 else:
@@ -96,16 +210,52 @@ def main():
         df = pd.concat(all_dfs, ignore_index=True)
         print(f"   Total combined rows: {len(df)}")
 
+        # Debug: Check if cluster_id column exists in the combined DataFrame
+        if provider == 'OCP' and 'cluster_id' in df.columns:
+            unique_clusters = df['cluster_id'].unique()
+            print(f"   ✓ cluster_id column present with values: {list(unique_clusters)}")
+        elif provider == 'OCP':
+            print(f"   ⚠️  cluster_id column NOT found in combined DataFrame")
+
+        # Normalize AWS CUR column names (following koku's approach)
+        # - Keep slashes and colons in resourceTags/* and costCategory/* columns
+        # - Normalize other columns: lineItem/ResourceId → lineitem_resourceid
+        if provider == 'AWS':
+            original_cols = df.columns.tolist()
+            new_cols = []
+            for col in original_cols:
+                # Keep resourceTags/* and costCategory/* columns as-is (koku needs these)
+                if col.startswith('resourceTags/') or col.startswith('costCategory/'):
+                    new_cols.append(col)
+                else:
+                    # Normalize other columns: lowercase + replace slashes/spaces
+                    new_cols.append(col.lower().replace('/', '_').replace(' ', '_').replace('-', '_'))
+            df.columns = new_cols
+            print(f"   ✓ Normalized {len(df.columns)} AWS CUR column names (kept resourceTags/* as-is)")
+            # Update date_column reference for normalized columns
+            if not date_column.startswith('resourceTags/') and not date_column.startswith('costCategory/'):
+                date_column = date_column.lower().replace('/', '_').replace(' ', '_').replace('-', '_')
+
         # Parse dates and group by day
-        # Handle nise date format: "2025-11-01 00:00:00 +0000 UTC"
-        # Strip timezone suffix and parse
-        df['interval_start_str'] = df['interval_start'].str.replace(r' \+\d{4} UTC$', '', regex=True)
-        df['interval_start_parsed'] = pd.to_datetime(df['interval_start_str'])
-        df['year_num'] = df['interval_start_parsed'].dt.year
-        df['month_num'] = df['interval_start_parsed'].dt.month
-        df['day_num'] = df['interval_start_parsed'].dt.day
-        df.drop('interval_start_str', axis=1, inplace=True)
-        df.drop('interval_start_parsed', axis=1, inplace=True)
+        if date_column not in df.columns:
+            print(f"   ⚠️  Date column '{date_column}' not found in CSV, skipping")
+            continue
+
+        # Handle different date formats
+        if provider == 'OCP':
+            # OCP nise format: "2025-11-01 00:00:00 +0000 UTC"
+            df['date_str'] = df[date_column].str.replace(r' \+\d{4} UTC$', '', regex=True)
+            df['date_parsed'] = pd.to_datetime(df['date_str'])
+        else:
+            # AWS format: "2025-10-01T00:00:00Z" or "2025-10-01"
+            df['date_parsed'] = pd.to_datetime(df[date_column])
+
+        df['year_num'] = df['date_parsed'].dt.year
+        df['month_num'] = df['date_parsed'].dt.month
+        df['day_num'] = df['date_parsed'].dt.day
+        df.drop('date_parsed', axis=1, inplace=True)
+        if 'date_str' in df.columns:
+            df.drop('date_str', axis=1, inplace=True)
 
         # Group by year, month, day (not just day)
         date_groups = df.groupby(['year_num', 'month_num', 'day_num'])
@@ -120,12 +270,51 @@ def main():
             day_df = group_df.copy()
             day_df.drop(['year_num', 'month_num', 'day_num'], axis=1, inplace=True)
 
-            # S3 path (matching POC aggregator expectations)
-            s3_path = f"{BUCKET}/data/{ORG_ID}/OCP/source={PROVIDER_UUID}/year={year}/month={month:02d}/day={day:02d}/{s3_dir}/data.parquet"
+            # Normalize OCP datetime columns (nise format: "2025-10-01 00:00:00 +0000 UTC")
+            if provider == 'OCP':
+                datetime_cols = ['interval_start', 'interval_end', 'report_period_start', 'report_period_end']
+                for col in datetime_cols:
+                    if col in day_df.columns:
+                        # Remove " +0000 UTC" suffix and convert to datetime
+                        day_df[col] = day_df[col].str.replace(r' \+\d{4} UTC$', '', regex=True)
+                        day_df[col] = pd.to_datetime(day_df[col])
 
-            print(f"   {year}-{month:02d}-{day:02d}: {len(day_df)} rows → {s3_dir}/")
+            # Debug: Log if cluster_id is in the day_df
+            if provider == 'OCP':
+                if 'cluster_id' in day_df.columns:
+                    clusters_in_day = day_df['cluster_id'].unique()
+                    print(f"      ✓ cluster_id column in day_df with values: {list(clusters_in_day)}")
+                else:
+                    print(f"      ⚠️  cluster_id column NOT in day_df!")
+
+            # S3 path (matching POC aggregator expectations)
+            s3_path = f"{BUCKET}/data/{ORG_ID}/{provider}/source={provider_uuid}/year={year}/month={month:02d}/day={day:02d}/{s3_dir}/data.parquet"
+
+            print(f"   {year}-{month:02d}-{day:02d}: {len(day_df)} rows → {provider}/{s3_dir}/")
 
             try:
+                # AWS CUR: Apply schema enforcement (production behavior)
+                if provider == 'AWS':
+                    # Coerce cost/numeric columns to float (handle nise's string values like "convertible")
+                    numeric_columns = [
+                        'lineitem_unblendedcost',
+                        'lineitem_blendedcost',
+                        'lineitem_unblendedrate',
+                        'lineitem_blendedrate',
+                        'lineitem_usageamount',
+                        'savingsplan_savingsplaneffectivecost',
+                        'savingsplan_savingsplanrate',
+                        'pricing_publicondemandcost',
+                        'pricing_publicondemandrate',
+                    ]
+
+                    for col in numeric_columns:
+                        if col in day_df.columns:
+                            # Convert to numeric, coercing errors (strings) to NaN, then fill NaN with 0.0
+                            day_df[col] = pd.to_numeric(day_df[col], errors='coerce').fillna(0.0)
+
+                    print(f"   ✓ Enforced numeric types for {len([c for c in numeric_columns if c in day_df.columns])} cost columns")
+
                 # Convert to Parquet with explicit schema (no dictionary encoding)
                 # This prevents type conflicts when reading multiple files
                 schema = pa.Schema.from_pandas(day_df)
@@ -154,10 +343,17 @@ def main():
     print("=" * 80)
     print("✓ All files converted and uploaded to MinIO")
     print("=" * 80)
+    print(f"Providers processed: {', '.join(processed_providers) if processed_providers else 'None'}")
+    if 'OCP' in processed_providers and 'AWS' not in processed_providers:
+        print("Mode: OCP-only")
+    elif 'OCP' in processed_providers and 'AWS' in processed_providers:
+        print("Mode: OCP-on-AWS")
+    elif 'AWS' in processed_providers:
+        print("Mode: AWS-only")
     print()
     print("Next steps:")
     print("  1. Verify files in MinIO console: http://localhost:9001")
-    print("  2. Run POC aggregator: python3 -m src.main --truncate")
+    print("  2. Run POC aggregator: python3 -m src.main")
     print()
 
 if __name__ == '__main__':

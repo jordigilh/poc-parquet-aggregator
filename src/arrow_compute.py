@@ -21,9 +21,47 @@ class ArrowLabelProcessor:
         self.logger = get_logger("arrow_compute")
         self.logger.info("Initialized Arrow label processor")
 
+    def _parse_single_label(self, value: str) -> Dict:
+        """
+        Parse a single label string (handles both JSON and pipe-delimited formats).
+        
+        Args:
+            value: Label string (JSON or pipe-delimited)
+            
+        Returns:
+            Parsed label dictionary
+        """
+        if value is None or value == '' or value == 'null':
+            return {}
+        
+        value = str(value).strip()
+        
+        # Handle pipe-delimited format (from nise CSV): "app:benchmark|tier:web|node:node-001"
+        if '|' in value or (':' in value and '{' not in value):
+            result = {}
+            pairs = value.split('|') if '|' in value else [value]
+            for pair in pairs:
+                pair = pair.strip()
+                if ':' in pair:
+                    key, val = pair.split(':', 1)
+                    # Remove 'label_' prefix if present
+                    key = key.replace('label_', '').strip()
+                    result[key] = val.strip()
+            return result
+        
+        # Handle JSON format
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    
     def parse_json_labels_vectorized(self, labels_series: pd.Series) -> List[Dict]:
         """
         Parse JSON label strings to dictionaries using vectorized operations.
+
+        Handles two formats:
+        1. Pipe-delimited: "app:benchmark|tier:web|node:node-001"
+        2. JSON: '{"app": "nginx", "env": "prod"}'
 
         Args:
             labels_series: Pandas Series of JSON strings or dict objects
@@ -47,33 +85,21 @@ class ArrowLabelProcessor:
             # Convert to Arrow array for zero-copy operation
             arrow_array = pa.array(labels_series, type=pa.string())
 
-            # Process in Arrow (vectorized)
+            # Process using the parser that handles both formats
             results = []
             for i in range(len(arrow_array)):
                 value = arrow_array[i].as_py()
-                if value is None or value == '':
-                    results.append({})
-                else:
-                    try:
-                        results.append(json.loads(value))
-                    except (json.JSONDecodeError, TypeError):
-                        results.append({})
+                results.append(self._parse_single_label(value))
 
             return results
 
         except Exception as e:
-            # Fallback to standard Python
-            # Check if it's already dict objects
-            try:
-                return [
-                    x if isinstance(x, dict) else (json.loads(x) if x and x != '' else {})
-                    for x in labels_series
-                ]
-            except Exception as fallback_e:
-                self.logger.warning(
-                    f"Arrow JSON parsing failed, and fallback also failed: {e}, fallback: {fallback_e}"
-                )
-                return [{}] * len(labels_series)
+            # Fallback to standard Python with format detection
+            self.logger.warning(f"Arrow parsing failed, using fallback: {e}")
+            return [
+                self._parse_single_label(x) if x else {}
+                for x in labels_series
+            ]
 
     def merge_labels_vectorized(
         self,

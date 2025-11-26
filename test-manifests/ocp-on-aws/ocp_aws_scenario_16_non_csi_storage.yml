@@ -1,0 +1,107 @@
+---
+# OCP-on-AWS Scenario 16: Non-CSI Storage (Tag-Based Matching)
+# Validates: EBS volumes WITHOUT CSI handles, matched via tags
+# Pattern: Legacy EBS volume has OCP tags but no CSI driver
+# Expected: Cost attributed via tag matching (like compute), not CSI handles
+# Real-world scenario: Pre-CSI storage or legacy volume configurations
+
+start_date: '2025-10-01'
+end_date: '2025-10-02'
+
+ocp:
+  generators:
+    - OCPGenerator:
+        start_date: '2025-10-01'
+        end_date: '2025-10-02'
+        nodes:
+          - node:
+            node_name: legacy-node-1
+            resource_id: legacy-node-001
+            cpu_cores: 4
+            memory_gig: 16
+            namespaces:
+              legacy-app:
+                pods:
+                  - pod:
+                    pod_name: legacy-pod-1
+                    cpu_request: 2
+                    mem_request_gig: 8
+                    cpu_limit: 4
+                    mem_limit_gig: 16
+                    pod_seconds: 3600
+                    cpu_usage:
+                      full_period: 2
+                    mem_usage_gig:
+                      full_period: 8
+                    labels: label_app:legacy|label_storage:non_csi
+                volumes:
+                  # Non-CSI volume: No csi_driver or csi_volume_handle
+                  # Uses storage_class for tag correlation
+                  - volume:
+                    volume_name: legacy-pv-1
+                    storage_class: sc_non_csi_legacy
+                    volume_request_gig: 50
+                    labels: label_volume:legacy|label_type:gp2
+                    volume_claims:
+                      - volume_claim:
+                        volume_claim_name: pvc-legacy-1
+                        pod_name: legacy-pod-1
+                        capacity_gig: 50
+                        labels: label_pvc:legacy|label_storageclass:sc_non_csi_legacy
+                        volume_claim_usage_gig:
+                          full_period: 30
+
+aws:
+  generators:
+    # Non-CSI EBS volume: Matched via tags (openshift_cluster, openshift_node, storageclass)
+    # NO lineitem_resourceid → must use tag matching
+    - EBSGenerator:
+        start_date: '2025-10-01'
+        end_date: '2025-10-02'
+        resource_id: non_csi_ebs_001
+        disk_size: 100
+        rate: 0.08  # $0.08 per GB-day = $8.00/day total
+        tags:
+          openshift_cluster: my-ocp-cluster
+          openshift_node: legacy-node-1
+          resourceTags/user:storageclass: sc_non_csi_legacy
+          resourceTags/user:tier: non_csi_disk
+          resourceTags/user:test_scenario: scenario_16
+
+    # EC2 instance for compute
+    - EC2Generator:
+        start_date: '2025-10-01'
+        end_date: '2025-10-02'
+        resource_id: legacy-node-001
+        instance_type:
+          inst_type: t3.medium
+          cost: 0.0416  # $1.00/day
+          rate: 0.0416
+        tags:
+          openshift_cluster: my-ocp-cluster
+          openshift_node: legacy-node-1
+
+expected_outcome:
+  # EBS cost breakdown (Non-CSI):
+  # Total EBS cost: 100 GB * $0.08/GB-day * 1 day = $8.00
+  # PVC capacity: 50 GB (out of 100 GB disk)
+  # Attributed to namespace: (50/100) * $8.00 = $4.00
+  # Unattributed: (50/100) * $8.00 = $4.00
+
+  total_ebs_cost: 8.00
+
+  legacy_app_storage_attributed: 4.00  # Proportional to PVC capacity
+  storage_unattributed: 4.00           # Remaining capacity
+
+  # Compute cost
+  legacy_app_compute_attributed: 1.00
+
+  # Total costs
+  legacy_app_total: 5.00  # $4 storage + $1 compute
+  storage_unattributed_namespace: 4.00
+  total_cost: 9.00        # $8 EBS + $1 compute
+
+  # Validation
+  tag_based_matching: true  # Must use openshift_cluster/node tags, NOT CSI handle
+  no_csi_handle: true       # Volume has NO csi_volume_handle
+

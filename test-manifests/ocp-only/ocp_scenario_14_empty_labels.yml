@@ -1,0 +1,48 @@
+# Scenario 14: Empty/Null Labels
+# Trino SQL: coalesce for null labels (lines 267-268)
+# Purpose: Validate graceful handling of empty or null labels
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-1
+          cpu_cores: 4
+          memory_gig: 16
+          resource_id: i-worker001
+          namespaces:
+            no-labels-ns:
+              pods:
+                # Pod with no labels
+                - pod: null
+                  pod_name: no-labels-pod
+                  cpu_request: 0.5
+                  mem_request_gig: 1
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.3
+                  mem_usage_gig:
+                    full_period: 0.8
+
+            some-labels-ns:
+              pods:
+                # Pod with some labels
+                - pod: null
+                  pod_name: partial-labels-pod
+                  cpu_request: 0.5
+                  mem_request_gig: 1
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.3
+                  mem_usage_gig:
+                    full_period: 0.8
+                  pod_labels: app:test
+
+# Expected:
+# no-labels-pod: pod_labels = "{}" (empty JSON)
+# partial-labels-pod: pod_labels = {"app": "test"}

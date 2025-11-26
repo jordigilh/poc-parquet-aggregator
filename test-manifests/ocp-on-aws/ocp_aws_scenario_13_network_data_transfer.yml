@@ -1,0 +1,69 @@
+start_date: '2025-10-01'
+end_date: '2025-10-02'
+ocp:
+  generators:
+  - OCPGenerator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      nodes:
+      - node_name: ip-10-0-1-100.ec2.internal
+        resource_id: network-node-01
+        cpu_cores: 4
+        memory_gig: 16
+        namespaces:
+          backend:
+            pods:
+            - pod_name: api-server-1
+              cpu_request: 2
+              mem_request_gig: 4
+              cpu_limit: 4
+              mem_limit_gig: 8
+              pod_seconds: 3600
+              cpu_usage:
+                full_period: 2
+              mem_usage_gig:
+                full_period: 6
+aws:
+  generators:
+  # EC2 compute costs (should be attributed to pod)
+  - EC2Generator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: network-node-01
+      instance_type:
+        inst_type: t3.large
+        physical_cores: 0.5
+        vcpu: '2'
+        memory: 8 GiB
+        storage: EBS Only
+        family: General Purpose
+        cost: 0.0832
+        rate: 0.0832
+      tags:
+        openshift_cluster: my-ocp-cluster
+        openshift_node: ip-10-0-1-100.ec2.internal
+  # Data transfer OUT costs (should go to "Network unattributed")
+  # Simplified data transfer pattern
+  - DataTransferGenerator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: network-node-01
+      product_sku: "DT-OCP-TEST-OUT"
+      amount: 2.083  # 50 GB total / 24 hours = 2.083 GB per hour
+      rate: 0.09    # $0.09 per GB
+      tags:
+        openshift_cluster: my-ocp-cluster
+        openshift_node: ip-10-0-1-100.ec2.internal
+        resourceTags/user:test_type: "DataTransfer"
+        resourceTags/user:transfer_type: "Out"
+expected_outcome:
+  # EC2 compute should be attributed to namespace
+  compute_attributed_cost: 1.9968
+  # Data transfer should go to "Network unattributed" namespace
+  network_attributed_cost: 4.50  # 50 GB * $0.09
+  # Total cost (compute + network)
+  total_cost: 6.4968
+  # Namespace breakdown
+  backend_namespace_cost: 1.9968  # Should NOT include network costs
+  network_unattributed_namespace_cost: 4.50
+

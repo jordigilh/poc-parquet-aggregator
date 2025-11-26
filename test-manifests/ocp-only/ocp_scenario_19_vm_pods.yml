@@ -1,0 +1,51 @@
+# Scenario 19: Virtual Machine Pods (KubeVirt)
+# Trino SQL: vm_kubevirt_io_name is always in enabled_keys (line 96)
+# Purpose: Validate VM pods are correctly identified by vm_kubevirt_io_name label
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-1
+          cpu_cores: 16
+          memory_gig: 64
+          resource_id: i-worker001
+          namespaces:
+            vm-namespace:
+              pods:
+                # VM pod (has vm_kubevirt_io_name)
+                - pod: null
+                  pod_name: virt-launcher-rhel-vm-12345
+                  cpu_request: 4.0
+                  cpu_limit: 8.0
+                  mem_request_gig: 16
+                  mem_limit_gig: 32
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 3.0
+                  mem_usage_gig:
+                    full_period: 12.0
+                  pod_labels: vm_kubevirt_io_name:rhel-vm|app:vm
+
+                # Regular pod (no vm_kubevirt_io_name)
+                - pod: null
+                  pod_name: regular-pod
+                  cpu_request: 0.5
+                  cpu_limit: 1.0
+                  mem_request_gig: 1
+                  mem_limit_gig: 2
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.3
+                  mem_usage_gig:
+                    full_period: 0.8
+                  pod_labels: app:web
+
+# Expected:
+# VM pod should have vm_kubevirt_io_name in pod_labels
+# This label is ALWAYS enabled regardless of enabled_keys config

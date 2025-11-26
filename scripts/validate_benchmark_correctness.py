@@ -3,7 +3,7 @@
 Validate POC aggregation correctness by comparing PostgreSQL results
 against expected values calculated from nise raw CSV data.
 
-This is a SELF-CONTAINED validator that doesn't depend on IQE.
+This is a SELF-CONTAINED validator that doesn't depend on Core.
 """
 
 import sys

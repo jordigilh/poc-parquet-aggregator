@@ -1,0 +1,394 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black isort
+
+      - name: Check formatting with black
+        run: black --check --diff src/ tests/
+
+      - name: Check imports with isort
+        run: isort --check-only --diff src/ tests/
+
+      - name: Lint with flake8
+        run: |
+          # Stop on syntax errors or undefined names
+          flake8 src/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Warnings (non-blocking)
+          flake8 src/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify imports
+        run: |
+          python -c "from src.main import main; print('✓ Main module imports successfully')"
+          python -c "from src.aggregator_ocp_aws import OCPAWSAggregator; print('✓ OCP-AWS aggregator imports successfully')"
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: |
+          pytest tests/test_cost_attributor.py \
+                 tests/test_resource_matcher.py \
+                 tests/test_tag_matcher.py \
+                 tests/test_network_cost_handler.py \
+                 tests/test_json_format.py \
+                 tests/test_disk_capacity_calculator.py \
+                 -v --tb=short
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: koku
+          POSTGRES_PASSWORD: koku123
+          POSTGRES_DB: koku
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      minio:
+        image: minio/minio:latest
+        ports:
+          - 9000:9000
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create PostgreSQL schema
+        run: |
+          PGPASSWORD=koku123 psql -h localhost -U koku -d koku -c "CREATE SCHEMA IF NOT EXISTS org1234567;"
+          PGPASSWORD=koku123 psql -h localhost -U koku -d koku -c "
+            CREATE TABLE IF NOT EXISTS org1234567.reporting_ocpusagelineitem_daily_summary (
+              id SERIAL PRIMARY KEY,
+              uuid UUID,
+              report_period_id INT,
+              cluster_id VARCHAR(255),
+              cluster_alias VARCHAR(255),
+              data_source VARCHAR(50),
+              usage_start DATE,
+              usage_end DATE,
+              namespace VARCHAR(255),
+              node VARCHAR(255),
+              resource_id VARCHAR(255),
+              pod VARCHAR(255),
+              pod_labels JSONB,
+              pod_usage_cpu_core_hours DOUBLE PRECISION,
+              pod_request_cpu_core_hours DOUBLE PRECISION,
+              pod_effective_usage_cpu_core_hours DOUBLE PRECISION,
+              pod_limit_cpu_core_hours DOUBLE PRECISION,
+              pod_usage_memory_gigabyte_hours DOUBLE PRECISION,
+              pod_request_memory_gigabyte_hours DOUBLE PRECISION,
+              pod_effective_usage_memory_gigabyte_hours DOUBLE PRECISION,
+              pod_limit_memory_gigabyte_hours DOUBLE PRECISION,
+              node_capacity_cpu_cores DOUBLE PRECISION,
+              node_capacity_cpu_core_hours DOUBLE PRECISION,
+              node_capacity_memory_gigabytes DOUBLE PRECISION,
+              node_capacity_memory_gigabyte_hours DOUBLE PRECISION,
+              cluster_capacity_cpu_core_hours DOUBLE PRECISION,
+              cluster_capacity_memory_gigabyte_hours DOUBLE PRECISION,
+              source_uuid UUID,
+              cost_category_id INT
+            );"
+
+      - name: Configure MinIO
+        run: |
+          # Install mc (MinIO client)
+          wget -q https://dl.min.io/client/mc/release/linux-amd64/mc
+          chmod +x mc
+          ./mc alias set local http://localhost:9000 minioadmin minioadmin
+          ./mc mb local/koku --ignore-existing
+
+      - name: Run integration tests
+        env:
+          S3_ENDPOINT: http://localhost:9000
+          S3_ACCESS_KEY: minioadmin
+          S3_SECRET_KEY: minioadmin
+          S3_BUCKET: koku
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: koku
+          POSTGRES_PASSWORD: koku123
+          POSTGRES_DB: koku
+          ORG_ID: org1234567
+          OCP_PROVIDER_UUID: 00000000-0000-0000-0000-000000000001
+          OCP_CLUSTER_ID: test-cluster
+        run: |
+          pytest tests/test_ocp_aws_integration.py \
+                 tests/test_storage_integration.py \
+                 tests/test_ocp_aws_aggregator.py \
+                 -v --tb=short
+
+  e2e-ocp:
+    name: E2E Tests (OCP-only)
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: koku
+          POSTGRES_PASSWORD: koku123
+          POSTGRES_DB: koku
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      minio:
+        image: minio/minio:latest
+        ports:
+          - 9000:9000
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install nise
+
+      - name: Configure MinIO
+        run: |
+          wget -q https://dl.min.io/client/mc/release/linux-amd64/mc
+          chmod +x mc
+          ./mc alias set local http://localhost:9000 minioadmin minioadmin
+          ./mc mb local/koku --ignore-existing
+
+      - name: Create PostgreSQL schema
+        run: |
+          PGPASSWORD=koku123 psql -h localhost -U koku -d koku -c "CREATE SCHEMA IF NOT EXISTS org1234567;"
+          # Create required tables (simplified for E2E)
+          PGPASSWORD=koku123 psql -h localhost -U koku -d koku -f scripts/create_tables.sql || true
+
+      - name: Run OCP E2E tests
+        env:
+          S3_ENDPOINT: http://localhost:9000
+          S3_ACCESS_KEY: minioadmin
+          S3_SECRET_KEY: minioadmin
+          S3_BUCKET: koku
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: koku
+          POSTGRES_PASSWORD: koku123
+          POSTGRES_DB: koku
+          ORG_ID: org1234567
+          OCP_PROVIDER_UUID: 00000000-0000-0000-0000-000000000001
+          OCP_CLUSTER_ID: test-cluster
+        run: |
+          # Run OCP-only unit tests as E2E proxy (no OCP-only E2E scenarios yet)
+          pytest tests/test_storage_integration.py -v --tb=short
+
+  e2e-ocp-aws:
+    name: E2E Tests (OCP-on-AWS)
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: koku
+          POSTGRES_PASSWORD: koku123
+          POSTGRES_DB: koku
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      minio:
+        image: minio/minio:latest
+        ports:
+          - 9000:9000
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install nise
+
+      - name: Install MinIO client
+        run: |
+          wget -q https://dl.min.io/client/mc/release/linux-amd64/mc
+          chmod +x mc
+          sudo mv mc /usr/local/bin/
+          mc alias set local http://localhost:9000 minioadmin minioadmin
+          mc mb local/koku --ignore-existing
+
+      - name: Create PostgreSQL schema and tables
+        run: |
+          PGPASSWORD=koku123 psql -h localhost -U koku -d koku -c "CREATE SCHEMA IF NOT EXISTS org1234567;"
+          # Create OCP-AWS summary table
+          PGPASSWORD=koku123 psql -h localhost -U koku -d koku -c "
+            CREATE TABLE IF NOT EXISTS org1234567.ocp_aws_summary (
+              id SERIAL PRIMARY KEY,
+              uuid UUID,
+              cluster_id VARCHAR(255),
+              cluster_alias VARCHAR(255),
+              namespace VARCHAR(255),
+              node VARCHAR(255),
+              resource_id VARCHAR(255),
+              pod VARCHAR(255),
+              usage_start DATE,
+              usage_end DATE,
+              product_code VARCHAR(255),
+              usage_type VARCHAR(255),
+              instance_type VARCHAR(255),
+              resource_ids TEXT,
+              cost_entry_type VARCHAR(50),
+              usage_amount DOUBLE PRECISION,
+              unit VARCHAR(50),
+              unblended_cost DOUBLE PRECISION,
+              blended_cost DOUBLE PRECISION,
+              markup_cost DOUBLE PRECISION,
+              currency_code VARCHAR(10),
+              source_uuid UUID,
+              aws_source_uuid UUID,
+              data_source VARCHAR(50),
+              pod_labels JSONB,
+              volume_labels JSONB,
+              tags JSONB,
+              pod_usage_cpu_core_hours DOUBLE PRECISION,
+              pod_request_cpu_core_hours DOUBLE PRECISION,
+              pod_usage_memory_gigabyte_hours DOUBLE PRECISION,
+              pod_request_memory_gigabyte_hours DOUBLE PRECISION,
+              node_capacity_cpu_core_hours DOUBLE PRECISION,
+              node_capacity_memory_gigabyte_hours DOUBLE PRECISION,
+              persistentvolumeclaim VARCHAR(255),
+              persistentvolume VARCHAR(255),
+              storageclass VARCHAR(255),
+              csi_volume_handle VARCHAR(255),
+              persistentvolumeclaim_capacity_gigabyte DOUBLE PRECISION,
+              persistentvolumeclaim_usage_gigabyte_months DOUBLE PRECISION,
+              volume_request_storage_gigabyte_months DOUBLE PRECISION
+            );"
+
+      - name: Run OCP-on-AWS E2E tests (sample scenarios)
+        env:
+          S3_ENDPOINT: http://localhost:9000
+          S3_ACCESS_KEY: minioadmin
+          S3_SECRET_KEY: minioadmin
+          S3_BUCKET: koku
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: koku
+          POSTGRES_PASSWORD: koku123
+          POSTGRES_DB: koku
+          ORG_ID: org1234567
+          OCP_PROVIDER_UUID: 00000000-0000-0000-0000-000000000001
+          AWS_PROVIDER_UUID: 00000000-0000-0000-0000-000000000002
+          OCP_CLUSTER_ID: test-cluster
+        run: |
+          # Run OCP-AWS integration tests as E2E validation
+          pytest tests/test_ocp_aws_integration.py -v --tb=short -k "not slow"
+
+

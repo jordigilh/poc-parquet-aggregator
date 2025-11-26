@@ -1,0 +1,76 @@
+start_date: '2025-10-01'
+end_date: '2025-10-02'
+ocp:
+  generators:
+  - OCPGenerator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      nodes:
+      - node_name: ip-10-0-1-200.ec2.internal
+        resource_id: sp-node-01
+        cpu_cores: 4
+        memory_gig: 16
+        namespaces:
+          production:
+            pods:
+            - pod_name: web-server-1
+              cpu_request: 2
+              mem_request_gig: 4
+              cpu_limit: 4
+              mem_limit_gig: 8
+              pod_seconds: 3600
+              cpu_usage:
+                full_period: 2
+              mem_usage_gig:
+                full_period: 6
+aws:
+  generators:
+  # EC2 instance with SavingsPlan applied
+  # This should have lineitem_lineitemtype = 'SavingsPlanCoveredUsage'
+  - EC2Generator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: sp-node-01
+      instance_type:
+        inst_type: m5.large
+        physical_cores: 1
+        vcpu: '2'
+        memory: 8 GiB
+        storage: EBS Only
+        family: General Purpose
+        cost: 0.05          # On-demand cost per hour
+        rate: 0.05          # On-demand rate per hour
+        saving: 0.035       # Savings Plan effective cost per hour (30% discount)
+      tags:
+        openshift_cluster: my-ocp-cluster
+        openshift_node: ip-10-0-1-200.ec2.internal
+        resourceTags/user:savings_plan: compute-1yr
+  # SavingsPlan Negation line item (required for accounting)
+  - EC2Generator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      product_sku: SP-NEGATION-TEST
+      region: us-east-1
+      instance_type:
+        inst_type: m5.large
+        cost: 0.035         # Negation amount per hour (matches saving per hour)
+        rate: 0.035
+        negation: true
+expected_outcome:
+  # With SavingsPlan:
+  # - lineitem_unblendedcost = 0.0 (set by COST-5098 logic)
+  # - lineitem_blendedcost = 0.0 (set by COST-5098 logic)
+  # - savingsplan_effectivecost = 0.84 (actual cost)
+  # - calculated_amortized_cost = 0.84 (uses savingsplan_effectivecost)
+
+  # Pod attribution should use calculated_amortized_cost
+  attributed_cost: 0.84  # NOT 1.20 (on-demand), NOT 0.0 (unblended)
+
+  # Verify cost calculations
+  total_unblended_cost: 0.0   # SavingsPlanCoveredUsage should be 0
+  total_amortized_cost: 0.84  # Should use savingsplan_effectivecost
+
+  # Verify no double-counting
+  # On-demand cost (1.20) should NOT appear in attributed costs
+  # Only the savings plan effective cost (0.84) should be attributed
+

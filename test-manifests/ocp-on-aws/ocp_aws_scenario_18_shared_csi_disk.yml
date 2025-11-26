@@ -1,0 +1,165 @@
+# Scenario 18: Multi-Cluster Shared CSI Disk
+# Purpose: Validate that a single EBS volume shared across multiple OCP clusters
+#          has its cost split proportionally based on PVC capacity from each cluster
+# Reference: Trino SQL shared disk capacity calculation
+# Business Case: "This is a real world scenario observed in customer data in prod"
+#                Multiple clusters sharing network-attached storage (e.g., EFS/EBS multi-attach)
+
+start_date: '2025-10-01'
+end_date: '2025-10-02'
+
+ocp:
+  clusters:
+    # Cluster A: Uses 40 GB of the shared 100 GB EBS volume
+    - cluster_id: cluster-alpha
+      cluster_alias: ClusterAlpha
+      generators:
+      - OCPGenerator:
+          start_date: '2025-10-01'
+          end_date: '2025-10-02'
+          nodes:
+          - node_name: node-alpha-01
+            resource_id: alpha-node # nise adds "i-" prefix
+            cpu_cores: 2
+            memory_gig: 8
+            namespaces:
+              project-alpha:
+                pods:
+                - pod_name: app-alpha
+                  cpu_request: 1
+                  mem_request_gig: 4
+                  cpu_limit: 2
+                  mem_limit_gig: 8
+                  pod_seconds: 3600
+                  cpu_usage:
+                    full_period: 1.5
+                  mem_usage_gig:
+                    full_period: 6
+                volumes:
+                - volume_name: shared-storage-alpha
+                  storage_class: gp3
+                  csi_driver: ebs.csi.aws.com
+                  csi_volume_handle: shared-disk-001  # SAME handle as cluster-bravo
+                  volume_claims:
+                  - volume_claim_name: pvc-alpha
+                    capacity_gig: 40  # 40 GB of 100 GB total
+                    volume_claim_usage:
+                      full_period: 25  # GB used
+
+    # Cluster B: Uses 30 GB of the shared 100 GB EBS volume
+    - cluster_id: cluster-bravo
+      cluster_alias: ClusterBravo
+      generators:
+      - OCPGenerator:
+          start_date: '2025-10-01'
+          end_date: '2025-10-02'
+          nodes:
+          - node_name: node-bravo-01
+            resource_id: bravo-node # nise adds "i-" prefix
+            cpu_cores: 2
+            memory_gig: 8
+            namespaces:
+              project-bravo:
+                pods:
+                - pod_name: app-bravo
+                  cpu_request: 1
+                  mem_request_gig: 4
+                  cpu_limit: 2
+                  mem_limit_gig: 8
+                  pod_seconds: 3600
+                  cpu_usage:
+                    full_period: 1.5
+                  mem_usage_gig:
+                    full_period: 6
+                volumes:
+                - volume_name: shared-storage-bravo
+                  storage_class: gp3
+                  csi_driver: ebs.csi.aws.com
+                  csi_volume_handle: shared-disk-001  # SAME handle as cluster-alpha
+                  volume_claims:
+                  - volume_claim_name: pvc-bravo
+                    capacity_gig: 30  # 30 GB of 100 GB total
+                    volume_claim_usage:
+                      full_period: 20  # GB used
+
+aws:
+  generators:
+  # EC2 compute for cluster-alpha
+  - EC2Generator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: alpha-node
+      instance_type:
+        inst_type: t3.medium
+        physical_cores: 0.5
+        vcpu: '2'
+        memory: 4 GiB
+        storage: EBS Only
+        family: General Purpose
+        cost: 0.0416  # $0.0416/hr = $0.9984/day
+        rate: 0.0416
+      tags:
+        openshift_cluster: cluster-alpha
+        openshift_node: node-alpha-01
+
+  # EC2 compute for cluster-bravo
+  - EC2Generator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: bravo-node
+      instance_type:
+        inst_type: t3.medium
+        physical_cores: 0.5
+        vcpu: '2'
+        memory: 4 GiB
+        storage: EBS Only
+        family: General Purpose
+        cost: 0.0416  # $0.0416/hr = $0.9984/day
+        rate: 0.0416
+      tags:
+        openshift_cluster: cluster-bravo
+        openshift_node: node-bravo-01
+
+  # Shared EBS volume (100 GB total)
+  - EBSGenerator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: shared-disk-001  # Matches CSI handle
+      disk_size: 100  # 100 GB
+      rate: 0.383    # $0.383/GB/month → 100 * 0.383 = $38.30/month = $1.277/day → $0.0532/hr
+      tags:
+        openshift_cluster: cluster-alpha  # Only tagged to alpha, but both use it
+        storage_tier: shared
+
+expected_outcome:
+  # Total EBS cost: 100 GB * $0.383/GB/month = $38.30/month = $1.277/day (for 1 day)
+  #
+  # Cluster Alpha (40 GB PVC):
+  #   - Attributed: (40/100) * $1.277 = $0.5108
+  #   - Plus EC2: $0.9984
+  #   - Total: $1.5092
+  #
+  # Cluster Bravo (30 GB PVC):
+  #   - Attributed: (30/100) * $1.277 = $0.3831
+  #   - Plus EC2: $0.9984
+  #   - Total: $1.3815
+  #
+  # Unattributed storage (30 GB unused):
+  #   - Cost: (30/100) * $1.277 = $0.3831
+  #   - Split equally across 2 clusters: $0.19155 per cluster
+  #   - Goes to "Storage unattributed" namespace in each cluster
+  #
+  # Total: $1.5092 + $1.3815 + $0.3831 = $3.2738
+
+  total_cost: 3.2738
+
+  # Namespace costs (including unattributed storage split)
+  cluster_alpha_project_alpha_cost: 1.5092   # EC2 + proportional storage
+  cluster_alpha_storage_unattributed_cost: 0.19155  # 50% of unattributed
+
+  cluster_bravo_project_bravo_cost: 1.3815  # EC2 + proportional storage
+  cluster_bravo_storage_unattributed_cost: 0.19155  # 50% of unattributed
+
+  # Verify no cost duplication
+  shared_disk_cost: 1.277  # EBS cost should appear only once, not 2x
+

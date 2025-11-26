@@ -1,5 +1,5 @@
 #!/bin/bash
-# Test streaming mode implementation with IQE scenarios
+# Test streaming mode implementation with Core scenarios
 
 set -e
 
@@ -51,7 +51,7 @@ else
 fi
 
 echo ""
-echo "Step 2: Run a single IQE test with streaming"
+echo "Step 2: Run a single Core test with streaming"
 echo "============================================="
 echo ""
 
@@ -66,10 +66,10 @@ fi
 echo "Running test with: $TEST_YAML"
 echo ""
 
-# Run the IQE validation script with streaming enabled
+# Run the Core validation script with streaming enabled
 if [ -f "scripts/run_iqe_validation.sh" ]; then
     echo "Using run_iqe_validation.sh..."
-    export IQE_YAML="$TEST_YAML"
+    export Core_YAML="$TEST_YAML"
     bash scripts/run_iqe_validation.sh
 else
     echo "run_iqe_validation.sh not found, using direct python execution..."
@@ -114,7 +114,7 @@ if [ $RESULT -eq 0 ]; then
     echo "Streaming mode is working correctly!"
     echo ""
     echo "Next steps:"
-    echo "1. Run full IQE test suite: ./scripts/test_iqe_production_scenarios.sh"
+    echo "1. Run full Core test suite: ./scripts/test_iqe_production_scenarios.sh"
     echo "2. Run performance benchmarks: python scripts/benchmark_performance.py"
     echo "3. Check memory usage during execution"
 else

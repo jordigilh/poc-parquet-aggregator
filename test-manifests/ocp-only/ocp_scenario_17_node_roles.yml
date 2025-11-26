@@ -1,0 +1,83 @@
+# Scenario 17: Node Role Detection
+# Trino SQL: cte_node_role, CASE for Platform/Worker unallocated (lines 491-511)
+# Purpose: Validate master/infra → "Platform unallocated", worker → "Worker unallocated"
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  # Master node
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: master-1
+          cpu_cores: 4
+          memory_gig: 16
+          resource_id: i-master001
+          namespaces:
+            kube-system:
+              pods:
+                - pod: null
+                  pod_name: api-server
+                  cpu_request: 0.5
+                  mem_request_gig: 2
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.3
+                  mem_usage_gig:
+                    full_period: 1.5
+                  pod_labels: component:apiserver
+
+  # Infra node
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: infra-1
+          cpu_cores: 4
+          memory_gig: 32
+          resource_id: i-infra001
+          namespaces:
+            monitoring:
+              pods:
+                - pod: null
+                  pod_name: prometheus
+                  cpu_request: 1.0
+                  mem_request_gig: 8
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.8
+                  mem_usage_gig:
+                    full_period: 6.0
+                  pod_labels: app:prometheus
+
+  # Worker node
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-1
+          cpu_cores: 8
+          memory_gig: 32
+          resource_id: i-worker001
+          namespaces:
+            default:
+              pods:
+                - pod: null
+                  pod_name: app-pod
+                  cpu_request: 2.0
+                  mem_request_gig: 4
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 1.5
+                  mem_usage_gig:
+                    full_period: 3.0
+                  pod_labels: app:myapp
+
+# Expected unallocated capacity:
+# Master/Infra → "Platform unallocated"
+# Worker → "Worker unallocated"

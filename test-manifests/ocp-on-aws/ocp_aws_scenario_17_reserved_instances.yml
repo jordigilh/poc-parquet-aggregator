@@ -1,0 +1,118 @@
+# Scenario 17: Reserved Instance (RI) Cost Handling
+# Purpose: Validate that Reserved Instance covered usage is correctly handled
+#          RI-covered usage has lineItem/LineItemType = "DiscountedUsage" and $0 unblended cost
+#          The POC should attribute $0 cost for RI-covered instances (correct behavior)
+# Business Case: Organizations using RIs to reduce costs; the RI fee is a separate
+#                line item not tied to specific resources, so per-resource costs are $0
+
+start_date: '2025-10-01'
+end_date: '2025-10-02'
+
+ocp:
+  generators:
+  - OCPGenerator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      nodes:
+      # Node 1: RI-covered instance (should show $0 attributed cost)
+      - node_name: ip-10-0-3-20.ec2.internal
+        resource_id: ri-covered-node
+        cpu_cores: 4
+        memory_gig: 16
+        namespaces:
+          production:
+            pods:
+            - pod_name: web-server
+              cpu_request: 2
+              mem_request_gig: 8
+              cpu_limit: 4
+              mem_limit_gig: 16
+              pod_seconds: 3600
+              cpu_usage:
+                full_period: 3
+              mem_usage_gig:
+                full_period: 12
+
+      # Node 2: On-demand instance (should show normal cost)
+      - node_name: ip-10-0-3-21.ec2.internal
+        resource_id: on-demand-node
+        cpu_cores: 2
+        memory_gig: 8
+        namespaces:
+          staging:
+            pods:
+            - pod_name: test-app
+              cpu_request: 1
+              mem_request_gig: 4
+              cpu_limit: 2
+              mem_limit_gig: 8
+              pod_seconds: 3600
+              cpu_usage:
+                full_period: 1.5
+              mem_usage_gig:
+                full_period: 6
+
+aws:
+  generators:
+  # EC2 instance 1: RI-covered (DiscountedUsage with $0 cost)
+  - EC2Generator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: ri-covered-node
+      instance_type:
+        inst_type: m5.xlarge
+        physical_cores: 2
+        vcpu: '4'
+        memory: 16 GiB
+        storage: EBS Only
+        family: General Purpose
+        cost: 0.192  # On-demand cost (for reference), but will be set to $0 by nise
+        rate: 0.192
+        reserved_instance: true  # This sets lineItem/LineItemType = "DiscountedUsage"
+      tags:
+        openshift_cluster: my-ocp-cluster
+        openshift_node: ip-10-0-3-20.ec2.internal
+        cost_center: production
+
+  # EC2 instance 2: On-demand (normal Usage with actual cost)
+  - EC2Generator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: on-demand-node
+      instance_type:
+        inst_type: t3.medium
+        physical_cores: 0.5
+        vcpu: '2'
+        memory: 4 GiB
+        storage: EBS Only
+        family: General Purpose
+        cost: 0.0416  # $0.0416/hr = $0.9984/day
+        rate: 0.0416
+      tags:
+        openshift_cluster: my-ocp-cluster
+        openshift_node: ip-10-0-3-21.ec2.internal
+        cost_center: staging
+
+expected_outcome:
+  # RI-covered instance (Node 1): $0 cost (unblended/blended are $0 for DiscountedUsage)
+  # On-demand instance (Node 2): $0.9984
+  # Total: $0.9984
+
+  total_cost: 0.9984
+
+  # Namespace breakdown:
+  # - production: $0.00 (RI-covered, correct behavior - RI fee is separate)
+  # - staging: $0.9984 (on-demand)
+
+  production_namespace_cost: 0.00
+  staging_namespace_cost: 0.9984
+
+  # Verify RI line item attributes
+  ri_line_item_type: DiscountedUsage
+  ri_unblended_cost: 0.00
+  ri_blended_cost: 0.00
+
+  # Note: The actual RI fee (amortized cost) would appear as a separate
+  # "Fee" line item not tied to specific resources, which is out of scope
+  # for OCP-on-AWS attribution (no OCP resource to attribute it to).
+

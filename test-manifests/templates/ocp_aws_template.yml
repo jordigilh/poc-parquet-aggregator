@@ -1,0 +1,887 @@
+---
+generators:
+  - EC2Generator:
+      start_date: last_month
+      end_date: "{{ ec2_single_orig_end }}"
+      user: 99999999999991
+      processor_arch: 64-bit
+      resource_id: "{{ resource_id_1 }}"
+      product_sku: VEAJHRNKTJZA
+      region: us-east-1b
+      operating_system: "Amazon Linux"
+      tags:
+        resourceTags/user:environment: smoke_test_run_sample_long_tag
+        resourceTags/user:correlation: resource_id_matching
+        resourceTags/user:app: slatt
+        resourceTags/user:version: zeta
+        resourceTags/user:com_redhat_rhel: "8"
+        resourceTags/user:com_redhat_rhel_conversion: "True"
+        resourceTags/user:com_redhat_rhel_variant: "{{ aws_rhel_variant }}" # rand. choice from ["Workstation", "SAP", "HPC"]
+        resourceTags/user:com_redhat_rhel_usage: "Development/Test"
+        resourceTags/user:com_redhat_rhel_sla: "Premium"
+        resourceTags/user:tm_aws_candidate1: "tm_aws_value1"
+        resourceTags/user:inst_raw_calc: "type_1_split"
+        resourceTags/user:git: "commit"
+        resourceTags/user:OCPonAWSCommonKey: aws_instance_one
+      cost_category:
+        costCategory/name: rhel-compute
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+      instance_type:
+        inst_type: m5.large
+        vcpu: "2"
+        physical_cores: 0.5
+        memory: '8 GiB'
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 10
+        rate: 10
+        saving: 2.0
+
+  # Usage of instance resource_id_1 above SavingsPlan covered usage
+  - EC2Generator:
+      start_date: today
+      user: 99999999999991
+      processor_arch: 64-bit
+      resource_id: "{{ resource_id_1 }}"
+      product_sku: VEAJHRNKTJZA
+      region: us-east-1b
+      operating_system: "Amazon Linux"
+      tags:
+        resourceTags/user:environment: smoke_test_run_sample_long_tag
+        resourceTags/user:correlation: resource_id_matching
+        resourceTags/user:app: slatt
+        resourceTags/user:version: zeta
+        resourceTags/user:com_redhat_rhel: "8"
+        resourceTags/user:com_redhat_rhel_conversion: "True"
+        resourceTags/user:com_redhat_rhel_variant: "{{ aws_rhel_variant }}" # rand. choice from ["Workstation", "SAP", "HPC"]
+        resourceTags/user:com_redhat_rhel_usage: "Development/Test"
+        resourceTags/user:com_redhat_rhel_sla: "Premium"
+        resourceTags/user:tm_aws_candidate1: "tm_aws_value1"
+        resourceTags/user:inst_raw_calc: "type_1_split"
+        resourceTags/user:git: "commit"
+        resourceTags/user:OCPonAWSCommonKey: aws_instance_one
+      cost_category:
+        costCategory/name: rhel-compute
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+      instance_type:
+        inst_type: m5.large
+        vcpu: "2"
+        physical_cores: 0.5
+        memory: '8 GiB'
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 10
+        rate: 10
+
+  - EC2Generator:
+      start_date: last_month
+      user: 99999999999991
+      processor_arch: 64-bit
+      resource_id: "{{ resource_id_2 }}"
+      product_sku: VEAJHRNKTJZA
+      region: us-east-1b
+      operating_system: "Amazon Linux"
+      tags:
+        resourceTags/user:correlation: not_correlated
+        resourceTags/user:openshift_project: negative_project_tag_matching
+        resourceTags/user:negative_special_tag_matching: openshift-ocp_prod
+        resourceTags/user:com_redhat_rhel: "7"
+        resourceTags/user:com_redhat_rhel_addon: "ELS"
+        resourceTags/user:com_redhat_rhel_conversion: "False"
+        resourceTags/user:com_redhat_rhel_variant: "Server"
+        resourceTags/user:com_redhat_rhel_usage: "Production"
+        resourceTags/user:com_redhat_rhel_sla: "Standard"
+        resourceTags/user:tm_aws_candidate1: "tm_aws_value2"
+        resourceTags/user:inst_raw_calc: "type_1"
+        resourceTags/user:OCPonAWSCommonKey: aws_instance_three
+      cost_category:
+        costCategory/name: rhel-compute
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+      instance_type:
+        inst_type: m5.large
+        vcpu: "2"
+        physical_cores: 0.5
+        memory: '8 GiB'
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 10.000
+        rate: 10
+        saving: 2.0
+
+  # Savingsplan Negation for sku VEAJHRNKTJZA (resource_id_1 and resource_id_2)
+  - EC2Generator:
+      start_date: last_month
+      end_date: "{{ ec2_single_orig_end }}"
+      user: 99999999999991
+      processor_arch: 64-bit
+      product_sku: VEAJHRNKTJZA
+      region: us-east-1b
+      operating_system: "Amazon Linux"
+      instance_type:
+        inst_type: m5.large
+        vcpu: "2"
+        physical_cores: 0.5
+        memory: '8 GiB'
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 20
+        rate: 10
+        amount: 2 # negation for two instances with the same sku
+        negation: True
+
+  # Savingsplan Negation for sku VEAJHRNKTJZA (only resource_id_2 is negated today)
+  - EC2Generator:
+      start_date: today
+      user: 99999999999991
+      processor_arch: 64-bit
+      product_sku: VEAJHRNKTJZA
+      region: us-east-1b
+      operating_system: "Amazon Linux"
+      instance_type:
+        inst_type: m5.large
+        vcpu: "2"
+        physical_cores: 0.5
+        memory: '8 GiB'
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 10.0
+        rate: 10
+        amount: 1 # negation for resource_id 2, resoruce_id 1 is above savings plan
+        negation: True
+
+  - EC2Generator:
+      start_date: last_month
+      user: 99999999999992
+      processor_arch: 64-bit
+      resource_id: "{{ resource_id_3 }}"
+      product_sku: VEAJHRNKTEEE
+      region: eu-west-1b
+      operating_system: "Fedora CoreOS"
+      tags:
+        resourceTags/user:correlation: not_correlated
+        resourceTags/user:openshift_cluster: negative_cluster_tag_matching
+        resourceTags/user:negative_special_tag_matching: "test_cost_ocp_on_aws_cluster{{ account_suffix }}"
+        # Test case insensivity - all tags/values should be parsed
+        resourceTags/user:com_redhat_RHEL: "8"
+        resourceTags/user:com_redhat_rhel_aDdon: "els"
+        resourceTags/user:com_redhat_rhel_conversion: "{{ rhel_conversion }}"
+        resourceTags/user:com_redhAT_rheL_Variant: "{{ aws_rhel_variant_case }}" # rand. choice from ["serVER", "worKSTATion", "sAp", "hPc"]
+        resourceTags/user:COm_redhat_rhel_usage: "DisastER Recovery"
+        resourceTags/user:com_ReDhat_rhel_sla: "Self-SUPPort"
+        resourceTags/user:tm_aws_candidate2: "tm_aws_value3"
+        resourceTags/user:inst_raw_calc: "type_2"
+        resourceTags/user:OCPonAWSCommonKey: aws_instance_four
+      cost_category:
+        costCategory/name: rhel-compute
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+      instance_type:
+        inst_type: t3.small
+        vcpu: "4"
+        physical_cores: 2.0
+        memory: '8 GiB'
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 25.000
+        rate: 25.0
+
+  # EC2 Reserved instance
+  - EC2Generator:
+      start_date: last_month
+      processor_arch: 64-bit
+      resource_id: "{{ resource_id_4 }}"
+      product_sku: VEAJHRNKTFFF
+      region: eu-west-2a
+      operating_system: "Fedora CoreOS"
+      tags:
+        resourceTags/user:correlation: not_correlated
+        resourceTags/user:openshift_node: negative_node_tag_matching
+        resourceTags/user:negative_special_tag_matching: ocp-nod
+        # Test missing tags -> tag will be added with a default value
+        resourceTags/user:com_redhat_rhel: "8" # com_redhat_rhel tag must be always present in RHEL instances
+        resourceTags/user:tm_aws_candidate2: "tm_aws_value4"
+        resourceTags/user:inst_raw_calc: "type_0"
+        resourceTags/user:app: test_reserved_instance_rhel_metering
+        resourceTags/user:name: "instance_name_negative"    # this shouldn't be used as an instance name
+        resourceTags/user:OCPonAWSCommonKey: aws_instance_five
+      cost_category:
+        costCategory/name: rhel-compute
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+      instance_type:
+        inst_type: m5.large
+        vcpu: "5"
+        physical_cores: 1.0
+        memory: '8 GiB'
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 0
+        rate: 0
+        reserved_instance: True
+
+  - EC2Generator:
+      start_date: last_month
+      processor_arch: 64-bit
+      resource_id: "{{ resource_id_5 }}"
+      product_sku: VEAJHRNKTEEE
+      region: eu-west-1b
+      operating_system: "CentOS"
+      tags:
+        resourceTags/user:correlation: not_correlated
+        # Test incorrect tag values -> default value will be used instead of incorrect one
+        resourceTags/user:com_redhat_rhel: "9"  # -> "8" (default in case of missing tag/incorrect value)
+        resourceTags/user:com_redhat_rhel_addon: "WRONG"  # -> "" (default in case of incorrect value -> addon is not applied)
+        resourceTags/user:com_redhat_rhel_conversion: "truuue" # -> false (default in case of missing tag/incorrect value)
+        resourceTags/user:com_redhat_rhel_variant: "Xerver" # -> Server (default in case of missing tag/incorrect value)
+        resourceTags/user:com_redhat_rhel_usage: "Xisaster Recovery" # -> Production (default in case of missing tag/incorrect value)
+        resourceTags/user:com_redhat_rhel_sla: "Xelf-Support" # -> Premium (default in case of missing tag/incorrect value)
+        resourceTags/user:tm_aws_candidate3: "tm_aws_value5"
+        resourceTags/user:inst_raw_calc: "type_2"
+        resourceTags/user:OCPonAWSCommonKey: aws_instance_six
+      cost_category:
+        costCategory/name: rhel-compute
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+      instance_type:
+        inst_type: m5.large
+        vcpu: "4"
+        physical_cores: 2.0
+        memory: '8 GiB'
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 25.000
+        rate: 25.0
+
+  - S3Generator:
+      start_date: last_month
+      user: 99999999999991
+      product_sku: VEAJHRNAAAAA
+      amount: 0.1
+      rate: 22
+      tags:
+        resourceTags/user:correlation: node_matching
+        resourceTags/user:openshift_node: ocp-nod
+        resourceTags/user:tm_aws_candidate4: "tm_aws_value6"
+        resourceTags/user:OCPonAWSCommonKey: s3_bucket
+      cost_category:
+        costCategory/name: object_storage
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+
+  - RDSGenerator:
+      start_date: last_month
+      user: 99999999999991
+      processor_arch: 64-bit
+      product_sku: VEAJHRNKTJZC
+      region: us-west-1a
+      resource_id: "{{ resource_id_1 }}"
+      tags:
+        resourceTags/user:correlation: resource_id_matching
+        resourceTags/user:openshift_node: ocp-nod
+        resourceTags/user:OCPonAWSCommonKey: rdsDB
+      cost_category:
+        costCategory/name: database
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+      instance_type:
+        inst_type: db.t3.medium
+        vcpu: "2"
+        memory: '4 GiB'
+        storage: 'EBS Only'
+        family: 'Memory Optimized'
+        cost: 1.2
+        rate: 0.344
+
+  - VPCGenerator:
+      start_date: last_month
+      cost: 28
+      rate: 23
+      tags:
+        resourceTags/user:correlation: tag_matching
+        resourceTags/user:git: commit
+        resourceTags/user:tm_aws_candidate5: "tm_aws_value7"
+        resourceTags/user:OCPonAWSCommonKey: VPCNetwork
+      cost_category:
+        costCategory/name: network
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+
+  - EBSGenerator:
+      start_date: last_month
+      product_sku: VEAJHRNBBBBA
+      disk_size: 15
+      rate: 120
+      tags:
+        resourceTags/user:correlation: node_matching
+        resourceTags/user:openshift_node: ocp-nod
+        resourceTags/user:test: ebs_non_csi
+        resourceTags/user:git: commit
+        resourceTags/user:stack: overflow
+        resourceTags/user:volume: stor_nod
+        resourceTags/user:storageclass: sc_aws_non_csi
+        resourceTags/user:preference: tests
+        resourceTags/user:app: nod
+        resourceTags/user:tm_aws_candidate6: "tm_aws_value8"
+        resourceTags/user:OCPonAWSCommonKey: sc_aws_non_csi
+      cost_category:
+        costCategory/name: storage
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+
+  - Route53Generator:
+      start_date: last_month
+      product_sku: AERJHRNRRRRR
+      product_code: AmazonRoute53
+      product_name: Amazon Route53
+      product_family: DNS Zone
+      cost: 26
+      rate: 20
+      region: us-west-1a
+      tags:
+        resourceTags/user:correlation: cluster_matching
+        resourceTags/user:openshift_cluster: "test_cost_ocp_on_aws_cluster{{ account_suffix }}"
+        resourceTags/user:tm_aws_candidate7: "tm_aws_value9"
+        resourceTags/user:OCPonAWSCommonKey: Route53
+      cost_category:
+        costCategory/name: dns
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+
+  - DataTransferGenerator:
+      start_date: last_month
+      product_sku: AERJHRNCCCCC
+      product_code: AmazonDynamoDB
+      product_name: Amazon DynamoDB
+      region: us-west-1a
+      amount: 12
+      rate: 19
+      saving: 2.2
+      tags:
+        resourceTags/user:correlation: tag_matching
+        resourceTags/user:storageclass: dua
+        resourceTags/user:test: nice
+        resourceTags/user:git: commit
+        resourceTags/user:stack: overflow
+        resourceTags/user:volume: stor_nod
+        resourceTags/user:tm_aws_candidate8: "tm_aws_value10"
+        resourceTags/user:tm_aws_candidate9: "tm_aws_value11"
+        resourceTags/user:OCPonAWSCommonKey: data_transfer_1
+      cost_category:
+        costCategory/name: db-backups
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+
+  # Savingsplan negation for sku AERJHRNCCCCC (AmazonDynamoDB)
+  - DataTransferGenerator:
+      start_date: last_month
+      product_sku: AERJHRNCCCCC
+      product_code: AmazonDynamoDB
+      product_name: Amazon DynamoDB
+      region: us-west-1a
+      amount: 12
+      rate: 19
+      negation: True
+
+  - DataTransferGenerator:
+      start_date: last_month
+      user: 99999999999991
+      resource_id: "i-{{ resource_id_1 }}"
+      product_sku: VEAJHRNKTJZQ
+      region: us-west-1a
+      amount: 10
+      rate: 20
+      saving: 2.0
+      data_direction: "out"
+      tags:
+        resourceTags/user:app: analytics
+        resourceTags/user:Mapping: d1
+        resourceTags/user:Map: d2
+        resourceTags/user:OCPonAWSCommonKey: data_transfer_2
+      cost_category:
+        costCategory/env: prod
+        costCategory/name: network
+
+  # Savingsplan negation for sku VEAJHRNKTJZQ (network out)
+  - DataTransferGenerator:
+      start_date: last_month
+      user: 99999999999991
+      product_sku: VEAJHRNKTJZQ
+      region: us-west-1a
+      amount: 10
+      rate: 20
+      data_direction: "out"
+      negation: True
+
+  - DataTransferGenerator:
+      start_date: last_month
+      user: 99999999999991
+      resource_id: "i-{{ resource_id_1 }}"
+      product_sku: VEAJHRNKTJZR
+      region: us-west-1a
+      amount: 20
+      rate: 10
+      saving: 2.0
+      data_direction: "in"
+      tags:
+        resourceTags/user:app: analytics
+        resourceTags/user:Mapping: d1
+        resourceTags/user:Map: d2
+        resourceTags/user:OCPonAWSCommonKey: data_transfer_3
+      cost_category:
+        costCategory/env: prod
+        costCategory/name: network
+
+    # Savingsplan negation for sku VEAJHRNKTJZR (network in)
+  - DataTransferGenerator:
+      start_date: last_month
+      user: 99999999999991
+      product_sku: VEAJHRNKTJZR
+      region: us-west-1a
+      amount: 20
+      rate: 10
+      data_direction: "in"
+      negation: True
+
+    # HCS private offer
+  - EC2Generator:
+      start_date: last_month
+      processor_arch: 64-bit
+      resource_id: "484848484848"
+      product_sku: MARBC5PQDGESPVMV
+      region: us-east-1a
+      operating_system: "Debian"
+      product_name: Marketplace testing product - private offer
+      lineitem_lineitemdescription: Marketplace testing product - private_offer
+      legal_entity: Red Hat Inc.
+      billing_entity: AWS Marketplace
+      tags:
+        resourceTags/user:correlation: not_correlated
+        resourceTags/user:app: hcs_test_private_offer
+        resourceTags/user:test: var1
+        resourceTags/user:inst_raw_calc: "type_1"
+        resourceTags/user:Name: "instance_name_test_1"
+        resourceTags/user:tm_aws_candidate8: "tm_aws_value10"
+        resourceTags/user:tm_aws_candidate9: "tm_aws_value11"
+        resourceTags/user:OCPonAWSCommonKey: aws_instance_seven
+      cost_category:
+        costCategory/name: marketplace
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+      instance_type:
+        inst_type: m5.large
+        vcpu: "2"
+        physical_cores: 2.0
+        memory: '8 GiB'
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 10.0
+        rate: 10
+        saving: 2.0
+
+  # Savingsplan negation for sku MARBC5PQDGESPVMV (resource-id 4848484848)
+  - EC2Generator:
+      start_date: last_month
+      processor_arch: 64-bit
+      product_sku: MARBC5PQDGESPVMV
+      region: us-east-1a
+      operating_system: "Debian"
+      product_name: Marketplace testing product - private offer
+      lineitem_lineitemdescription: Marketplace testing product - private_offer
+      legal_entity: Red Hat Inc.
+      billing_entity: AWS Marketplace
+      instance_type:
+        inst_type: m5.large
+        vcpu: "2"
+        physical_cores: 2.0
+        memory: '8 GiB'
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 10.0
+        rate: 10
+        negation: True
+
+  # HCS alternative CCSP
+  - EC2Generator:
+      start_date: last_month
+      user: 99999999999992
+      resource_id: "2929292929"
+      product_sku: MARBC5PQDGESYZRE
+      region: us-east-1a
+      operating_system: "Fedora"
+      product_name: "Red Hat Enterprise Linux for SAP with HA and Update Services 8.6"
+      lineitem_lineitemdescription: Marketplace testing product - alternative CCSP
+      legal_entity: "{{ aws_legal_entity }}"
+      billing_entity: AWS Marketplace
+      tags:
+        resourceTags/user:correlation: not_correlated
+        resourceTags/user:app: hcs_test_alternative_ccsp
+        resourceTags/user:openshift_project: openshift-ocp_prod-negative
+        resourceTags/user:openshift_node: ocp
+        resourceTags/user:partial_match_negative: abcd
+        resourceTags/user:inst_raw_calc: "type_1"
+        resourceTags/user:Name: "inSTANCE_name_test_2"
+        resourceTags/user:OCPonAWSCommonKey: aws_instance_eight
+      cost_category:
+        costCategory/name: marketplace
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+      instance_type:
+        inst_type: db.t3.large
+        vcpu: "4"
+        physical_cores: 2.0
+        memory: '16 GiB'
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 10
+        rate: 10
+        saving: 2.0
+
+  # Savingsplan negation for sku MARBC5PQDGESYZRE (resource_id: 2929292929)
+  - EC2Generator:
+      start_date: last_month
+      user: 99999999999992
+      product_sku: MARBC5PQDGESYZRE
+      region: us-east-1a
+      operating_system: "Fedora"
+      product_name: "Red Hat Enterprise Linux for SAP with HA and Update Services 8.6"
+      lineitem_lineitemdescription: Marketplace testing product - alternative CCSP
+      legal_entity: "{{ aws_legal_entity }}"
+      billing_entity: AWS Marketplace
+      instance_type:
+        inst_type: db.t3.large
+        vcpu: "4"
+        physical_cores: 2.0
+        memory: '16 GiB'
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 10
+        rate: 10
+        negation: True
+
+  # HCS CCSP negative
+  - EC2Generator:
+      start_date: last_month
+      end_date: "{{ ec2_single_orig_end }}"
+      resource_id: "191119111911"
+      product_sku: MARJHRNAAEEE
+      region: us-west-1a
+      operating_system: "CentOS"
+      product_name: "Marketplace testing product - negative"
+      lineitem_lineitemdescription: "Marketplace testing product - negative"
+      legal_entity: "{{ aws_legal_entity }}"
+      billing_entity: AWS Marketplace
+      tags:
+        resourceTags/user:correlation: not_correlated
+        resourceTags/user:test: var2
+        resourceTags/user:app: hcs_test_negative
+        resourceTags/user:partial_match_negative: bc
+        resourceTags/user:inst_raw_calc: "type_2"
+        resourceTags/user:test_tag_value_change: "value_1"    # test tag value change
+        resourceTags/user:test_tag_remove: "value_remove"     # test tag removal
+        resourceTags/user:Name: "instance_name_TESt_5"        # test instance name change
+        resourceTags/user:OCPonAWSCommonKey: aws_instance_hcs_ccsp_negative
+      cost_category:
+        costCategory/name: marketplace
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+      instance_type:
+        inst_type:  m5dn.16xlarge
+        vcpu: 256
+        memory: '64.0 GiB'
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 25
+        rate: 25
+
+  # Test "today's" change of attributes and tags of instance with resource_id "191119111911"
+  # For EC2 tests, make sure that both generators for this instance cover two full months
+
+  - EC2Generator:
+      start_date: today
+      resource_id: "191119111911"
+      product_sku: MARJHRNAAEEE
+      region: us-west-1a
+      operating_system: "CentOS"
+      product_name: "Marketplace testing product - negative"
+      lineitem_lineitemdescription: "Marketplace testing product - negative"
+      legal_entity: "{{ aws_legal_entity }}"
+      billing_entity: AWS Marketplace
+      tags:
+        resourceTags/user:correlation: not_correlated
+        resourceTags/user:test: var2
+        resourceTags/user:app: hcs_test_negative
+        resourceTags/user:partial_match_negative: bc
+        resourceTags/user:inst_raw_calc: "type_2"
+        resourceTags/user:test_tag_value_change: "value_2"    # test tag value change
+        resourceTags/user:test_new_tag: "value_new_tag"       # test addition of new tag
+        resourceTags/user:Name: "instance_name_TESt_3"        # test change of instance_name
+        resourceTags/user:OCPonAWSCommonKey: aws_instance_hcs_ccsp_negative
+      cost_category:
+        costCategory/name: marketplace
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+      instance_type:
+        inst_type: db.t3.medium    # test inst_type change
+        vcpu: 16              # test vcpu change
+        memory: '7.0 GiB'       # test memory change
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 25
+        rate: 25
+
+  # HCS CCSP - xlarge
+  - EC2Generator:
+      start_date: last_month
+      processor_arch: 64-bit
+      resource_id: "210121012101"
+      product_sku: VEAJHRNKDEFGA
+      region: eu-west-2a
+      operating_system: "Ubuntu"
+      legal_entity: "{{ aws_legal_entity }}"
+      tags:
+        resourceTags/user:correlation: not_correlated
+        resourceTags/user:app: hcs_test_ccsp_xlarge
+        resourceTags/user:inst_raw_calc: "type_2"
+        resourceTags/user:Name: "instance_name_test_11"
+        resourceTags/user:OCPonAWSCommonKey: aws_instance_hcs_ccsp
+      cost_category:
+        costCategory/name: marketplace
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+      instance_type:
+        inst_type: "{{ rhel_description }} a1.2xlarge"
+        vcpu: "{{ aws_vcpu_large }}"
+        memory: '16.0 GiB'
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 25.0
+        rate: 25
+
+  # HCS CCSP - small
+  - EC2Generator:
+      start_date: last_month
+      processor_arch: 32-bit
+      resource_id: "20142017"
+      product_sku: VEAJHRNKJLRTY
+      region: eu-west-1a
+      operating_system: "CentOS"
+      legal_entity: "{{ aws_legal_entity }}"
+      tags:
+        resourceTags/user:correlation: not_correlated
+        resourceTags/user:app: hcs_test_ccsp_small
+        resourceTags/user:inst_raw_calc: "type_1"
+        resourceTags/user:OCPonAWSCommonKey: aws_instance_hcs_ccsp_small
+      cost_category:
+        costCategory/name: marketplace
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+      instance_type:
+        inst_type: "{{ rhel_description }} t3a.small"
+        vcpu: "{{ aws_vcpu_small}}"
+        memory: '4.0 GiB'
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 10.0
+        rate: 10
+        saving: 2.0
+
+  # Savingsplan Negation for sku VEAJHRNKJLRTY (resource_id: 20142017)
+  - EC2Generator:
+      start_date: last_month
+      processor_arch: 32-bit
+      product_sku: VEAJHRNKJLRTY
+      region: eu-west-1a
+      operating_system: "CentOS"
+      legal_entity: "{{ aws_legal_entity }}"
+      instance_type:
+        inst_type: "{{ rhel_description }} t3a.small"
+        vcpu: "{{ aws_vcpu_small}}"
+        memory: '4.0 GiB'
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 10.0
+        rate: 10
+        negation: True
+
+  # EC2 instance only for today
+  - EC2Generator:
+      start_date: today
+      processor_arch: 64-bit
+      resource_id: "9876555522"
+      product_sku: ZOOKEEPER
+      region: eu-west-2a
+      operating_system: "openSUSE Leap"
+      tags:
+        resourceTags/user:correlation: not_correlated
+        resourceTags/user:app: test_instance_today
+        resourceTags/user:inst_raw_calc: "type_1_no_savings"
+        resourceTags/user:OCPonAWSCommonKey: aws_instance_nine
+        resourceTags/user:Name: "instance_name_test_22_today"
+      cost_category:
+        costCategory/name: compute
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+      instance_type:
+        inst_type: "t3.small"
+        vcpu: "8"
+        memory: '16.0 GiB'
+        storage: 'EBS Only'
+        family: 'General Purpose'
+        cost: 10.0
+        rate: 10
+
+  # EC2 instance ending yesterday
+  - EC2Generator:
+      start_date: last_month
+      end_date: "{{ ec2_single_orig_end }}"
+      processor_arch: 64-bit
+      resource_id: "6666777722"
+      product_sku: GORILLAKEEPER
+      region: sa-east-1a
+      operating_system: "Windows Server"
+      tags:
+        resourceTags/user:correlation: not_correlated
+        resourceTags/user:app: test_instance_till_yesterday
+        resourceTags/user:inst_raw_calc: "type_1"
+        resourceTags/user:OCPonAWSCommonKey: aws_instance_ten
+        resourceTags/user:Name: "instance_name_test_22_yesterday"
+      cost_category:
+        costCategory/name: compute
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+      instance_type:
+        family: "General Purpose"
+        inst_type: m5dn.16xlarge
+        memory: "256.0 GiB"
+        vcpu: "64"
+        storage: "2400 GiB (4 * 600 GiB NVMe SSD)"
+        cost: 10.0
+        rate: 10
+        saving: 2.0
+
+  # Savingsplan Negation for sku GORILLAKEEPER (resource_id 6666777722)
+  - EC2Generator:
+      start_date: last_month
+      end_date: "{{ ec2_single_orig_end }}"
+      processor_arch: 64-bit
+      product_sku: GORILLAKEEPER
+      region: sa-east-1a
+      operating_system: "Windows Server"
+      instance_type:
+        family: "General Purpose"
+        inst_type: m5dn.16xlarge
+        memory: "256.0 GiB"
+        vcpu: "64"
+        storage: "2400 GiB (4 * 600 GiB NVMe SSD)"
+        cost: 10.0
+        rate: 10
+        negation: True
+
+    # Aws EBS csi disk correlated with volumes in pod "nod" in ocp on aws single source
+    # Disk size in GiB will be randomly picked in each template render
+  - EBSGenerator:
+      start_date: last_month
+      product_sku: VEAJHRNBBBBF
+      disk_size: "{{ aws_disk_one_size }}"
+      resource_id: "aws_single_source_disk_one"
+      rate: 110
+      tags:
+        resourceTags/user:correlation: disk_id_matching
+        resourceTags/user:test: ebs_managed_one
+        resourceTags/user:storageclass: sc_aws_disk_one
+        resourceTags/user:OCPonAWSCommonKey: sc_aws_disk_one
+      cost_category:
+        costCategory/name: storage
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+
+    # Aws EBS csi disk uncorrelated wit OCP,
+    # will add cost only to aws /cost and /storage endpoint
+  - EBSGenerator:
+      start_date: last_month
+      user: 99999999999992
+      product_sku: VEAJHRNBBBBF
+      disk_size: 11
+      resource_id: "aws_single_source_disk_two"
+      rate: 90
+      tags:
+        resourceTags/user:correlation: not_correlated
+        resourceTags/user:test: ebs_managed_two
+        resourceTags/user:storageclass: sc_aws_disk_two
+        resourceTags/user:OCPonAWSCommonKey: sc_aws_disk_two
+      cost_category:
+        costCategory/name: storage
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+
+
+    # Aws EBS csi disk uncorrelated wit OCP,
+    # will add cost only to aws /cost and /storage endpoints
+  - EBSGenerator:
+      start_date: last_month
+      product_sku: VEAJHRNBBBBF
+      disk_size: 10
+      resource_id: "aws_single_source_disk_three"
+      rate: 100
+      tags:
+        resourceTags/user:correlation: not_correlated
+        resourceTags/user:test: ebs_managed_three
+        resourceTags/user:storageclass: sc_aws_disk_three
+        resourceTags/user:OCPonAWSCommonKey: sc_aws_disk_three
+      cost_category:
+        costCategory/name: storage
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+
+  # Savings Plan recurring fee
+  - EC2Generator:
+      start_date: last_month
+      processor_arch: 32-bit
+      resource_id: "66644401"
+      product_sku: VEAJHRNKJLEVA
+      tags:
+        resourceTags/user:correlation: not_correlated
+        resourceTags/user:app: test_recurring_fee
+        resourceTags/user:inst_raw_calc: "recurring_fee"
+        resourceTags/user:OCPonAWSCommonKey: aws_instance_recurring_fee
+      cost_category:
+        costCategory/name: savingsplanrecurring
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+      instance_type:
+        cost: 15.0
+        rate: 15
+        recurring_fee: True
+
+  # Savings Plan upfront fee
+  - EC2Generator:
+      start_date: "{{ upfront_start }}"
+      end_date: "{{ upfront_end }}"
+      processor_arch: 32-bit
+      resource_id: "66644402"
+      product_sku: VEAJHRNKJLEWA
+      tags:
+        resourceTags/user:correlation: not_correlated
+        resourceTags/user:app: test_upfront_fee
+        resourceTags/user:inst_raw_calc: "upfront_fee"
+        resourceTags/user:OCPonAWSCommonKey: aws_instance_upfront_fee
+      cost_category:
+        costCategory/name: savingsplanupfront
+        costCategory/cost_env: prod
+        costCategory/qe_source: aws-single
+      instance_type:
+        cost: 5005
+        upfront_fee: True
+
+
+finalized_report:
+  invoice_id: 987654321
+
+accounts:
+  payer: 9999999999900
+  user:
+    - 99999999999990    # default user account -> can be overwritten by "user: account_nb" field
+  currency_code: NOK

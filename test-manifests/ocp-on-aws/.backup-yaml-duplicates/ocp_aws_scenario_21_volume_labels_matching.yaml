@@ -1,0 +1,136 @@
+# Scenario 21: Volume Labels Matching (Gap #2) - CRITICAL
+#
+# PURPOSE: Test that AWS EBS volumes matched via volume_labels (not CSI handles)
+#          are correctly attributed to storage
+#
+# TRINO REFERENCE:
+#   2_summarize_data_by_cluster.sql, line 642:
+#   OR (aws.matched_tag != '' AND any_match(split(aws.matched_tag, ','),
+#       x->strpos(ocp.volume_labels, replace(x, ' ')) != 0))
+#
+# SETUP:
+#   - OCP PersistentVolume with volume_labels: {app: database, tier: storage}
+#   - AWS EBS volume with matching tags: {app: database, tier: storage}
+#   - NO CSI volume handle (tests tag-based matching only)
+#   - Expected: EBS cost attributed via volume_labels match
+#
+# KEY DIFFERENCE FROM SCENARIO 19:
+#   - Scenario 19: Tests openshift_project tag (direct namespace match)
+#   - Scenario 21: Tests generic tags matched against volume_labels
+#
+# VALIDATES:
+#   - Trino parity: volume_labels matching (critical missing feature)
+#   - Tag-based storage attribution for non-CSI volumes
+#   - Generic tag matching for storage (not just pod_labels)
+#
+# DATE: 2025-11-25
+# STATUS: NEW - Tests Gap #2 from unbiased Trino analysis
+# SEVERITY: CRITICAL
+
+start_date: "2025-10-01"
+end_date: "2025-10-02"
+
+# OCP Configuration
+ocp:
+  cluster_id: "test-cluster-001"
+  cluster_alias: "test-cluster-alias"
+
+  generators:
+    # 1. Pod usage (minimal - just to have valid OCP data)
+    - generator: OCPGenerator
+      attributes:
+        start_date: "{{ start_date }}"
+        end_date: "{{ end_date }}"
+        nodes:
+          - node: "{{ resource_id_1 }}"
+            node_name: "storage-node-01"
+            resource_id: "{{ resource_id_1 }}"
+            cpu_cores: 4
+            memory_gig: 16
+            namespaces:
+              database:
+                pods:
+                  - pod: "postgres-01"
+                    cpu_request: 2
+                    mem_request_gig: 8
+                    labels: |
+                      app: database
+                      tier: storage
+
+    # 2. Storage usage with volume_labels (KEY!)
+    - generator: OCPGenerator
+      attributes:
+        start_date: "{{ start_date }}"
+        end_date: "{{ end_date }}"
+        nodes:
+          - node: "{{ resource_id_1 }}"
+            node_name: "storage-node-01"
+            resource_id: "{{ resource_id_1 }}"
+            namespaces:
+              database:
+                volumes:
+                  - volume: "pv-database-001"
+                    volume_name: "pv-database-001"
+                    storage_class: "ebs-sc"
+                    volume_request_gig: 100
+                    # KEY: volume_labels should be matched against AWS tags
+                    labels: |
+                      app: database
+                      tier: storage
+                      persistence: required
+                    volume_claims:
+                      - volume_claim: "pvc-database-001"
+                        pod_name: "postgres-01"
+                        capacity_gig: 100
+
+# AWS Configuration
+aws:
+  generators:
+    # 1. EC2 instance (node) - for completeness
+    - generator: EC2Generator
+      attributes:
+        start_date: "{{ start_date }}"
+        end_date: "{{ end_date }}"
+        resource_id: "{{ resource_id_1 }}"
+        tags: |
+          openshift_cluster: test-cluster-001
+          openshift_node: storage-node-01
+        amount: 1.0
+        rate: 0.05
+        # EC2 cost: 24 hours * $0.05 = $1.20
+
+    # 2. EBS volume - matched via volume_labels (NO CSI handle!)
+    - generator: EBSGenerator
+      attributes:
+        start_date: "{{ start_date }}"
+        end_date: "{{ end_date }}"
+        resource_id: "vol-labels-match-001"
+        # KEY: Tags match volume_labels, NOT openshift_project
+        tags: |
+          app: database
+          tier: storage
+        amount: 100
+        rate: 0.01
+        # EBS cost: 100 GB * 24 hours * $0.01 = $24.00
+
+# Expected Results
+expected_output:
+  summary:
+    total_cost: 25.20  # $1.20 (EC2) + $24.00 (EBS)
+    namespaces: 1
+    clusters: 1
+
+  namespaces:
+    database:
+      cost: 25.20
+      # EC2: $1.20 (via node tag match)
+      # EBS: $24.00 (via volume_labels match) ← KEY TEST
+
+# Test Metadata
+test_metadata:
+  gap_id: "gap_02_volume_labels"
+  severity: "CRITICAL"
+  trino_reference: "2_summarize_data_by_cluster.sql:642"
+  description: "Validates volume_labels tag matching for non-CSI storage attribution"
+  note: "This is THE mechanism for non-CSI storage in Trino"
+

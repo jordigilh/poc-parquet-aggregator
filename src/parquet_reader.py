@@ -46,7 +46,7 @@ class ParquetReader:
         Returns:
             s3fs.S3FileSystem instance
         """
-        return s3fs.S3FileSystem(
+        fs = s3fs.S3FileSystem(
             key=self.access_key,
             secret=self.secret_key,
             client_kwargs={
@@ -56,6 +56,10 @@ class ParquetReader:
             },
             use_ssl=self.use_ssl
         )
+        # Clear any cached directory listings to prevent cross-scenario contamination
+        # This is critical for test scenarios that share the same S3 paths
+        fs.invalidate_cache()
+        return fs
 
     def list_parquet_files(self, s3_prefix: str) -> List[str]:
         """List all Parquet files in an S3 prefix.
@@ -258,7 +262,7 @@ class ParquetReader:
         if self.config.get('performance', {}).get('column_filtering', True):
             columns = self.get_optimal_columns_pod_usage()
             self.logger.info(f"Column filtering enabled: reading {len(columns)} of ~50 columns")
-        
+
         if streaming:
             # For streaming, yield chunks from all files sequentially
             def stream_all_files():
@@ -356,6 +360,72 @@ class ParquetReader:
         self.logger.info(f"Combined {len(dfs)} namespace label files", total_rows=len(combined_df))
         return combined_df
 
+    def read_storage_usage_line_items(
+        self,
+        provider_uuid: str,
+        year: str,
+        month: str,
+        daily: bool = True,
+        streaming: bool = False,
+        chunk_size: int = 10000
+    ) -> pd.DataFrame | Iterator[pd.DataFrame]:
+        """Read OCP storage usage line items (hourly or daily).
+
+        Args:
+            provider_uuid: Provider UUID
+            year: Year (e.g., "2025")
+            month: Month (e.g., "11")
+            daily: If True, read daily aggregated data; if False, read hourly
+            streaming: Whether to stream chunks
+            chunk_size: Chunk size for streaming
+
+        Returns:
+            DataFrame or Iterator of DataFrames
+        """
+        # Determine path based on daily vs hourly
+        if daily:
+            path_key = 'parquet_path_storage_usage_daily'
+        else:
+            path_key = 'parquet_path_storage_usage'
+
+        path_template = self.config['ocp'].get(
+            path_key,
+            'cost-management/data/{provider_uuid}/{year}/{month}/openshift_storage_usage_line_items_daily'
+        )
+
+        s3_prefix = path_template.format(
+            provider_uuid=provider_uuid,
+            year=year,
+            month=month
+        )
+
+        files = self.list_parquet_files(s3_prefix)
+
+        if not files:
+            self.logger.warning(f"No storage usage files found in: {s3_prefix}")
+            if streaming:
+                return iter([pd.DataFrame()])
+            return pd.DataFrame()
+
+        self.logger.info(f"Found {len(files)} storage usage files")
+
+        # Column filtering (if enabled)
+        columns = None
+        if self.config.get('performance', {}).get('column_filtering', False):
+            columns = self.get_optimal_columns_storage_usage()
+            self.logger.info(f"Column filtering enabled: reading {len(columns)} columns for storage")
+
+        if streaming:
+            # For streaming, yield chunks from all files sequentially
+            def stream_all_files():
+                for file in files:
+                    yield from self.read_parquet_streaming(file, chunk_size, columns=columns)
+            return stream_all_files()
+        else:
+            # Use parallel reading for better performance
+            parallel_workers = self.config.get('performance', {}).get('parallel_readers', 4)
+            return self._read_files_parallel(files, parallel_workers, columns=columns)
+
     def _read_files_parallel(
         self,
         files: List[str],
@@ -420,7 +490,7 @@ class ParquetReader:
 
         Returns:
             List of essential columns
-            
+
         Note: pod_effective_usage_* columns are NOT included because they are
         computed at runtime in aggregator_pod.py, not present in source Parquet files.
         Also, 'source' column is not in input Parquet - it's added later as provider_uuid.
@@ -431,6 +501,7 @@ class ParquetReader:
             'node',
             'pod',
             'resource_id',
+            'cluster_id',  # Required for multi-cluster scenarios
             'pod_labels',
             'pod_usage_cpu_core_seconds',
             'pod_request_cpu_core_seconds',
@@ -445,36 +516,59 @@ class ParquetReader:
             # 'source' is NOT in input data - it's added later in _format_output()
         ]
 
+    def get_optimal_columns_storage_usage(self) -> List[str]:
+        """Get optimal column list for storage usage (reduce memory).
+
+        Returns:
+            List of essential columns for storage aggregation
+        """
+        return [
+            'interval_start',
+            'namespace',
+            'pod',
+            'persistentvolumeclaim',
+            'persistentvolume',
+            'storageclass',
+            'cluster_id',  # Required for multi-cluster scenarios
+            'persistentvolumeclaim_capacity_byte_seconds',
+            'volume_request_storage_byte_seconds',
+            'persistentvolumeclaim_usage_byte_seconds',
+            'persistentvolume_labels',
+            'persistentvolumeclaim_labels',
+            'csi_volume_handle'
+            # 'source' is NOT in input data - it's added later
+        ]
+
     def _optimize_dataframe_memory(self, df: pd.DataFrame) -> pd.DataFrame:
         """Optimize DataFrame memory by using categorical types.
-        
+
         String columns that repeat frequently (namespace, node, pod) use a lot of memory.
         Converting to categorical can save 50-70% memory.
-        
+
         Args:
             df: Input DataFrame
-            
+
         Returns:
             Optimized DataFrame with categorical types
         """
         # String columns that repeat a lot → use categorical (50-70% memory savings)
         # NOTE: 'source' is critical for groupby, make sure it exists before converting
         categorical_cols = ['namespace', 'node', 'pod', 'resource_id']
-        
+
         # Only add 'source' if it exists in the DataFrame
         if 'source' in df.columns:
             categorical_cols.append('source')
-        
+
         for col in categorical_cols:
             if col in df.columns and df[col].dtype == 'object':
                 df[col] = df[col].astype('category')
-        
+
         # Downcast numeric types (10-20% memory savings)
         for col in df.select_dtypes(include=['float64']).columns:
             # Skip columns that might have NaN values or need high precision
             if 'cpu' not in col and 'memory' not in col:
                 df[col] = pd.to_numeric(df[col], downcast='float')
-        
+
         return df
 
     def test_connectivity(self) -> bool:

@@ -1,0 +1,81 @@
+# Scenario 21: Volume Labels Matching (Generic Tag Matching for Storage)
+# Purpose: Validate EBS volumes matched via volume_labels (not CSI handles)
+#          are correctly attributed to storage
+# Trino Reference: 2_summarize_data_by_cluster.sql line 643
+# Business Case: Custom volume labels for storage cost attribution
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+ocp:
+  generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node_name: storage-node-01
+          resource_id: '{{ resource_id_21 }}'
+          cpu_cores: 4
+          memory_gig: 16
+          namespaces:
+            database:
+              pods:
+                - pod: null
+                  pod_name: postgres-01
+                  cpu_request: 2
+                  mem_request_gig: 8
+                  cpu_limit: 4
+                  mem_limit_gig: 16
+                  pod_seconds: 3600
+                  cpu_usage:
+                    full_period: 2
+                  mem_usage_gig:
+                    full_period: 10
+                  pod_labels: app:database|tier:storage
+              volumes:
+                - volume:
+                  volume_name: pv-database-001
+                  storage_class: ebs-sc
+                  volume_request_gig: 100
+                  # KEY: volume_labels with generic tags (no CSI handle)
+                  labels: app:database|tier:storage|persistence:required
+                  volume_claims:
+                    - volume_claim:
+                      volume_claim_name: pvc-database-001
+                      pod_name: postgres-01
+                      capacity_gig: 100
+                      volume_claim_usage_gig:
+                        full_period: 50
+
+aws:
+  generators:
+  # EC2 instance (node)
+  - EC2Generator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      resource_id: '{{ resource_id_21 }}'
+      instance_type:
+        inst_type: m5.large
+        cost: 0.05
+        rate: 0.05
+      tags:
+        openshift_cluster: test-cluster-001
+        openshift_node: storage-node-01
+
+  # EBS volume with matching labels (NO CSI handle in AWS resource_id)
+  - EBSGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      resource_id: vol-labels-match-001  # No CSI handle to match
+      disk_size: 100
+      rate: 0.596  # $0.596/GB-month → 100GB × (24h/744h) = $1.92/day
+      tags:
+        app: database          # Matches volume_labels
+        tier: storage          # Matches volume_labels
+        openshift_cluster: test-cluster-001
+
+expected_outcome:
+  ec2_cost: 1.20    # $0.05/hr × 24hr = $1.20
+  ebs_cost: 1.92    # Should be attributed via volume_labels match
+  total_cost: 3.12  # EC2 + EBS
+  namespace: database

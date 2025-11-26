@@ -1,12 +1,12 @@
 #!/bin/bash
-# Run empirical performance benchmarks against IQE test scenarios
+# Run empirical performance benchmarks against Core test scenarios
 
 set -e
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 POC_DIR="$(dirname "$SCRIPT_DIR")"
-IQE_PLUGIN_DIR="${IQE_PLUGIN_DIR:-../../iqe-cost-management-plugin}"
+Core_PLUGIN_DIR="${Core_PLUGIN_DIR:-../../iqe-cost-management-plugin}"
 OUTPUT_DIR="${POC_DIR}/benchmark_results"
 
 # Create output directory
@@ -55,9 +55,9 @@ echo "" >> "${RESULTS_FILE}"
 echo "---" >> "${RESULTS_FILE}"
 echo "" >> "${RESULTS_FILE}"
 
-for IQE_YAML in "${SCENARIOS[@]}"; do
+for Core_YAML in "${SCENARIOS[@]}"; do
     echo "========================================================================"
-    echo "Benchmarking: ${IQE_YAML}"
+    echo "Benchmarking: ${Core_YAML}"
     echo "========================================================================"
 
     # Generate unique UUID for this test
@@ -66,8 +66,8 @@ for IQE_YAML in "${SCENARIOS[@]}"; do
 
     # Step 1: Generate nise data
     echo "Step 1: Generating nise data..."
-    "${SCRIPT_DIR}/generate_iqe_test_data.sh" "${IQE_YAML}" || {
-        echo "❌ Failed to generate nise data for ${IQE_YAML}"
+    "${SCRIPT_DIR}/generate_iqe_test_data.sh" "${Core_YAML}" || {
+        echo "❌ Failed to generate nise data for ${Core_YAML}"
         FAILED=$((FAILED + 1))
         continue
     }
@@ -75,7 +75,7 @@ for IQE_YAML in "${SCENARIOS[@]}"; do
     # Step 2: Convert to Parquet and upload to MinIO
     echo "Step 2: Converting to Parquet..."
     python3 "${SCRIPT_DIR}/csv_to_parquet_minio.py" "/tmp/nise-iqe-data" || {
-        echo "❌ Failed to convert to Parquet for ${IQE_YAML}"
+        echo "❌ Failed to convert to Parquet for ${Core_YAML}"
         FAILED=$((FAILED + 1))
         continue
     }
@@ -111,20 +111,20 @@ except Exception as e:
 
     # Step 4: Run benchmark
     echo "Step 4: Running benchmark..."
-    BENCHMARK_OUTPUT="${OUTPUT_DIR}/benchmark_${IQE_YAML%.yml}_$(date +%Y%m%d_%H%M%S).json"
+    BENCHMARK_OUTPUT="${OUTPUT_DIR}/benchmark_${Core_YAML%.yml}_$(date +%Y%m%d_%H%M%S).json"
 
     python3 "${SCRIPT_DIR}/benchmark_performance.py" \
         --provider-uuid "${OCP_PROVIDER_UUID}" \
         --year "${POC_YEAR}" \
         --month "${POC_MONTH}" \
-        --output "${BENCHMARK_OUTPUT}" 2>&1 | tee "${OUTPUT_DIR}/benchmark_${IQE_YAML%.yml}.log"
+        --output "${BENCHMARK_OUTPUT}" 2>&1 | tee "${OUTPUT_DIR}/benchmark_${Core_YAML%.yml}.log"
 
     if [ $? -eq 0 ]; then
-        echo "✅ Benchmark completed: ${IQE_YAML}"
+        echo "✅ Benchmark completed: ${Core_YAML}"
         PASSED=$((PASSED + 1))
 
         # Extract key metrics and add to summary
-        echo "## ${IQE_YAML}" >> "${RESULTS_FILE}"
+        echo "## ${Core_YAML}" >> "${RESULTS_FILE}"
         echo "" >> "${RESULTS_FILE}"
         python3 << EOF >> "${RESULTS_FILE}"
 import json
@@ -151,7 +151,7 @@ EOF
         echo "---" >> "${RESULTS_FILE}"
         echo "" >> "${RESULTS_FILE}"
     else
-        echo "❌ Benchmark failed: ${IQE_YAML}"
+        echo "❌ Benchmark failed: ${Core_YAML}"
         FAILED=$((FAILED + 1))
     fi
 

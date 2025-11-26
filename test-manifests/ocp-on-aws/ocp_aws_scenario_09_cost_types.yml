@@ -1,0 +1,83 @@
+---
+# OCP-on-AWS Scenario 9: Cost Type Variations (CRITICAL EDGE CASE)
+# Validates: All 4 AWS cost types (unblended, blended, savings plan, amortized)
+# Expected: All cost columns populated, all attributed correctly, no NULLs
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+ocp:
+  generators:
+    - OCPGenerator:
+        start_date: 2025-10-01
+        end_date: 2025-10-02
+        nodes:
+          - node:
+            node_name: ip-10-0-9-100.ec2.internal
+            resource_id: '{{ resource_id_9 }}'
+            cpu_cores: 8
+            memory_gig: 32
+            namespaces:
+              prod-api:
+                pods:
+                  - pod:
+                      pod_name: api-1
+                      cpu_request: 4
+                      mem_request_gig: 16
+                      cpu_limit: 8
+                      mem_limit_gig: 32
+                      pod_seconds: 3600
+                      cpu_usage:
+                        full_period: 6
+                      mem_usage_gig:
+                        full_period: 24
+              prod-worker:
+                pods:
+                  - pod:
+                      pod_name: worker-1
+                      cpu_request: 2
+                      mem_request_gig: 8
+                      cpu_limit: 4
+                      mem_limit_gig: 16
+                      pod_seconds: 3600
+                      cpu_usage:
+                        full_period: 2
+                      mem_usage_gig:
+                        full_period: 8
+
+aws:
+  generators:
+    - EC2Generator:
+        start_date: 2025-10-01
+        end_date: 2025-10-02
+        resource_id: '{{ resource_id_9 }}'
+        instance_type:
+          inst_type: m5.4xlarge
+          physical_cores: 8
+          vcpu: '16'
+          memory: 64 GiB
+          storage: EBS Only
+          family: General Purpose
+          cost: 0.768
+          rate: 0.768
+
+expected_outcome:
+  resource_id_matched: true
+  tag_matched: false
+  min_namespaces: 2
+  attributed_cost: 18.432
+  prod_api_percentage: 75.0
+  prod_worker_percentage: 25.0
+  validation:
+    all_cost_columns_populated: true
+    no_null_costs: true
+    no_zero_costs: true
+
+note: |
+  This scenario validates a critical production requirement:
+  - AWS CUR contains 4 different cost types simultaneously
+  - All 4 must be attributed to namespaces
+  - All 4 must have markup applied
+  - Missing any cost type = billing error = $$$ lost
+  - NULL costs = data loss = production failure
+

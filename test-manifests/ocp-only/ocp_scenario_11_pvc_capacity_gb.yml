@@ -1,0 +1,79 @@
+# Scenario 11: PVC Capacity Gigabyte
+# Trino SQL: max(capacity_bytes) * power(2, -30) (lines 356-357)
+# Purpose: Validate persistentvolumeclaim_capacity_gigabyte is calculated
+# CRITICAL: Tests Gap 4 - PVC Capacity Gigabyte
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-1
+          cpu_cores: 8
+          memory_gig: 32
+          resource_id: i-worker001
+          namespaces:
+            storage-test:
+              pods:
+                - pod: null
+                  pod_name: db-pod
+                  cpu_request: 1.0
+                  mem_request_gig: 4
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.8
+                  mem_usage_gig:
+                    full_period: 3.0
+                  pod_labels: app:database
+
+              volumes:
+                # 10 GB PVC
+                - volume:
+                  volume_name: small-pvc
+                  storage_class: gp2
+                  volume_request_gig: 10
+                  labels: size:small
+                  volume_claims:
+                    - volume_claim:
+                      volume_claim_name: small-pvc
+                      pod_name: db-pod
+                      capacity_gig: 10
+                      volume_claim_usage_gig:
+                        full_period: 5
+
+                # 100 GB PVC
+                - volume:
+                  volume_name: medium-pvc
+                  storage_class: gp2
+                  volume_request_gig: 100
+                  labels: size:medium
+                  volume_claims:
+                    - volume_claim:
+                      volume_claim_name: medium-pvc
+                      pod_name: db-pod
+                      capacity_gig: 100
+                      volume_claim_usage_gig:
+                        full_period: 50
+
+                # 1 TB PVC
+                - volume:
+                  volume_name: large-pvc
+                  storage_class: gp2
+                  volume_request_gig: 1000
+                  labels: size:large
+                  volume_claims:
+                    - volume_claim:
+                      volume_claim_name: large-pvc
+                      pod_name: db-pod
+                      capacity_gig: 1000
+                      volume_claim_usage_gig:
+                        full_period: 500
+
+# Expected:
+# small-pvc: persistentvolumeclaim_capacity_gigabyte = 10.0
+# medium-pvc: persistentvolumeclaim_capacity_gigabyte = 100.0
+# large-pvc: persistentvolumeclaim_capacity_gigabyte = 1000.0

@@ -1,0 +1,64 @@
+# Scenario 06: Cost Category Assignment
+# Trino SQL: LIKE pattern matching for cost categories (lines 302-303, 406)
+# Purpose: Validate cost_category_id is correctly assigned based on namespace patterns
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-1
+          cpu_cores: 8
+          memory_gig: 32
+          resource_id: i-worker001
+          namespaces:
+            # Matches pattern "platform-%"
+            platform-monitoring:
+              pods:
+                - pod: null
+                  pod_name: prometheus
+                  cpu_request: 1.0
+                  mem_request_gig: 4
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.8
+                  mem_usage_gig:
+                    full_period: 3.0
+                  pod_labels: app:prometheus
+
+            # Matches pattern "platform-%"
+            platform-logging:
+              pods:
+                - pod: null
+                  pod_name: elasticsearch
+                  cpu_request: 2.0
+                  mem_request_gig: 8
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 1.5
+                  mem_usage_gig:
+                    full_period: 6.0
+                  pod_labels: app:elasticsearch
+
+            # Does NOT match any pattern
+            unassigned-namespace:
+              pods:
+                - pod: null
+                  pod_name: orphan-pod
+                  cpu_request: 0.5
+                  mem_request_gig: 1
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.3
+                  mem_usage_gig:
+                    full_period: 0.8
+                  pod_labels: app:orphan
+
+# Expected:
+# platform-monitoring: cost_category_id = 1 (if pattern matches)
+# platform-logging: cost_category_id = 1 (same pattern)
+# unassigned-namespace: cost_category_id = NULL (no match)

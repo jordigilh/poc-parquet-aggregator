@@ -1,0 +1,109 @@
+# Scenario 15: RDS Database Costs Attribution
+# Purpose: Validate that RDS (Amazon Relational Database Service) costs are correctly
+#          attributed to OCP pods running on nodes that match RDS resource IDs
+# Business Case: Organizations running database workloads in RDS that are logically
+#                tied to OCP clusters/nodes via tagging or resource ID matching
+
+start_date: '2025-10-01'
+end_date: '2025-10-02'
+
+ocp:
+  generators:
+  - OCPGenerator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      nodes:
+      # Node 1: Backend database pod (matches RDS instance)
+      - node_name: ip-10-0-1-50.ec2.internal
+        resource_id: rds-backend-node # Will be prefixed with "i-" by nise → "i-rds-backend-node"
+        cpu_cores: 4
+        memory_gig: 16
+        namespaces:
+          database:
+            pods:
+            - pod_name: postgres-primary
+              cpu_request: 2
+              mem_request_gig: 8
+              cpu_limit: 4
+              mem_limit_gig: 16
+              pod_seconds: 3600
+              cpu_usage:
+                full_period: 3
+              mem_usage_gig:
+                full_period: 12
+
+      # Node 2: Application pod (tagged to match RDS via tags)
+      - node_name: ip-10-0-1-51.ec2.internal
+        resource_id: rds-app-node # Will be prefixed with "i-" by nise → "i-rds-app-node"
+        cpu_cores: 2
+        memory_gig: 8
+        namespaces:
+          application:
+            pods:
+            - pod_name: api-backend
+              cpu_request: 1
+              mem_request_gig: 2
+              cpu_limit: 2
+              mem_limit_gig: 4
+              pod_seconds: 3600
+              cpu_usage:
+                full_period: 1.5
+              mem_usage_gig:
+                full_period: 3
+
+aws:
+  generators:
+  # RDS instance 1: Matched by resource ID (ARN suffix matches node resource ID)
+  - RDSGenerator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: rds-backend-node # Will be formatted as ARN: arn:aws:rds:...:db:i-rds-backend-node
+      instance_type:
+        inst_type: db.m5.xlarge
+        vcpu: '4'
+        memory: 16 GiB
+        storage: EBS Only
+        family: General Purpose
+        cost: 0.356  # $0.356/hr = $8.544/day
+        rate: 0.356
+      tags:
+        openshift_cluster: my-ocp-cluster
+        openshift_node: ip-10-0-1-50.ec2.internal
+        cost_center: engineering
+
+  # RDS instance 2: Matched by tags only (no resource ID match)
+  - RDSGenerator:
+      start_date: '2025-10-01'
+      end_date: '2025-10-02'
+      resource_id: rds-unmatched-123  # This won't match by resource ID
+      instance_type:
+        inst_type: db.t3.large
+        vcpu: '2'
+        memory: 8 GiB
+        storage: EBS Only
+        family: General Purpose
+        cost: 0.145  # $0.145/hr = $3.48/day
+        rate: 0.145
+      tags:
+        openshift_cluster: my-ocp-cluster
+        openshift_node: ip-10-0-1-51.ec2.internal
+        cost_center: engineering
+
+expected_outcome:
+  # RDS instance 1 ($8.544) should be attributed to "database" namespace
+  # RDS instance 2 ($3.48) should be attributed to "application" namespace
+  # Total: $12.024
+
+  total_cost: 12.024
+
+  # Namespace breakdown:
+  # - database: $8.544 (RDS db.m5.xlarge matched by resource ID)
+  # - application: $3.48 (RDS db.t3.large matched by tags)
+
+  database_namespace_cost: 8.544
+  application_namespace_cost: 3.48
+
+  # Verify RDS-specific attributes
+  product_code: AmazonRDS
+  product_family: Database Instance
+

@@ -42,7 +42,7 @@ PYEOF
 
 if [ -z "$PROVIDER_UUID" ]; then
     echo "❌ No existing test data found in MinIO"
-    echo "Run an IQE test first: ./scripts/run_iqe_validation.sh"
+    echo "Run an Core test first: ./scripts/run_iqe_validation.sh"
     exit 1
 fi
 

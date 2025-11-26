@@ -1,0 +1,79 @@
+# Scenario 22: PV Name Suffix Matching
+# Purpose: Validate EBS volumes matched via PV name SUFFIX (not substring)
+# Trino Reference: 1_resource_matching_by_cluster.sql line 76
+#                  substr(resource_id, -length(pv_name)) = pv_name
+# Business Case: Custom PV naming without CSI handles
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+ocp:
+  generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node_name: storage-node-01
+          resource_id: '{{ resource_id_22 }}'
+          cpu_cores: 4
+          memory_gig: 16
+          namespaces:
+            database:
+              pods:
+                - pod: null
+                  pod_name: postgres-01
+                  cpu_request: 2
+                  mem_request_gig: 8
+                  cpu_limit: 4
+                  mem_limit_gig: 16
+                  pod_seconds: 3600
+                  cpu_usage:
+                    full_period: 2
+                  mem_usage_gig:
+                    full_period: 10
+              volumes:
+                - volume:
+                  volume_name: pv-database-001  # PV name
+                  storage_class: ebs-sc
+                  volume_request_gig: 100
+                  csi_volume_handle: ''  # Explicitly empty - forces PV name matching
+                  volume_claims:
+                    - volume_claim:
+                      volume_claim_name: pvc-database-001
+                      pod_name: postgres-01
+                      capacity_gig: 100
+                      volume_claim_usage_gig:
+                        full_period: 50
+
+aws:
+  generators:
+  # EC2 instance
+  - EC2Generator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      resource_id: '{{ resource_id_22 }}'
+      instance_type:
+        inst_type: m5.large
+        cost: 0.05
+        rate: 0.05
+      tags:
+        openshift_cluster: test-cluster-001
+        openshift_node: storage-node-01
+
+  # EBS volume - resource_id ENDS WITH pv-database-001 (suffix match)
+  - EBSGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      resource_id: vol-abc123def456-pv-database-001  # Suffix matches PV name
+      disk_size: 100
+      rate: 0.596  # $0.596/GB-month
+      tags:
+        openshift_cluster: test-cluster-001
+
+expected_outcome:
+  ec2_cost: 1.20
+  ebs_cost: 1.92
+  total_cost: 3.12
+  namespace: database
+  # NOTE: This test will FAIL until PV suffix matching is implemented
+  # Current POC uses substring matching (too lenient)

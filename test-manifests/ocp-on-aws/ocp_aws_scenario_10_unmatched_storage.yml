@@ -1,0 +1,171 @@
+start_date: 2025-10-01
+end_date: 2025-10-02
+ocp:
+  generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+      - node:
+        node_name: ip-10-0-10-100.ec2.internal
+        resource_id: i-test0010
+        cpu_cores: 4
+        memory_gig: 16
+        namespaces:
+            database:
+
+              pods:
+              - pod:
+                pod_name: postgres-0
+                cpu_request: 2
+                mem_request_gig: 8
+                cpu_limit: 4
+                mem_limit_gig: 16
+                pod_seconds: 3600
+                cpu_usage:
+                  full_period: 3
+                mem_usage_gig:
+                  full_period: 12
+              volumes:
+              - volume:
+                volume_name: postgres-data
+                volume_request_gig: 100
+                storage_class: gp3
+                csi_driver: ebs.csi.aws.com
+                csi_volume_handle: vol-matched-001
+                volume_claims:
+                  - volume_claim:
+                      volume_claim_name: postgres-data-pvc
+                      pod_name: postgres-0
+                      capacity_gig: 100
+                      volume_claim_usage_gig:
+                        full_period: 75
+              - volume:
+                volume_name: postgres-logs
+                volume_request_gig: 50
+                storage_class: gp3
+                csi_driver: ebs.csi.aws.com
+                csi_volume_handle: vol-matched-002
+                volume_claims:
+                  - volume_claim:
+                      volume_claim_name: postgres-logs-pvc
+                      pod_name: postgres-0
+                      capacity_gig: 50
+                      volume_claim_usage_gig:
+                        full_period: 30
+aws:
+  generators:
+  - EC2Generator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      resource_id: i-test0010
+      instance_type:
+        inst_type: c5.xlarge
+        cost: 0.170
+        rate: 0.170
+  - EBSGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      resource_id: matched-001  # nise adds vol- prefix
+      disk_size: 100
+      rate: 2.48  # $2.48/GB-month × 100GB × (24h/744h) = $8.0/day
+      tags:
+        purpose: postgres-data
+        namespace: database
+  - EBSGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      resource_id: matched-002  # nise adds vol- prefix
+      disk_size: 50
+      rate: 2.48  # $2.48/GB-month × 50GB × (24h/744h) = $4.0/day
+      tags:
+        purpose: postgres-logs
+        namespace: database
+  - EBSGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      resource_id: orphaned-001  # nise adds vol- prefix
+      disk_size: 200
+      rate: 2.48  # $2.48/GB-month × 200GB × (24h/744h) = $16.0/day (unmatched)
+      tags:
+        purpose: detached-volume
+        note: No matching OCP PV
+  - EBSGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      resource_id: orphaned-002  # nise adds vol- prefix
+      disk_size: 100
+      rate: 2.48  # $2.48/GB-month × 100GB × (24h/744h) = $8.0/day (unmatched)
+      tags:
+        purpose: deleted-pv
+        note: PV was deleted but EBS still exists
+expected_outcome:
+  attributed_cost: 16.08  # EC2: 4.08 + Matched EBS: 12.0 (8.0 + 4.0)
+
+  ec2_cost: 4.08  # $0.170/hr × 24hr
+  ebs_costs:
+    matched:
+      vol-matched-001:
+        size_gb: 100
+        cost: 8.0
+        matched_to_pv: postgres-data
+        namespace: database
+        attributed: true
+      vol-matched-002:
+        size_gb: 50
+        cost: 4.0
+        matched_to_pv: postgres-logs
+        namespace: database
+        attributed: true
+    unmatched:
+      vol-orphaned-001:
+        size_gb: 200
+        cost: 16.0
+        matched_to_pv: null
+        namespace: null
+        attributed: false
+        handling: tracked_as_unmatched
+        note: Must not be lost!
+      vol-orphaned-002:
+        size_gb: 100
+        cost: 8.0
+        matched_to_pv: null
+        namespace: null
+        attributed: false
+        handling: tracked_as_unmatched
+        note: Must not be lost!
+  total_ebs_cost: 36.0
+  attributed_ebs_cost: 12.0
+  unattributed_ebs_cost: 24.0
+  disk_capacity:
+    vol-matched-001:
+      capacity_gb_month: 100
+      namespace: database
+    vol-matched-002:
+      capacity_gb_month: 50
+      namespace: database
+    vol-orphaned-001:
+      capacity_gb_month: 0
+    vol-orphaned-002:
+      capacity_gb_month: 0
+  validation:
+    all_ebs_costs_tracked: true
+    no_cost_loss: true
+    total_cost: 4.08
+    attributed_cost: 4.08
+    costs_sum_correct: true
+    no_null_costs: true
+    unmatched_handling: separate_tracking
+note: 'This scenario validates a critical production pattern:
+
+  - Not all EBS volumes have matching OCP PVs
+
+  - Reasons: detached volumes, deleted PVs, orphaned storage
+
+  - Unmatched EBS costs are REAL costs that must be tracked
+
+  - Losing unmatched costs = $$$$ billing error
+
+  - Production has ~20-30% unmatched storage (common!)
+
+  '

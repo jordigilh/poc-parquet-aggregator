@@ -1,0 +1,74 @@
+# Scenario 05: Cluster Capacity Calculation
+# Trino SQL: cte_ocp_cluster_capacity (lines 165-171)
+# Purpose: Validate cluster-wide capacity is correctly summed from all nodes
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: master-1
+          cpu_cores: 4
+          memory_gig: 16
+          resource_id: i-master001
+          namespaces:
+            kube-system:
+              pods:
+                - pod: null
+                  pod_name: kube-apiserver
+                  cpu_request: 0.5
+                  mem_request_gig: 2
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.3
+                  mem_usage_gig:
+                    full_period: 1.5
+                  pod_labels: component:apiserver
+
+        - node: null
+          node_name: worker-1
+          cpu_cores: 8
+          memory_gig: 32
+          resource_id: i-worker001
+          namespaces:
+            default:
+              pods:
+                - pod: null
+                  pod_name: app-pod
+                  cpu_request: 2.0
+                  mem_request_gig: 8
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 1.5
+                  mem_usage_gig:
+                    full_period: 6.0
+                  pod_labels: app:myapp
+
+        - node: null
+          node_name: worker-2
+          cpu_cores: 8
+          memory_gig: 32
+          resource_id: i-worker002
+          namespaces:
+            default:
+              pods:
+                - pod: null
+                  pod_name: db-pod
+                  cpu_request: 4.0
+                  mem_request_gig: 16
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 3.0
+                  mem_usage_gig:
+                    full_period: 12.0
+                  pod_labels: app:database
+
+# Expected cluster capacity:
+# Total cores: 4 + 8 + 8 = 20
+# Total memory: 16 + 32 + 32 = 80 GB
+# cluster_capacity_cpu_core_hours = 20 * 24 = 480
+# cluster_capacity_memory_gigabyte_hours = 80 * 24 = 1920

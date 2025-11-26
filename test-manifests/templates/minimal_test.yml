@@ -1,0 +1,46 @@
+---
+# Minimal OCP-on-AWS Test - Just 1 day, 1 node, 2 pods
+# Expected: ~48 hourly rows → ~1 daily summary row
+
+start_date: 2025-10-01
+end_date: 2025-10-01  # Just 1 day!
+
+ocp:
+  generators:
+    - OCPGenerator:
+        start_date: 2025-10-01
+        end_date: 2025-10-01
+        nodes:
+          - node:
+              node_name: worker-node-01
+              resource_id: i-minimal001
+              cpu_cores: 4
+              memory_gig: 16
+              namespaces:
+                frontend:
+                  pods:
+                    - pod:
+                        pod_name: web-1
+                        cpu_request: 1
+                        mem_request_gig: 2
+                        cpu_usage:
+                          full_period: 0.5
+                        mem_usage_gig:
+                          full_period: 1.5
+
+aws:
+  generators:
+    - EC2Generator:
+        start_date: 2025-10-01
+        end_date: 2025-10-01
+        resource_id: i-minimal001
+        amount: 24  # 1 day * 24 hours
+        rate: 0.10
+        tags:
+          environment: test
+
+expected_outcome:
+  resource_id_matched: true
+  namespace: frontend
+  attributed_cost: 2.40  # 24 * 0.10
+

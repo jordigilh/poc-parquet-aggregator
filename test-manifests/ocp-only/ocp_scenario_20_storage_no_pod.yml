@@ -1,0 +1,77 @@
+# Scenario 20: Storage Without Pod Match
+# Trino SQL: LEFT JOIN with pods (lines 183-188)
+# Purpose: Validate storage is handled even when no pod uses the PVC
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-1
+          cpu_cores: 8
+          memory_gig: 32
+          resource_id: i-worker001
+          namespaces:
+            # Namespace with both pods and volumes
+            with-pods:
+              pods:
+                - pod: null
+                  pod_name: app-pod
+                  cpu_request: 0.5
+                  mem_request_gig: 1
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.3
+                  mem_usage_gig:
+                    full_period: 0.8
+                  pod_labels: app:normal
+
+              volumes:
+                - volume:
+                  volume_name: used-pvc
+                  storage_class: gp2
+                  volume_request_gig: 50
+                  labels: storage:used
+                  volume_claims:
+                    - volume_claim:
+                      volume_claim_name: used-pvc
+                      pod_name: app-pod
+                      capacity_gig: 50
+                      volume_claim_usage_gig:
+                        full_period: 25
+
+            # Namespace with only storage (no pod reference)
+            storage-only:
+              pods:
+                - pod: null
+                  pod_name: placeholder-pod
+                  cpu_request: 0.1
+                  mem_request_gig: 0.1
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.05
+                  mem_usage_gig:
+                    full_period: 0.05
+                  pod_labels: app:placeholder
+
+              volumes:
+                - volume:
+                  volume_name: orphan-pvc
+                  storage_class: gp2
+                  volume_request_gig: 100
+                  labels: storage:orphan
+                  volume_claims:
+                    - volume_claim:
+                      volume_claim_name: orphan-pvc
+                      pod_name: placeholder-pod
+                      capacity_gig: 100
+                      volume_claim_usage_gig:
+                        full_period: 50
+
+# Expected:
+# Storage rows should exist even without direct pod association
+# Node info comes from pod join

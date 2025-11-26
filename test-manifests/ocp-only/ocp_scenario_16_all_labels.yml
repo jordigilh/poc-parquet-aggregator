@@ -1,0 +1,49 @@
+# Scenario 16: all_labels Column
+# Trino SQL: map_concat(pod_labels, volume_labels) (lines 651-654)
+# Purpose: Validate all_labels = merge(pod_labels, volume_labels)
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-1
+          cpu_cores: 4
+          memory_gig: 16
+          resource_id: i-worker001
+          namespaces:
+            storage-app:
+              pods:
+                - pod: null
+                  pod_name: db-pod
+                  cpu_request: 1.0
+                  mem_request_gig: 4
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.8
+                  mem_usage_gig:
+                    full_period: 3.0
+                  pod_labels: app:database|tier:backend|env:production
+
+              volumes:
+                - volume:
+                  volume_name: db-pvc
+                  storage_class: gp2
+                  volume_request_gig: 100
+                  # Volume labels (should merge with pod labels)
+                  labels: storage:premium|backup:enabled|env:storage
+                  volume_claims:
+                    - volume_claim:
+                      volume_claim_name: db-pvc
+                      pod_name: db-pod
+                      capacity_gig: 100
+                      volume_claim_usage_gig:
+                        full_period: 50
+
+# Expected all_labels for Storage data_source:
+# Merged: app:database|tier:backend|env:storage|storage:premium|backup:enabled
+# Note: volume's "env:storage" overrides pod's "env:production" for storage rows

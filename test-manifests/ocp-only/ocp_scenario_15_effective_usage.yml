@@ -1,0 +1,66 @@
+# Scenario 15: Effective Usage Calculation
+# Trino SQL: coalesce(effective_usage, greatest(usage, request)) (lines 277, 281)
+# Purpose: Validate pod_effective_usage = max(usage, request)
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-1
+          cpu_cores: 8
+          memory_gig: 32
+          resource_id: i-worker001
+          namespaces:
+            test:
+              pods:
+                # Case 1: Usage > Request (burst)
+                - pod: null
+                  pod_name: burst-pod
+                  cpu_request: 0.5
+                  cpu_limit: 2.0
+                  mem_request_gig: 1
+                  mem_limit_gig: 4
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 1.5
+                  mem_usage_gig:
+                    full_period: 3.0
+                  pod_labels: app:burst
+
+                # Case 2: Request > Usage (over-provisioned)
+                - pod: null
+                  pod_name: idle-pod
+                  cpu_request: 2.0
+                  cpu_limit: 4.0
+                  mem_request_gig: 8
+                  mem_limit_gig: 16
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.1
+                  mem_usage_gig:
+                    full_period: 0.5
+                  pod_labels: app:idle
+
+                # Case 3: Usage = Request (optimal)
+                - pod: null
+                  pod_name: optimal-pod
+                  cpu_request: 1.0
+                  cpu_limit: 2.0
+                  mem_request_gig: 2
+                  mem_limit_gig: 4
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 1.0
+                  mem_usage_gig:
+                    full_period: 2.0
+                  pod_labels: app:optimal
+
+# Expected effective CPU:
+# burst-pod: max(1.5, 0.5) = 1.5 → 36 core-hours
+# idle-pod: max(0.1, 2.0) = 2.0 → 48 core-hours (request wins)
+# optimal-pod: max(1.0, 1.0) = 1.0 → 24 core-hours
