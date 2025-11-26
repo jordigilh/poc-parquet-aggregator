@@ -421,9 +421,12 @@ WRAPPER_AGG
     [[ -z "$output_rows" ]] && output_rows="0"
 
     local throughput=0
-    if [[ "$output_rows" != "0" && "$agg_time" != "0" ]]; then
-        # Use bc for reliable calculation (avoid Python quoting issues)
-        throughput=$(echo "scale=0; $output_rows / $agg_time" | bc 2>/dev/null || echo "0")
+    # Clean numeric values (remove any whitespace/special chars)
+    local clean_rows=$(echo "$output_rows" | tr -dc '0-9')
+    local clean_time=$(echo "$agg_time" | tr -dc '0-9.')
+    if [[ -n "$clean_rows" && "$clean_rows" != "0" && -n "$clean_time" && "$clean_time" != "0" ]]; then
+        # Use bc for reliable calculation
+        throughput=$(echo "scale=0; $clean_rows / $clean_time" | bc 2>/dev/null || echo "0")
         [[ -z "$throughput" ]] && throughput=0
     fi
 
