@@ -62,15 +62,15 @@ jobs:
           --health-retries 5
 
       minio:
-        image: bitnami/minio:latest
+        image: minio/minio:latest
+        command: server /data --console-address ":9001"
         env:
           MINIO_ROOT_USER: minioadmin
           MINIO_ROOT_PASSWORD: minioadmin
-          MINIO_DEFAULT_BUCKETS: cost-management
         ports:
           - 9000:9000
         options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-cmd "curl -f http://localhost:9000/minio/health/live"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -148,6 +148,13 @@ jobs:
             ('version', TRUE, 'OCP')
             ON CONFLICT DO NOTHING;"
 
+      - name: Configure MinIO
+        run: |
+          wget -q https://dl.min.io/client/mc/release/linux-amd64/mc
+          chmod +x mc
+          ./mc alias set local http://localhost:9000 minioadmin minioadmin
+          ./mc mb local/cost-management --ignore-existing
+
       - name: Run integration tests
         env:
           PYTHONPATH: ${{ github.workspace }}
@@ -192,15 +199,15 @@ jobs:
           --health-retries 5
 
       minio:
-        image: bitnami/minio:latest
+        image: minio/minio:latest
+        command: server /data --console-address ":9001"
         env:
           MINIO_ROOT_USER: minioadmin
           MINIO_ROOT_PASSWORD: minioadmin
-          MINIO_DEFAULT_BUCKETS: cost-management
         ports:
           - 9000:9000
         options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-cmd "curl -f http://localhost:9000/minio/health/live"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
