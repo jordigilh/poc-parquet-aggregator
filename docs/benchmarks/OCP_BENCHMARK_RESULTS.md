@@ -36,18 +36,21 @@
 
 What does each scale represent in a production environment?
 
-| Scale | Output Rows | Cluster Size | Use Case Example |
-|-------|-------------|--------------|------------------|
-| **20k** | 420 | 5 nodes, ~420 pods | Single development cluster |
-| **50k** | 1,050 | 10 nodes, ~1,050 pods | Production workload, small org |
-| **100k** | 2,085 | 15 nodes, ~2,085 pods | Medium enterprise |
-| **250k** | 5,225 | 25 nodes, ~5,225 pods | Large enterprise |
-| **500k** | 10,430 | 35 nodes, ~10,430 pods | Multiple production clusters |
-| **1m** | 20,850 | 50 nodes, ~20,850 pods | Large-scale platform |
-| **1.5m** | 31,260 | 60 nodes, ~31,260 pods | Major enterprise |
-| **2m** | 41,650 | 70 nodes, ~41,650 pods | Cloud-scale operations |
+| Scale | Input Rows | Output Rows | Cluster Size | Use Case Example |
+|-------|------------|-------------|--------------|------------------|
+| **20k** | 10,080 | 420 | 5 nodes, ~420 pods | Single development cluster |
+| **50k** | 25,200 | 1,050 | 10 nodes, ~1,050 pods | Production workload, small org |
+| **100k** | 50,040 | 2,085 | 15 nodes, ~2,085 pods | Medium enterprise |
+| **250k** | 125,400 | 5,225 | 25 nodes, ~5,225 pods | Large enterprise |
+| **500k** | 250,320 | 10,430 | 35 nodes, ~10,430 pods | Multiple production clusters |
+| **1m** | 500,400 | 20,850 | 50 nodes, ~20,850 pods | Large-scale platform |
+| **1.5m** | 750,240 | 31,260 | 60 nodes, ~31,260 pods | Major enterprise |
+| **2m** | 999,600 | 41,650 | 70 nodes, ~41,650 pods | Cloud-scale operations |
 
-> **Note**: Output Rows = Pods × 24 hours × 2 data sources (Pod + Storage). Scale names (20k, 50k, etc.) refer to target output rows, not pod count.
+> **Note**: 
+> - **Input Rows** = Pods × 24 hours (hourly data from nise)
+> - **Output Rows** = Daily aggregated summaries (Pod + Storage per namespace/node)
+> - Scale names (20k, 50k, etc.) refer to target scale, not exact row counts
 
 ---
 

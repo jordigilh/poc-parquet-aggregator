@@ -51,18 +51,22 @@ The POC can process **666K output rows using only 6.2 GB of memory**, well withi
 
 What does each scale represent in a production environment?
 
-| Scale | Output Rows | OCP Cluster | AWS Resources | Use Case Example |
-|-------|-------------|-------------|---------------|------------------|
-| **scale-20k** | 6,720 | 10 nodes, ~420 pods | 10 EC2 + EBS | Small OCP-on-AWS |
-| **scale-50k** | 16,800 | 25 nodes, ~1,050 pods | 25 EC2 + EBS | Growing hybrid |
-| **scale-100k** | 33,600 | 50 nodes, ~2,085 pods | 50 EC2 + EBS | Medium enterprise |
-| **scale-250k** | 83,328 | 125 nodes, ~5,225 pods | 125 EC2 + EBS | Large enterprise |
-| **scale-500k** | 166,656 | 250 nodes, ~10,417 pods | 250 EC2 + EBS | Multi-cluster |
-| **scale-1m** | 333,312 | 500 nodes, ~20,833 pods | 500 EC2 + EBS | Enterprise platform |
-| **scale-1.5m** | 499,968 | 750 nodes, ~31,250 pods | 750 EC2 + EBS | Large-scale platform |
-| **scale-2m** | 666,624 | 1,000 nodes, ~41,667 pods | 1,000 EC2 + EBS | Cloud-scale |
+| Scale | OCP Input | AWS Input | Output Rows | OCP Cluster | Use Case |
+|-------|-----------|-----------|-------------|-------------|----------|
+| **scale-20k** | 10,080 | 7,200 | 6,720 | 10 nodes, ~420 pods | Small OCP-on-AWS |
+| **scale-50k** | 25,200 | 18,000 | 16,800 | 25 nodes, ~1,050 pods | Growing hybrid |
+| **scale-100k** | 50,040 | 36,000 | 33,600 | 50 nodes, ~2,085 pods | Medium enterprise |
+| **scale-250k** | 125,400 | 90,000 | 83,328 | 125 nodes, ~5,225 pods | Large enterprise |
+| **scale-500k** | 250,320 | 180,000 | 166,656 | 250 nodes, ~10,417 pods | Multi-cluster |
+| **scale-1m** | 500,400 | 360,000 | 333,312 | 500 nodes, ~20,833 pods | Enterprise platform |
+| **scale-1.5m** | 750,240 | 540,000 | 499,968 | 750 nodes, ~31,250 pods | Large-scale platform |
+| **scale-2m** | 999,600 | 720,000 | 666,624 | 1,000 nodes, ~41,667 pods | Cloud-scale |
 
-> **Note**: Output Rows = OCP pods × matched AWS resources × 24 hours × cost attribution methods. Scale names (20k, 50k, etc.) are targets; actual output varies based on matching.
+> **Note**: 
+> - **OCP Input** = Pods × 24 hours (hourly pod usage from nise)
+> - **AWS Input** = AWS resources × 24 hours × 30 line items (CUR data from nise)
+> - **Output Rows** = Matched costs after JOIN (OCP × AWS × cost methods)
+> - Scale names (20k, 50k, etc.) are targets; actual output varies based on matching
 
 ---
 
