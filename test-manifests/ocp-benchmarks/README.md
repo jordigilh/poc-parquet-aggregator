@@ -4,14 +4,18 @@ These manifests generate synthetic OCP data for benchmarking.
 
 ## Scales
 
-| Scale | Nodes | Pods/Node | Total Pods | Expected Output |
-|-------|-------|-----------|------------|-----------------|
-| 20k   | 5     | 84        | 420        | ~20,160         |
-| 50k   | 10    | 105       | 1,050      | ~50,400         |
-| 100k  | 15    | 139       | 2,085      | ~100,080        |
-| 250k  | 25    | 209       | 5,225      | ~250,800        |
-| 500k  | 35    | 298       | 10,430     | ~500,640        |
-| 1m    | 50    | 417       | 20,850     | ~1,000,800      |
+Scale names refer to **INPUT ROWS** (hourly data from nise).
+
+| Scale | Nodes | Pods/Node | Total Pods | Input Rows |
+|-------|-------|-----------|------------|------------|
+| 20k   | 10    | 83        | 830        | ~19,920    |
+| 50k   | 20    | 104       | 2,080      | ~49,920    |
+| 100k  | 40    | 104       | 4,160      | ~99,840    |
+| 250k  | 100   | 104       | 10,400     | ~249,600   |
+| 500k  | 200   | 104       | 20,800     | ~499,200   |
+| 1m    | 400   | 104       | 41,600     | ~998,400   |
+| 1.5m  | 600   | 104       | 62,400     | ~1,497,600 |
+| 2m    | 800   | 104       | 83,200     | ~1,996,800 |
 
 ## Usage
 
@@ -26,11 +30,10 @@ These manifests generate synthetic OCP data for benchmarking.
 ## Formula
 
 ```
-output_rows ≈ total_pods × hours × data_sources
-            = total_pods × 24 × 2
-            = total_pods × 48
+input_rows = total_pods × 24 hours
+output_rows = daily aggregated summaries (much smaller)
 ```
 
 Where:
-- hours = 24 (full day of data)
-- data_sources = 2 (Pod usage + Storage usage)
+- Input: Hourly pod usage data from nise
+- Output: Daily aggregated summaries per namespace/node

@@ -17,55 +17,61 @@ MANIFESTS_DIR = Path(__file__).parent.parent / "test-manifests" / "ocp-benchmark
 MANIFESTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Scale configurations
-# For OCP-only: output_rows ≈ pods * hours * 2 (pod + storage data sources)
-# With 24 hours per day, we can estimate:
-#   - 20k output: ~420 pods (420 * 24 * 2 = 20,160)
-#   - 50k output: ~1042 pods
-#   - 100k output: ~2083 pods
-#   - 250k output: ~5208 pods
-#   - 500k output: ~10417 pods
-#   - 1m output: ~20833 pods
+# Scale names refer to TARGET INPUT ROWS (hourly data from nise)
+# Formula: input_rows = pods × 24 hours
+# So pods needed = target_input / 24
+#
+# | Scale | Target Input | Pods Needed |
+# |-------|--------------|-------------|
+# | 20k   | 20,000       | 833         |
+# | 50k   | 50,000       | 2,083       |
+# | 100k  | 100,000      | 4,167       |
+# | 250k  | 250,000      | 10,417      |
+# | 500k  | 500,000      | 20,833      |
+# | 1m    | 1,000,000    | 41,667      |
+# | 1.5m  | 1,500,000    | 62,500      |
+# | 2m    | 2,000,000    | 83,333      |
 
 SCALES = {
     "20k": {
-        "nodes": 5,
-        "pods_per_node": 84,  # 5 * 84 = 420 pods
-        "expected_output": 20160,
+        "nodes": 10,
+        "pods_per_node": 83,   # 10 * 83 = 830 pods → 19,920 input rows
+        "expected_input": 19920,
     },
     "50k": {
-        "nodes": 10,
-        "pods_per_node": 105,  # 10 * 105 = 1050 pods
-        "expected_output": 50400,
+        "nodes": 20,
+        "pods_per_node": 104,  # 20 * 104 = 2,080 pods → 49,920 input rows
+        "expected_input": 49920,
     },
     "100k": {
-        "nodes": 15,
-        "pods_per_node": 139,  # 15 * 139 = 2085 pods
-        "expected_output": 100080,
+        "nodes": 40,
+        "pods_per_node": 104,  # 40 * 104 = 4,160 pods → 99,840 input rows
+        "expected_input": 99840,
     },
     "250k": {
-        "nodes": 25,
-        "pods_per_node": 209,  # 25 * 209 = 5225 pods
-        "expected_output": 250800,
+        "nodes": 100,
+        "pods_per_node": 104,  # 100 * 104 = 10,400 pods → 249,600 input rows
+        "expected_input": 249600,
     },
     "500k": {
-        "nodes": 35,
-        "pods_per_node": 298,  # 35 * 298 = 10430 pods
-        "expected_output": 500640,
+        "nodes": 200,
+        "pods_per_node": 104,  # 200 * 104 = 20,800 pods → 499,200 input rows
+        "expected_input": 499200,
     },
     "1m": {
-        "nodes": 50,
-        "pods_per_node": 417,  # 50 * 417 = 20850 pods
-        "expected_output": 1000800,
+        "nodes": 400,
+        "pods_per_node": 104,  # 400 * 104 = 41,600 pods → 998,400 input rows
+        "expected_input": 998400,
     },
     "1.5m": {
-        "nodes": 60,
-        "pods_per_node": 521,  # 60 * 521 = 31260 pods
-        "expected_output": 1500480,
+        "nodes": 600,
+        "pods_per_node": 104,  # 600 * 104 = 62,400 pods → 1,497,600 input rows
+        "expected_input": 1497600,
     },
     "2m": {
-        "nodes": 70,
-        "pods_per_node": 595,  # 70 * 595 = 41650 pods
-        "expected_output": 1999200,
+        "nodes": 800,
+        "pods_per_node": 104,  # 800 * 104 = 83,200 pods → 1,996,800 input rows
+        "expected_input": 1996800,
     },
 }
 
@@ -114,12 +120,11 @@ def generate_manifest(scale_name: str, config: dict) -> str:
     nodes_str = "\n".join(nodes_yaml)
 
     manifest = f"""# OCP-only benchmark manifest: {scale_name}
-# Expected output rows: ~{config['expected_output']:,}
+# Expected INPUT rows: ~{config['expected_input']:,} (hourly data from nise)
 # Nodes: {nodes}, Pods per node: {pods_per_node}, Total pods: {nodes * pods_per_node}
 #
-# Formula: output_rows ≈ pods * hours * data_sources
-#          where data_sources = 2 (Pod + Storage)
-#          and hours = 24 (full day)
+# Formula: input_rows = pods × 24 hours
+#          output_rows = daily aggregated (much smaller)
 
 start_date: 2025-10-01
 end_date: 2025-10-02
@@ -151,11 +156,11 @@ def main():
         nodes = config["nodes"]
         pods = config["pods_per_node"]
         total_pods = nodes * pods
-        expected = config["expected_output"]
+        expected_input = config["expected_input"]
 
         print(f"  ✓ {filename}")
         print(f"    Nodes: {nodes}, Pods/node: {pods}, Total: {total_pods}")
-        print(f"    Expected output: ~{expected:,} rows")
+        print(f"    Expected INPUT: ~{expected_input:,} rows")
         print()
 
     # Create README
@@ -165,14 +170,18 @@ These manifests generate synthetic OCP data for benchmarking.
 
 ## Scales
 
-| Scale | Nodes | Pods/Node | Total Pods | Expected Output |
-|-------|-------|-----------|------------|-----------------|
-| 20k   | 5     | 84        | 420        | ~20,160         |
-| 50k   | 10    | 105       | 1,050      | ~50,400         |
-| 100k  | 15    | 139       | 2,085      | ~100,080        |
-| 250k  | 25    | 209       | 5,225      | ~250,800        |
-| 500k  | 35    | 298       | 10,430     | ~500,640        |
-| 1m    | 50    | 417       | 20,850     | ~1,000,800      |
+Scale names refer to **INPUT ROWS** (hourly data from nise).
+
+| Scale | Nodes | Pods/Node | Total Pods | Input Rows |
+|-------|-------|-----------|------------|------------|
+| 20k   | 10    | 83        | 830        | ~19,920    |
+| 50k   | 20    | 104       | 2,080      | ~49,920    |
+| 100k  | 40    | 104       | 4,160      | ~99,840    |
+| 250k  | 100   | 104       | 10,400     | ~249,600   |
+| 500k  | 200   | 104       | 20,800     | ~499,200   |
+| 1m    | 400   | 104       | 41,600     | ~998,400   |
+| 1.5m  | 600   | 104       | 62,400     | ~1,497,600 |
+| 2m    | 800   | 104       | 83,200     | ~1,996,800 |
 
 ## Usage
 
@@ -187,14 +196,13 @@ These manifests generate synthetic OCP data for benchmarking.
 ## Formula
 
 ```
-output_rows ≈ total_pods × hours × data_sources
-            = total_pods × 24 × 2
-            = total_pods × 48
+input_rows = total_pods × 24 hours
+output_rows = daily aggregated summaries (much smaller)
 ```
 
 Where:
-- hours = 24 (full day of data)
-- data_sources = 2 (Pod usage + Storage usage)
+- Input: Hourly pod usage data from nise
+- Output: Daily aggregated summaries per namespace/node
 """
 
     with open(MANIFESTS_DIR / "README.md", "w") as f:

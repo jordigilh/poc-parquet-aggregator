@@ -62,7 +62,7 @@ What does each scale represent in a production environment?
 | **scale-1.5m** | 750,240 | 540,000 | 499,968 | 750 nodes, ~31,250 pods | Large-scale platform |
 | **scale-2m** | 999,600 | 720,000 | 666,624 | 1,000 nodes, ~41,667 pods | Cloud-scale |
 
-> **Note**: 
+> **Note**:
 > - **OCP Input** = Pods × 24 hours (hourly pod usage from nise)
 > - **AWS Input** = AWS resources × 24 hours × 30 line items (CUR data from nise)
 > - **Output Rows** = Matched costs after JOIN (OCP × AWS × cost methods)

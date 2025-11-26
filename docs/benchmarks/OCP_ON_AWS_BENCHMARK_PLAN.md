@@ -1,9 +1,9 @@
 # OCP-on-AWS Benchmark Plan
 
 **Date**: November 26, 2025
-**Status**: ✅ **EXECUTED**
+**Status**: 🔄 **PENDING RE-RUN** (manifests updated to target input rows)
 **Purpose**: Measure processing time and memory for OCP-on-AWS aggregation at production scale
-**Results**: See [OCP_ON_AWS_BENCHMARK_RESULTS.md](OCP_ON_AWS_BENCHMARK_RESULTS.md)
+**Note**: Scale names now refer to INPUT ROWS (combined OCP + AWS hourly data)
 
 ## Table of Contents
 
@@ -19,7 +19,7 @@
 
 ## 🎯 Objectives
 
-1. **Measure processing performance** at 6 scale points: 20K, 50K, 100K, 250K, 500K, 1M output rows
+1. **Measure processing performance** at 8 scale points: 20K, 50K, 100K, 250K, 500K, 1M, 1.5M, 2M input rows
 2. **Capture time and memory** for data processing + PostgreSQL insertion (NOT data generation)
 3. **Generate reproducible benchmark results** with chart visualizations
 4. **Validate memory stays within production limits** (target: < 32 GB)
@@ -28,48 +28,54 @@
 
 ## 📊 Benchmark Data Points
 
-### Target Output Rows (After OCP × AWS Matching)
+### Target Input Rows (OCP + AWS Combined)
 
-| Scale ID | Target Output Rows | Tolerance (±1%) | OCP Pods | Nodes | AWS Resources | Hours |
-|----------|-------------------|-----------------|----------|-------|---------------|-------|
-| **scale-20k** | 20,000 | 19,800 - 20,200 | 417 | 10 | 10 | 24 |
-| **scale-50k** | 50,000 | 49,500 - 50,500 | 1,042 | 25 | 25 | 24 |
-| **scale-100k** | 100,000 | 99,000 - 101,000 | 2,083 | 50 | 50 | 24 |
-| **scale-250k** | 250,000 | 247,500 - 252,500 | 5,208 | 125 | 125 | 24 |
-| **scale-500k** | 500,000 | 495,000 - 505,000 | 10,417 | 250 | 250 | 24 |
-| **scale-1m** | 1,000,000 | 990,000 - 1,010,000 | 20,833 | 500 | 500 | 24 |
+Scale names refer to **INPUT ROWS** (combined OCP + AWS hourly data before aggregation).
+
+| Scale ID | Target Input | Tolerance (±1%) | OCP Pods | Nodes | AWS Resources | Hours |
+|----------|--------------|-----------------|----------|-------|---------------|-------|
+| **scale-20k** | ~20,000 | 19,800 - 20,200 | 830 | 10 | 10 | 24 |
+| **scale-50k** | ~50,000 | 49,500 - 50,500 | 2,080 | 20 | 20 | 24 |
+| **scale-100k** | ~100,000 | 99,000 - 101,000 | 4,160 | 40 | 40 | 24 |
+| **scale-250k** | ~250,000 | 247,500 - 252,500 | 10,400 | 100 | 100 | 24 |
+| **scale-500k** | ~500,000 | 495,000 - 505,000 | 20,800 | 200 | 200 | 24 |
+| **scale-1m** | ~1,000,000 | 990,000 - 1,010,000 | 41,600 | 400 | 400 | 24 |
+| **scale-1.5m** | ~1,500,000 | 1,485,000 - 1,515,000 | 62,400 | 600 | 600 | 24 |
+| **scale-2m** | ~2,000,000 | 1,980,000 - 2,020,000 | 83,200 | 800 | 800 | 24 |
 
 ### Scale Interpretation (Real-World Equivalents)
 
 What does each scale represent in a production environment?
 
-| Scale | Cluster Size | Use Case Example |
-|-------|--------------|------------------|
-| **20k** | Small: 10 nodes, ~400 pods | Single development cluster, small team |
-| **50k** | Medium: 25 nodes, ~1,000 pods | Production workload for small org |
-| **100k** | Large: 50 nodes, ~2,000 pods | Medium enterprise, multiple applications |
-| **250k** | Enterprise: 125 nodes, ~5,200 pods | Large enterprise, multi-tenant platform |
-| **500k** | Multi-cluster: 250 nodes, ~10,400 pods | Multiple production clusters |
-| **1m** | Platform: 500 nodes, ~20,800 pods | Large-scale platform, SaaS provider |
-| **1.5m** | Hyperscale: 750+ nodes, ~31,000 pods | Major enterprise, aggregated data centers |
-| **2m** | Maximum: 1000+ nodes, ~41,000 pods | Cloud-scale operations |
+| Scale | Input Rows | Cluster Size | Use Case Example |
+|-------|------------|--------------|------------------|
+| **20k** | ~20,000 | 10 nodes, ~830 pods | Small OCP-on-AWS deployment |
+| **50k** | ~50,000 | 20 nodes, ~2,080 pods | Medium production environment |
+| **100k** | ~100,000 | 40 nodes, ~4,160 pods | Large enterprise deployment |
+| **250k** | ~250,000 | 100 nodes, ~10,400 pods | Multi-cluster enterprise |
+| **500k** | ~500,000 | 200 nodes, ~20,800 pods | Very large enterprise |
+| **1m** | ~1,000,000 | 400 nodes, ~41,600 pods | Hyperscale platform |
+| **1.5m** | ~1,500,000 | 600 nodes, ~62,400 pods | Major cloud provider scale |
+| **2m** | ~2,000,000 | 800 nodes, ~83,200 pods | Maximum tested scale |
 
-**Note**: These are approximations based on:
-- Average pods per node: ~40-60 for production workloads
-- OCP-on-AWS matching produces rows = pods × hours × matched resources
-- A single day (24h) of data per benchmark run
+**Note**: Scale names refer to combined OCP + AWS hourly input rows.
 
-### Output Row Formula
+### Input/Output Row Formula
 
 ```
-Output Rows = Pods × Hours × (Matched AWS Resources per Pod)
+Input Rows = (OCP Pods × 24 hours) + (AWS Resources × 24 hours)
+Output Rows = Daily aggregated matched summaries (smaller than input)
 
 Example for scale-20k:
-  - 417 pods × 24 hours × 2 matched AWS resources = 20,016 rows ✓
+  - OCP: 830 pods × 24 hours = 19,920 rows
+  - AWS: 10 resources × 24 hours = 240 rows
+  - Total input: ~20,160 rows ✓
+  - Output: Aggregated by namespace/node/day
 ```
 
 **Key Constraints**:
-- Tolerance: ±1% of target row count is acceptable
+- Scale names refer to INPUT rows (combined OCP + AWS)
+- Tolerance: ±1% of target input row count is acceptable
 - 24-hour period (single day) for consistent hourly granularity
 
 ---
@@ -320,13 +326,12 @@ monitor_thread.join()
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| **Current Trino VMs** | 48 GB | Production baseline |
-| **Target: Stay under** | 48 GB | No infra changes needed |
-| **Observed at 500K rows** | ~5 GB | From previous benchmarks |
-| **Projected at 1M rows** | ~10-12 GB | Linear extrapolation |
-| **Projected max rows** | ~4M rows | Before hitting 48 GB limit |
+| **Production VM** | 32 GB | Target production environment |
+| **Target: Stay under** | 32 GB | No infra changes needed |
+| **Expected at 2M input rows** | ~6 GB | Based on actual benchmarks |
+| **Projected max input rows** | ~10M rows | Before hitting 32 GB limit |
 
-**Success Criteria**: If 1M rows can be processed with < 48 GB memory, in-memory processing is sufficient.
+**Success Criteria**: If 2M input rows can be processed with < 32 GB memory, in-memory processing is sufficient.
 
 ### Warmup Protocol
 
@@ -411,25 +416,29 @@ xychart-beta
 
 ### Summary Results (Median ± StdDev from 3 runs)
 
-| Scale | Output Rows | Time (s) | Time StdDev | Memory (MB) | Memory StdDev | Throughput |
-|-------|-------------|----------|-------------|-------------|---------------|------------|
-| scale-20k | 20,000 | ___ | ±___ | ___ | ±___ | ___ rows/s |
-| scale-50k | 50,000 | ___ | ±___ | ___ | ±___ | ___ rows/s |
-| scale-100k | 100,000 | ___ | ±___ | ___ | ±___ | ___ rows/s |
-| scale-250k | 250,000 | ___ | ±___ | ___ | ±___ | ___ rows/s |
-| scale-500k | 500,000 | ___ | ±___ | ___ | ±___ | ___ rows/s |
-| scale-1m | 1,000,000 | ___ | ±___ | ___ | ±___ | ___ rows/s |
+| Scale | Input Rows | Time (s) | Time StdDev | Memory (MB) | Memory StdDev | Throughput |
+|-------|------------|----------|-------------|-------------|---------------|------------|
+| scale-20k | ~20,000 | ___ | ±___ | ___ | ±___ | ___ rows/s |
+| scale-50k | ~50,000 | ___ | ±___ | ___ | ±___ | ___ rows/s |
+| scale-100k | ~100,000 | ___ | ±___ | ___ | ±___ | ___ rows/s |
+| scale-250k | ~250,000 | ___ | ±___ | ___ | ±___ | ___ rows/s |
+| scale-500k | ~500,000 | ___ | ±___ | ___ | ±___ | ___ rows/s |
+| scale-1m | ~1,000,000 | ___ | ±___ | ___ | ±___ | ___ rows/s |
+| scale-1.5m | ~1,500,000 | ___ | ±___ | ___ | ±___ | ___ rows/s |
+| scale-2m | ~2,000,000 | ___ | ±___ | ___ | ±___ | ___ rows/s |
 
 ### Memory Efficiency
 
-| Scale | Output Rows | Memory (MB) | KB/row |
-|-------|-------------|-------------|--------|
-| scale-20k | 20,000 | ___ | ___ |
-| scale-50k | 50,000 | ___ | ___ |
-| scale-100k | 100,000 | ___ | ___ |
-| scale-250k | 250,000 | ___ | ___ |
-| scale-500k | 500,000 | ___ | ___ |
-| scale-1m | 1,000,000 | ___ | ___ |
+| Scale | Input Rows | Memory (MB) | KB/row |
+|-------|------------|-------------|--------|
+| scale-20k | ~20,000 | ___ | ___ |
+| scale-50k | ~50,000 | ___ | ___ |
+| scale-100k | ~100,000 | ___ | ___ |
+| scale-250k | ~250,000 | ___ | ___ |
+| scale-500k | ~500,000 | ___ | ___ |
+| scale-1m | ~1,000,000 | ___ | ___ |
+| scale-1.5m | ~1,500,000 | ___ | ___ |
+| scale-2m | ~2,000,000 | ___ | ___ |
 
 ---
 
@@ -619,10 +628,10 @@ python -c "from src.main import main; main()"
 
 - [ ] Pre-flight checklist completed
 - [ ] Software versions documented
-- [ ] All 18 benchmark runs complete without errors (6 scales × 3 runs)
+- [ ] All 24 benchmark runs complete without errors (8 scales × 3 runs)
 - [ ] Results captured with median ± stddev
 - [ ] Correctness validation passed for all scales
-- [ ] Memory stays within 16 GB limit (local) / 48 GB (production target)
+- [ ] Memory stays within 32 GB limit
 - [ ] Charts generated showing scaling behavior
 - [ ] Clear comparison with OCP-only documented
 
