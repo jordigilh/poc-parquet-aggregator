@@ -80,9 +80,7 @@ class TestAllLabelsColumn:
     # =========================================================================
     # Test 1: Pod data has all_labels = pod_labels
     # =========================================================================
-    def test_pod_data_all_labels_equals_pod_labels(
-        self, sample_pod_config, sample_pod_usage, sample_node_capacity
-    ):
+    def test_pod_data_all_labels_equals_pod_labels(self, sample_pod_config, sample_pod_usage, sample_node_capacity):
         """Test that for Pod data, all_labels equals pod_labels (volume_labels is NULL).
 
         Trino: all_labels = map_concat(pod_labels, coalesce(volume_labels, '{}'))
@@ -109,9 +107,7 @@ class TestAllLabelsColumn:
         pod_labels = json.loads(row["pod_labels"]) if row["pod_labels"] else {}
         all_labels = json.loads(row["all_labels"]) if row["all_labels"] else {}
 
-        assert (
-            all_labels == pod_labels
-        ), f"all_labels {all_labels} != pod_labels {pod_labels}"
+        assert all_labels == pod_labels, f"all_labels {all_labels} != pod_labels {pod_labels}"
 
     # =========================================================================
     # Test 2: Storage data has all_labels = merge(pod_labels, volume_labels)
@@ -138,9 +134,7 @@ class TestAllLabelsColumn:
                 "persistentvolumeclaim_capacity_bytes": [10737418240.0],  # 10GB
                 "persistentvolumeclaim_capacity_byte_seconds": [10737418240.0 * 86400],
                 "volume_request_storage_byte_seconds": [5368709120.0 * 86400],  # 5GB
-                "persistentvolumeclaim_usage_byte_seconds": [
-                    3221225472.0 * 86400
-                ],  # 3GB
+                "persistentvolumeclaim_usage_byte_seconds": [3221225472.0 * 86400],  # 3GB
             }
         )
 
@@ -181,9 +175,7 @@ class TestAllLabelsColumn:
         )
 
         # all_labels column must exist
-        assert (
-            "all_labels" in result.columns
-        ), "all_labels column missing from storage output"
+        assert "all_labels" in result.columns, "all_labels column missing from storage output"
 
         # For Storage data, all_labels should contain volume_labels
         row = result.iloc[0]
@@ -191,32 +183,18 @@ class TestAllLabelsColumn:
         volume_labels_str = row["volume_labels"] if row["volume_labels"] else "{}"
 
         # Parse JSON strings to dicts
-        all_labels = (
-            json.loads(all_labels_str)
-            if isinstance(all_labels_str, str)
-            else all_labels_str
-        )
-        volume_labels = (
-            json.loads(volume_labels_str)
-            if isinstance(volume_labels_str, str)
-            else volume_labels_str
-        )
+        all_labels = json.loads(all_labels_str) if isinstance(all_labels_str, str) else all_labels_str
+        volume_labels = json.loads(volume_labels_str) if isinstance(volume_labels_str, str) else volume_labels_str
 
         # volume_labels should be a subset of all_labels
         for key, value in volume_labels.items():
-            assert (
-                key in all_labels
-            ), f"volume_labels key '{key}' missing from all_labels"
-            assert (
-                all_labels[key] == value
-            ), f"all_labels[{key}] = {all_labels[key]} != {value}"
+            assert key in all_labels, f"volume_labels key '{key}' missing from all_labels"
+            assert all_labels[key] == value, f"all_labels[{key}] = {all_labels[key]} != {value}"
 
     # =========================================================================
     # Test 3: all_labels is valid JSON
     # =========================================================================
-    def test_all_labels_is_valid_json(
-        self, sample_pod_config, sample_pod_usage, sample_node_capacity
-    ):
+    def test_all_labels_is_valid_json(self, sample_pod_config, sample_pod_usage, sample_node_capacity):
         """Test that all_labels is always valid JSON string."""
         from src.aggregator_pod import PodAggregator
 
@@ -234,25 +212,19 @@ class TestAllLabelsColumn:
         for idx, row in result.iterrows():
             all_labels_str = row["all_labels"]
             assert all_labels_str is not None, f"all_labels is None at row {idx}"
-            assert isinstance(
-                all_labels_str, str
-            ), f"all_labels is not a string at row {idx}"
+            assert isinstance(all_labels_str, str), f"all_labels is not a string at row {idx}"
 
             # Should be valid JSON that parses to a dict
             try:
                 parsed = json.loads(all_labels_str)
-                assert isinstance(
-                    parsed, dict
-                ), f"all_labels does not parse to dict at row {idx}: {type(parsed)}"
+                assert isinstance(parsed, dict), f"all_labels does not parse to dict at row {idx}: {type(parsed)}"
             except json.JSONDecodeError as e:
                 pytest.fail(f"all_labels is not valid JSON at row {idx}: {e}")
 
     # =========================================================================
     # Test 4: Empty labels produce empty JSON object
     # =========================================================================
-    def test_empty_labels_produce_empty_json(
-        self, sample_pod_config, sample_node_capacity
-    ):
+    def test_empty_labels_produce_empty_json(self, sample_pod_config, sample_node_capacity):
         """Test that empty/null labels produce '{}'."""
         from src.aggregator_pod import PodAggregator
 
@@ -295,11 +267,7 @@ class TestAllLabelsColumn:
 
         # all_labels should be a JSON string '{}' or parse to empty dict
         assert all_labels_str is not None, "all_labels is None"
-        parsed = (
-            json.loads(all_labels_str)
-            if isinstance(all_labels_str, str)
-            else all_labels_str
-        )
+        parsed = json.loads(all_labels_str) if isinstance(all_labels_str, str) else all_labels_str
         assert parsed == {}, f"Expected empty dict, got {parsed}"
 
     # =========================================================================
@@ -355,18 +323,12 @@ class TestAllLabelsColumn:
 
         aggregator = UnallocatedCapacityAggregator(config)
 
-        result = aggregator.calculate_unallocated(
-            daily_summary_df=daily_summary, node_roles_df=node_roles
-        )
+        result = aggregator.calculate_unallocated(daily_summary_df=daily_summary, node_roles_df=node_roles)
 
         # all_labels column must exist
-        assert (
-            "all_labels" in result.columns
-        ), "all_labels column missing from unallocated output"
+        assert "all_labels" in result.columns, "all_labels column missing from unallocated output"
 
         row = result.iloc[0]
         all_labels = json.loads(row["all_labels"]) if row["all_labels"] else {}
 
-        assert (
-            all_labels == {}
-        ), f"Expected empty dict for unallocated, got {all_labels}"
+        assert all_labels == {}, f"Expected empty dict for unallocated, got {all_labels}"

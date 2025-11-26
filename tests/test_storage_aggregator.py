@@ -134,9 +134,7 @@ class TestStorageAggregatorBehavior:
 
         assert not result.empty, "Result should not be empty"
         assert "data_source" in result.columns, "data_source column must exist"
-        assert (
-            result["data_source"] == "Storage"
-        ).all(), "All rows must have data_source='Storage'"
+        assert (result["data_source"] == "Storage").all(), "All rows must have data_source='Storage'"
 
     def test_output_has_null_cpu_memory_columns(
         self,
@@ -349,9 +347,7 @@ class TestStorageAggregatorBehavior:
         # Should still produce output, but with empty/NULL nodes
         assert not result.empty, "Should produce output even without pod matches"
         # Nodes should be empty strings (not NaN) for PostgreSQL compatibility
-        assert (result["node"] == "").any() or result[
-            "node"
-        ].isna().any(), "Some nodes should be empty/NULL"
+        assert (result["node"] == "").any() or result["node"].isna().any(), "Some nodes should be empty/NULL"
 
     def test_output_schema_matches_expected(
         self,
@@ -493,9 +489,7 @@ class TestStorageAggregatorBehavior:
             }
         )
 
-        result = storage_aggregator.aggregate(
-            storage_data, pod_data, pd.DataFrame(), pd.DataFrame()
-        )
+        result = storage_aggregator.aggregate(storage_data, pod_data, pd.DataFrame(), pd.DataFrame())
 
         # Should have 4 rows (one per PVC)
         assert len(result) == 4, "Should have one row per PVC"
@@ -533,9 +527,7 @@ class TestStorageAggregatorEdgeCases:
             }
         )
 
-        result = storage_aggregator.aggregate(
-            storage_data, pod_data, pd.DataFrame(), pd.DataFrame()
-        )
+        result = storage_aggregator.aggregate(storage_data, pod_data, pd.DataFrame(), pd.DataFrame())
 
         assert len(result) == 1, "Should produce output for zero metrics"
         assert result.iloc[0]["persistentvolumeclaim_capacity_gigabyte_months"] == 0.0
@@ -568,9 +560,7 @@ class TestStorageAggregatorEdgeCases:
             }
         )
 
-        result = storage_aggregator.aggregate(
-            storage_data, pod_data, pd.DataFrame(), pd.DataFrame()
-        )
+        result = storage_aggregator.aggregate(storage_data, pod_data, pd.DataFrame(), pd.DataFrame())
 
         assert len(result) == 1
         # Should be empty string, not None (for PostgreSQL)
@@ -604,9 +594,7 @@ class TestStorageAggregatorEdgeCases:
             }
         )
 
-        result = storage_aggregator.aggregate(
-            storage_data, pod_data, pd.DataFrame(), pd.DataFrame()
-        )
+        result = storage_aggregator.aggregate(storage_data, pod_data, pd.DataFrame(), pd.DataFrame())
 
         # Should have valid JSON, not None
         assert result.iloc[0]["pod_labels"] is not None
@@ -671,9 +659,7 @@ class TestSharedVolumeNodeCount:
             }
         )
 
-        result = storage_aggregator.aggregate(
-            storage_data, pod_data, pd.DataFrame(), pd.DataFrame()
-        )
+        result = storage_aggregator.aggregate(storage_data, pod_data, pd.DataFrame(), pd.DataFrame())
 
         # Trino groups by node, so we get 3 rows (one per node)
         assert len(result) == 3, f"Expected 3 rows (one per node), got {len(result)}"
@@ -687,9 +673,7 @@ class TestSharedVolumeNodeCount:
         bytes_to_gb = 1024**3
         seconds_per_day = 86400
         days_in_month = 31  # October 2025 has 31 days
-        expected_gb_months = expected_raw_divided / (
-            bytes_to_gb * seconds_per_day * days_in_month
-        )
+        expected_gb_months = expected_raw_divided / (bytes_to_gb * seconds_per_day * days_in_month)
 
         # Check each row has the divided value
         for idx, row in result.iterrows():
@@ -706,9 +690,7 @@ class TestSharedVolumeNodeCount:
 
         # Total across all rows should equal original / node_count
         total_request = result["volume_request_storage_gigabyte_months"].sum()
-        expected_total = (
-            (3000.0 * 3) / 3 / (bytes_to_gb * seconds_per_day * days_in_month)
-        )  # 9000 / 3 = 3000
+        expected_total = (3000.0 * 3) / 3 / (bytes_to_gb * seconds_per_day * days_in_month)  # 9000 / 3 = 3000
         assert (
             abs(total_request - expected_total) < 1e-10
         ), f"Total usage should be {expected_total}, got {total_request}"
@@ -743,18 +725,14 @@ class TestSharedVolumeNodeCount:
             }
         )
 
-        result = storage_aggregator.aggregate(
-            storage_data, pod_data, pd.DataFrame(), pd.DataFrame()
-        )
+        result = storage_aggregator.aggregate(storage_data, pod_data, pd.DataFrame(), pd.DataFrame())
 
         # With 1 node, no division should occur (divide by 1)
         expected_raw = 3000.0  # 3000 / 1 node = 3000
         bytes_to_gb = 1024**3
         seconds_per_day = 86400
         days_in_month = 31  # October 2025 has 31 days
-        expected_gb_months = expected_raw / (
-            bytes_to_gb * seconds_per_day * days_in_month
-        )
+        expected_gb_months = expected_raw / (bytes_to_gb * seconds_per_day * days_in_month)
 
         actual_request = result.iloc[0]["volume_request_storage_gigabyte_months"]
 
@@ -822,9 +800,7 @@ class TestSharedVolumeNodeCount:
             }
         )
 
-        result = storage_aggregator.aggregate(
-            storage_data, pod_data, pd.DataFrame(), pd.DataFrame()
-        )
+        result = storage_aggregator.aggregate(storage_data, pod_data, pd.DataFrame(), pd.DataFrame())
 
         # Should have 4 rows: 3 for shared-pvc (one per node), 1 for single-pvc
         assert len(result) == 4, f"Expected 4 rows, got {len(result)}"
@@ -837,29 +813,20 @@ class TestSharedVolumeNodeCount:
         shared_rows = result[result["persistentvolumeclaim"] == "shared-pvc"]
         single_row = result[result["persistentvolumeclaim"] == "single-pvc"].iloc[0]
 
-        assert (
-            len(shared_rows) == 3
-        ), f"Expected 3 shared PVC rows, got {len(shared_rows)}"
+        assert len(shared_rows) == 3, f"Expected 3 shared PVC rows, got {len(shared_rows)}"
 
         # Shared: each row = 3000 sum / 3 nodes = 1000
-        expected_shared_per_row = (
-            1000.0 / (bytes_to_gb * seconds_to_hours) / hours_in_month
-        )
+        expected_shared_per_row = 1000.0 / (bytes_to_gb * seconds_to_hours) / hours_in_month
         # Single: 6000 / 1 node = 6000
         expected_single = 6000.0 / (bytes_to_gb * seconds_to_hours) / hours_in_month
 
         for idx, row in shared_rows.iterrows():
             assert (
-                abs(
-                    row["volume_request_storage_gigabyte_months"]
-                    - expected_shared_per_row
-                )
-                < 1e-10
+                abs(row["volume_request_storage_gigabyte_months"] - expected_shared_per_row) < 1e-10
             ), f"Shared PV row should be divided by 3"
 
         assert (
-            abs(single_row["volume_request_storage_gigabyte_months"] - expected_single)
-            < 1e-10
+            abs(single_row["volume_request_storage_gigabyte_months"] - expected_single) < 1e-10
         ), f"Single PV should not be divided"
 
 
@@ -893,9 +860,7 @@ class TestDaysInMonthFormula:
                 "storageclass": ["gp2"],
                 # Use a value that makes calculation clear
                 # 1 GB for 1 day = 1 * 1024^3 * 86400 byte-seconds
-                "persistentvolumeclaim_capacity_byte_seconds": [
-                    1073741824.0 * 86400
-                ],  # 1 GB * 1 day
+                "persistentvolumeclaim_capacity_byte_seconds": [1073741824.0 * 86400],  # 1 GB * 1 day
                 "volume_request_storage_byte_seconds": [1073741824.0 * 86400],
                 "persistentvolumeclaim_usage_byte_seconds": [1073741824.0 * 86400],
                 "volume_labels": ["{}"],
@@ -913,9 +878,7 @@ class TestDaysInMonthFormula:
             }
         )
 
-        result = storage_aggregator.aggregate(
-            storage_data, pod_data, pd.DataFrame(), pd.DataFrame()
-        )
+        result = storage_aggregator.aggregate(storage_data, pod_data, pd.DataFrame(), pd.DataFrame())
 
         # February has 28 days
         # 1 GB for 1 day = 1/28 GB-months
@@ -962,9 +925,7 @@ class TestDaysInMonthFormula:
             }
         )
 
-        result = storage_aggregator.aggregate(
-            storage_data, pod_data, pd.DataFrame(), pd.DataFrame()
-        )
+        result = storage_aggregator.aggregate(storage_data, pod_data, pd.DataFrame(), pd.DataFrame())
 
         # July has 31 days
         # 1 GB for 1 day = 1/31 GB-months
@@ -972,9 +933,7 @@ class TestDaysInMonthFormula:
 
         actual = result.iloc[0]["persistentvolumeclaim_capacity_gigabyte_months"]
 
-        assert (
-            abs(actual - expected_gb_months) < 1e-10
-        ), f"July (31 days): Expected {expected_gb_months}, got {actual}"
+        assert abs(actual - expected_gb_months) < 1e-10, f"July (31 days): Expected {expected_gb_months}, got {actual}"
 
     def test_february_vs_july_difference(self, config):
         """
@@ -994,9 +953,7 @@ class TestDaysInMonthFormula:
                     "persistentvolumeclaim": ["pvc1"],
                     "persistentvolume": ["pv1"],
                     "storageclass": ["gp2"],
-                    "persistentvolumeclaim_capacity_byte_seconds": [
-                        1073741824.0 * 86400
-                    ],
+                    "persistentvolumeclaim_capacity_byte_seconds": [1073741824.0 * 86400],
                     "volume_request_storage_byte_seconds": [1073741824.0 * 86400],
                     "persistentvolumeclaim_usage_byte_seconds": [1073741824.0 * 86400],
                     "volume_labels": ["{}"],
@@ -1014,33 +971,23 @@ class TestDaysInMonthFormula:
                 }
             )
 
-            return storage_aggregator.aggregate(
-                storage_data, pod_data, pd.DataFrame(), pd.DataFrame()
-            )
+            return storage_aggregator.aggregate(storage_data, pod_data, pd.DataFrame(), pd.DataFrame())
 
         feb_result = get_result_for_month("2025-02-15")
         jul_result = get_result_for_month("2025-07-15")
 
-        feb_capacity = feb_result.iloc[0][
-            "persistentvolumeclaim_capacity_gigabyte_months"
-        ]
-        jul_capacity = jul_result.iloc[0][
-            "persistentvolumeclaim_capacity_gigabyte_months"
-        ]
+        feb_capacity = feb_result.iloc[0]["persistentvolumeclaim_capacity_gigabyte_months"]
+        jul_capacity = jul_result.iloc[0]["persistentvolumeclaim_capacity_gigabyte_months"]
 
         # Feb (28 days) should be higher than July (31 days)
         # 1/28 > 1/31
-        assert (
-            feb_capacity > jul_capacity
-        ), f"Feb ({feb_capacity}) should be > July ({jul_capacity}) for same input"
+        assert feb_capacity > jul_capacity, f"Feb ({feb_capacity}) should be > July ({jul_capacity}) for same input"
 
         # The ratio should be close to 31/28 = 1.107
         expected_ratio = 31.0 / 28.0
         actual_ratio = feb_capacity / jul_capacity
 
-        assert (
-            abs(actual_ratio - expected_ratio) < 0.001
-        ), f"Ratio should be {expected_ratio}, got {actual_ratio}"
+        assert abs(actual_ratio - expected_ratio) < 0.001, f"Ratio should be {expected_ratio}, got {actual_ratio}"
 
 
 class TestStorageCostCategory:
@@ -1139,9 +1086,7 @@ class TestStorageCostCategory:
             }
         )
 
-        cost_category_df = pd.DataFrame(
-            {"namespace": ["platform-%"], "cost_category_id": [42]}
-        )
+        cost_category_df = pd.DataFrame({"namespace": ["platform-%"], "cost_category_id": [42]})
 
         result = storage_aggregator.aggregate(
             storage_data,
@@ -1186,12 +1131,8 @@ class TestPVCCapacityGigabyte:
                 "persistentvolumeclaim": ["pvc1"],
                 "persistentvolume": ["pv1"],
                 "storageclass": ["gp2"],
-                "persistentvolumeclaim_capacity_bytes": [
-                    float(capacity_bytes)
-                ],  # 10 GB
-                "persistentvolumeclaim_capacity_byte_seconds": [
-                    float(capacity_bytes) * 86400
-                ],
+                "persistentvolumeclaim_capacity_bytes": [float(capacity_bytes)],  # 10 GB
+                "persistentvolumeclaim_capacity_byte_seconds": [float(capacity_bytes) * 86400],
                 "volume_request_storage_byte_seconds": [1e9],
                 "persistentvolumeclaim_usage_byte_seconds": [1e9],
                 "volume_labels": ["{}"],
@@ -1209,9 +1150,7 @@ class TestPVCCapacityGigabyte:
             }
         )
 
-        result = storage_aggregator.aggregate(
-            storage_data, pod_data, pd.DataFrame(), pd.DataFrame()
-        )
+        result = storage_aggregator.aggregate(storage_data, pod_data, pd.DataFrame(), pd.DataFrame())
 
         # persistentvolumeclaim_capacity_gigabyte = 10 GB
         expected_gb = 10.0
@@ -1219,12 +1158,8 @@ class TestPVCCapacityGigabyte:
         assert "persistentvolumeclaim_capacity_gigabyte" in result.columns
         actual = result.iloc[0]["persistentvolumeclaim_capacity_gigabyte"]
 
-        assert (
-            actual is not None
-        ), "persistentvolumeclaim_capacity_gigabyte should not be None"
-        assert (
-            abs(actual - expected_gb) < 0.001
-        ), f"Expected {expected_gb} GB, got {actual} GB"
+        assert actual is not None, "persistentvolumeclaim_capacity_gigabyte should not be None"
+        assert abs(actual - expected_gb) < 0.001, f"Expected {expected_gb} GB, got {actual} GB"
 
     def test_pvc_capacity_gigabyte_max_across_intervals(self, config):
         """
@@ -1240,9 +1175,7 @@ class TestPVCCapacityGigabyte:
 
         storage_data = pd.DataFrame(
             {
-                "interval_start": pd.to_datetime(
-                    ["2025-10-01 00:00:00", "2025-10-01 12:00:00"]
-                ),
+                "interval_start": pd.to_datetime(["2025-10-01 00:00:00", "2025-10-01 12:00:00"]),
                 "namespace": ["ns1", "ns1"],
                 "pod": ["pod-a", "pod-a"],
                 "persistentvolumeclaim": ["pvc1", "pvc1"],
@@ -1262,9 +1195,7 @@ class TestPVCCapacityGigabyte:
 
         pod_data = pd.DataFrame(
             {
-                "interval_start": pd.to_datetime(
-                    ["2025-10-01 00:00:00", "2025-10-01 12:00:00"]
-                ),
+                "interval_start": pd.to_datetime(["2025-10-01 00:00:00", "2025-10-01 12:00:00"]),
                 "namespace": ["ns1", "ns1"],
                 "pod": ["pod-a", "pod-a"],
                 "node": ["node-1", "node-1"],
@@ -1272,17 +1203,11 @@ class TestPVCCapacityGigabyte:
             }
         )
 
-        result = storage_aggregator.aggregate(
-            storage_data, pod_data, pd.DataFrame(), pd.DataFrame()
-        )
+        result = storage_aggregator.aggregate(storage_data, pod_data, pd.DataFrame(), pd.DataFrame())
 
         # Should use MAX = 10 GB
         expected_gb = 10.0
         actual = result.iloc[0]["persistentvolumeclaim_capacity_gigabyte"]
 
-        assert (
-            actual is not None
-        ), "persistentvolumeclaim_capacity_gigabyte should not be None"
-        assert (
-            abs(actual - expected_gb) < 0.001
-        ), f"Expected MAX {expected_gb} GB, got {actual} GB"
+        assert actual is not None, "persistentvolumeclaim_capacity_gigabyte should not be None"
+        assert abs(actual - expected_gb) < 0.001, f"Expected MAX {expected_gb} GB, got {actual} GB"

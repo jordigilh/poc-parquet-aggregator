@@ -92,9 +92,7 @@ class TestOCPAWSAggregator:
         mock_reader.read_storage_usage_line_items.return_value = pd.DataFrame(
             {"namespace": ["default"], "persistentvolumeclaim": ["pvc-1"]}
         )
-        mock_reader.read_node_labels_line_items.return_value = pd.DataFrame(
-            {"node": ["node-1"], "labels": ["{}"]}
-        )
+        mock_reader.read_node_labels_line_items.return_value = pd.DataFrame({"node": ["node-1"], "labels": ["{}"]})
         mock_reader.read_namespace_labels_line_items.return_value = pd.DataFrame(
             {"namespace": ["default"], "labels": ["{}"]}
         )
@@ -227,9 +225,7 @@ class TestOCPAWSAggregator:
         aggregator = OCPAWSAggregator(mock_config, enabled_tag_keys)
         aggregator.tag_matcher = mock_matcher
 
-        ocp_data = {
-            "pod_usage": pd.DataFrame({"namespace": ["default"], "node": ["node-1"]})
-        }
+        ocp_data = {"pod_usage": pd.DataFrame({"namespace": ["default"], "node": ["node-1"]})}
 
         # Match
         result = aggregator._match_tags(aws_df, ocp_data, "test-cluster")
@@ -241,9 +237,7 @@ class TestOCPAWSAggregator:
         mock_matcher.match_by_tags.assert_called_once()
 
     @patch("src.aggregator_ocp_aws.DiskCapacityCalculator")
-    def test_calculate_disk_capacities_with_volumes(
-        self, mock_calculator_class, mock_config, enabled_tag_keys
-    ):
+    def test_calculate_disk_capacities_with_volumes(self, mock_calculator_class, mock_config, enabled_tag_keys):
         """Test disk capacity calculation when volumes are present."""
         # Setup mocks
         mock_calculator = Mock()
@@ -258,9 +252,7 @@ class TestOCPAWSAggregator:
             }
         )
 
-        ocp_storage = pd.DataFrame(
-            {"csi_volume_handle": ["vol-123"], "namespace": ["default"]}
-        )
+        ocp_storage = pd.DataFrame({"csi_volume_handle": ["vol-123"], "namespace": ["default"]})
 
         mock_calculator.extract_matched_volumes.return_value = {"vol-123"}
 
@@ -283,9 +275,7 @@ class TestOCPAWSAggregator:
         aggregator.disk_calculator = mock_calculator
 
         # Calculate
-        result = aggregator._calculate_disk_capacities(
-            matched_aws, ocp_storage, "2024", "10", "aws-provider-uuid"
-        )
+        result = aggregator._calculate_disk_capacities(matched_aws, ocp_storage, "2024", "10", "aws-provider-uuid")
 
         # Verify
         assert len(result) == 1
@@ -294,9 +284,7 @@ class TestOCPAWSAggregator:
         mock_calculator.calculate_disk_capacities.assert_called_once()
 
     @patch("src.aggregator_ocp_aws.DiskCapacityCalculator")
-    def test_calculate_disk_capacities_no_volumes(
-        self, mock_calculator_class, mock_config, enabled_tag_keys
-    ):
+    def test_calculate_disk_capacities_no_volumes(self, mock_calculator_class, mock_config, enabled_tag_keys):
         """Test disk capacity calculation when no volumes are matched."""
         # Setup mock
         mock_calculator = Mock()
@@ -319,18 +307,14 @@ class TestOCPAWSAggregator:
         aggregator.disk_calculator = mock_calculator
 
         # Calculate
-        result = aggregator._calculate_disk_capacities(
-            matched_aws, ocp_storage, "2024", "10", "aws-provider-uuid"
-        )
+        result = aggregator._calculate_disk_capacities(matched_aws, ocp_storage, "2024", "10", "aws-provider-uuid")
 
         # Verify
         assert result.empty
         mock_calculator.extract_matched_volumes.assert_called_once()
 
     @patch("src.aggregator_ocp_aws.CostAttributor")
-    def test_attribute_costs(
-        self, mock_attributor_class, mock_config, enabled_tag_keys
-    ):
+    def test_attribute_costs(self, mock_attributor_class, mock_config, enabled_tag_keys):
         """Test cost attribution."""
         # Setup mock
         mock_attributor = Mock()
@@ -362,9 +346,7 @@ class TestOCPAWSAggregator:
             "storage_usage": pd.DataFrame(),
         }
 
-        matched_aws = pd.DataFrame(
-            {"lineitem_resourceid": ["i-123"], "lineitem_unblendedcost": [10.0]}
-        )
+        matched_aws = pd.DataFrame({"lineitem_resourceid": ["i-123"], "lineitem_unblendedcost": [10.0]})
 
         disk_capacities = pd.DataFrame()
 
@@ -398,9 +380,7 @@ class TestOCPAWSAggregator:
             }
         )
 
-        result = aggregator._format_output(
-            attributed_df, "test-cluster", "Test Cluster", "ocp-provider-uuid"
-        )
+        result = aggregator._format_output(attributed_df, "test-cluster", "Test Cluster", "ocp-provider-uuid")
 
         # Verify required columns exist
         required_columns = [
@@ -476,9 +456,7 @@ class TestOCPAWSAggregator:
             }
         )
 
-        result = aggregator._format_output(
-            attributed_df, "test-cluster", "Test Cluster", "ocp-provider-uuid"
-        )
+        result = aggregator._format_output(attributed_df, "test-cluster", "Test Cluster", "ocp-provider-uuid")
 
         # Verify NaN is replaced with empty string
         assert result["node"].iloc[0] == ""

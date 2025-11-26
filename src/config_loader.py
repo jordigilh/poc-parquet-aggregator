@@ -95,8 +95,7 @@ class ConfigLoader:
                 return default_value
             else:
                 raise ValueError(
-                    f"Required environment variable '{var_name}' is not set. "
-                    f"Found in configuration value: {value}"
+                    f"Required environment variable '{var_name}' is not set. " f"Found in configuration value: {value}"
                 )
 
         return re.sub(pattern, replacer, value)

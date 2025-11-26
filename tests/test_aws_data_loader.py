@@ -78,9 +78,7 @@ def sample_aws_cur_data():
                 '{"openshift_cluster": "other-cluster"}',
                 "{}",
             ],
-            "lineitem_usagestartdate": pd.to_datetime(
-                ["2025-10-01", "2025-10-01", "2025-10-01", "2025-10-01"]
-            ),
+            "lineitem_usagestartdate": pd.to_datetime(["2025-10-01", "2025-10-01", "2025-10-01", "2025-10-01"]),
         }
     )
 
@@ -160,9 +158,7 @@ class TestAWSDataLoader:
 
             assert summary["status"] == "empty"
 
-    def test_read_aws_line_items_for_matching_no_filter(
-        self, mock_config, sample_aws_cur_data
-    ):
+    def test_read_aws_line_items_for_matching_no_filter(self, mock_config, sample_aws_cur_data):
         """Test reading AWS CUR for matching without resource type filter."""
         with patch("src.aws_data_loader.ParquetReader"):
             loader = AWSDataLoader(mock_config)
@@ -170,17 +166,13 @@ class TestAWSDataLoader:
             # Mock read_aws_line_items_daily to return sample data
             loader.read_aws_line_items_daily = Mock(return_value=sample_aws_cur_data)
 
-            result = loader.read_aws_line_items_for_matching(
-                provider_uuid="test-provider", year="2025", month="10"
-            )
+            result = loader.read_aws_line_items_for_matching(provider_uuid="test-provider", year="2025", month="10")
 
             # Should remove rows with null resource IDs
             assert len(result) == 3  # 4 rows - 1 with null resource_id
             assert result["lineitem_resourceid"].notna().all()
 
-    def test_read_aws_line_items_for_matching_with_filter(
-        self, mock_config, sample_aws_cur_data
-    ):
+    def test_read_aws_line_items_for_matching_with_filter(self, mock_config, sample_aws_cur_data):
         """Test reading AWS CUR for matching with resource type filter."""
         with patch("src.aws_data_loader.ParquetReader"):
             loader = AWSDataLoader(mock_config)
@@ -207,9 +199,7 @@ class TestAWSDataLoader:
             # Mock read_aws_line_items_daily to return empty DataFrame
             loader.read_aws_line_items_daily = Mock(return_value=pd.DataFrame())
 
-            result = loader.read_aws_line_items_for_matching(
-                provider_uuid="test-provider", year="2025", month="10"
-            )
+            result = loader.read_aws_line_items_for_matching(provider_uuid="test-provider", year="2025", month="10")
 
             assert result.empty
 
@@ -218,9 +208,7 @@ class TestAWSDataLoader:
         with patch("src.aws_data_loader.ParquetReader") as mock_reader_class:
             # Mock the ParquetReader instance
             mock_reader = MagicMock()
-            mock_reader.list_parquet_files.return_value = [
-                "s3://test-bucket/test-file.parquet"
-            ]
+            mock_reader.list_parquet_files.return_value = ["s3://test-bucket/test-file.parquet"]
             mock_reader._read_files_parallel.return_value = pd.DataFrame(
                 {
                     "lineitem_resourceid": ["i-test"],
@@ -253,18 +241,14 @@ class TestAWSDataLoader:
         """Test that column filtering is applied when enabled."""
         with patch("src.aws_data_loader.ParquetReader") as mock_reader_class:
             mock_reader = MagicMock()
-            mock_reader.list_parquet_files.return_value = [
-                "s3://test-bucket/test.parquet"
-            ]
+            mock_reader.list_parquet_files.return_value = ["s3://test-bucket/test.parquet"]
             mock_reader._read_files_parallel.return_value = pd.DataFrame()
             mock_reader_class.return_value = mock_reader
 
             loader = AWSDataLoader(mock_config)
 
             # Read data
-            loader.read_aws_line_items_daily(
-                provider_uuid="test", year="2025", month="10"
-            )
+            loader.read_aws_line_items_daily(provider_uuid="test", year="2025", month="10")
 
             # Verify _read_files_parallel was called
             # Note: columns=None because we read all columns for resourcetags consolidation
@@ -275,9 +259,7 @@ class TestAWSDataLoader:
         """Test that streaming mode uses the correct method."""
         with patch("src.aws_data_loader.ParquetReader") as mock_reader_class:
             mock_reader = MagicMock()
-            mock_reader.list_parquet_files.return_value = [
-                "s3://test-bucket/test.parquet"
-            ]
+            mock_reader.list_parquet_files.return_value = ["s3://test-bucket/test.parquet"]
 
             # Mock streaming to return an iterator
             def mock_stream(*args, **kwargs):
@@ -317,19 +299,11 @@ class TestAWSDataLoader:
                 {
                     "lineitem_resourceid": [f"i-{i:08d}" for i in range(num_rows)],
                     "lineitem_productcode": ["AmazonEC2"] * num_rows,
-                    "lineitem_unblendedcost": [
-                        1.0 + (i % 100) * 0.01 for i in range(num_rows)
-                    ],
-                    "lineitem_blendedcost": [
-                        0.9 + (i % 100) * 0.01 for i in range(num_rows)
-                    ],
-                    "savingsplan_savingsplaneffectivecost": [
-                        0.8 + (i % 100) * 0.01 for i in range(num_rows)
-                    ],
+                    "lineitem_unblendedcost": [1.0 + (i % 100) * 0.01 for i in range(num_rows)],
+                    "lineitem_blendedcost": [0.9 + (i % 100) * 0.01 for i in range(num_rows)],
+                    "savingsplan_savingsplaneffectivecost": [0.8 + (i % 100) * 0.01 for i in range(num_rows)],
                     "resourcetags": ['{"openshift_cluster":"prod"}'] * num_rows,
-                    "lineitem_usagestartdate": pd.to_datetime(
-                        ["2025-10-01"] * num_rows
-                    ),
+                    "lineitem_usagestartdate": pd.to_datetime(["2025-10-01"] * num_rows),
                     "lineitem_usageaccountid": ["123456789012"] * num_rows,
                 }
             )
@@ -346,9 +320,7 @@ class TestAWSDataLoader:
 
             start = time.time()
 
-            result = loader.read_aws_line_items_daily(
-                provider_uuid="test", year="2025", month="10"
-            )
+            result = loader.read_aws_line_items_daily(provider_uuid="test", year="2025", month="10")
 
             elapsed = time.time() - start
 
@@ -368,9 +340,7 @@ class TestAWSDataLoader:
         with patch("src.aws_data_loader.ParquetReader") as mock_reader_class:
             # Simulate 10 files with 1000 rows each
             mock_reader = MagicMock()
-            mock_reader.list_parquet_files.return_value = [
-                f"s3://test/file-{i}.parquet" for i in range(10)
-            ]
+            mock_reader.list_parquet_files.return_value = [f"s3://test/file-{i}.parquet" for i in range(10)]
 
             # Create aggregated data (10K rows total)
             combined_df = pd.DataFrame(
@@ -388,9 +358,7 @@ class TestAWSDataLoader:
 
             loader = AWSDataLoader(mock_config)
 
-            result = loader.read_aws_line_items_daily(
-                provider_uuid="test", year="2025", month="10"
-            )
+            result = loader.read_aws_line_items_daily(provider_uuid="test", year="2025", month="10")
 
             # Should load all 10K rows
             assert len(result) == 10000
@@ -424,9 +392,7 @@ class TestAWSDataLoader:
 
             loader = AWSDataLoader(mock_config)
 
-            result = loader.read_aws_line_items_daily(
-                provider_uuid="test", year="2025", month="10"
-            )
+            result = loader.read_aws_line_items_daily(provider_uuid="test", year="2025", month="10")
 
             # Should handle large tags gracefully (150 tags consolidated into JSON)
             assert len(result) == 2
@@ -456,9 +422,7 @@ class TestAWSDataLoader:
             loader = AWSDataLoader(mock_config)
 
             # Should not raise an error for missing optional columns
-            result = loader.read_aws_line_items_daily(
-                provider_uuid="test", year="2025", month="10"
-            )
+            result = loader.read_aws_line_items_daily(provider_uuid="test", year="2025", month="10")
 
             assert len(result) == 1
             assert "lineitem_resourceid" in result.columns
@@ -490,9 +454,7 @@ class TestAWSDataLoader:
 
             loader = AWSDataLoader(mock_config)
 
-            result = loader.read_aws_line_items_daily(
-                provider_uuid="test", year="2025", month="10"  # October data
-            )
+            result = loader.read_aws_line_items_daily(provider_uuid="test", year="2025", month="10")  # October data
 
             # Should load all 3 rows (no date filtering in loader)
             assert len(result) == 3
@@ -526,9 +488,7 @@ class TestAWSDataLoader:
 
             loader = AWSDataLoader(mock_config)
 
-            result = loader.read_aws_line_items_daily(
-                provider_uuid="test", year="2025", month="10"
-            )
+            result = loader.read_aws_line_items_daily(provider_uuid="test", year="2025", month="10")
 
             # Should handle all cases
             assert len(result) == 4
@@ -551,16 +511,11 @@ class TestAWSDataLoader:
                     start_idx = i * chunk_size
                     chunk_df = pd.DataFrame(
                         {
-                            "lineitem_resourceid": [
-                                f"i-{j:08d}"
-                                for j in range(start_idx, start_idx + chunk_size)
-                            ],
+                            "lineitem_resourceid": [f"i-{j:08d}" for j in range(start_idx, start_idx + chunk_size)],
                             "lineitem_productcode": ["AmazonEC2"] * chunk_size,
                             "lineitem_unblendedcost": [1.0] * chunk_size,
                             "resourcetags": ["{}"] * chunk_size,
-                            "lineitem_usagestartdate": pd.to_datetime(
-                                ["2025-10-01"] * chunk_size
-                            ),
+                            "lineitem_usagestartdate": pd.to_datetime(["2025-10-01"] * chunk_size),
                         }
                     )
                     yield chunk_df
@@ -606,18 +561,14 @@ class TestAWSDataLoader:
         with patch("src.aws_data_loader.ParquetReader") as mock_reader_class:
             # Create DataFrame with 50 columns (simulating full CUR schema)
             num_rows = 10000
-            full_df = pd.DataFrame(
-                {f"column_{i}": [f"value_{i}"] * num_rows for i in range(50)}
-            )
+            full_df = pd.DataFrame({f"column_{i}": [f"value_{i}"] * num_rows for i in range(50)})
 
             # Add required columns
             full_df["lineitem_resourceid"] = [f"i-{i:06d}" for i in range(num_rows)]
             full_df["lineitem_productcode"] = ["AmazonEC2"] * num_rows
             full_df["lineitem_unblendedcost"] = [1.0] * num_rows
             full_df["resourcetags"] = ["{}"] * num_rows
-            full_df["lineitem_usagestartdate"] = pd.to_datetime(
-                ["2025-10-01"] * num_rows
-            )
+            full_df["lineitem_usagestartdate"] = pd.to_datetime(["2025-10-01"] * num_rows)
 
             mock_reader = MagicMock()
             mock_reader.list_parquet_files.return_value = ["s3://test/file.parquet"]

@@ -76,9 +76,7 @@ class OCPAWSAggregator:
             self.use_streaming = bool(use_streaming_raw)
 
         chunk_size_raw = self.perf_config.get("chunk_size", 100000)
-        self.chunk_size = (
-            int(chunk_size_raw) if isinstance(chunk_size_raw, str) else chunk_size_raw
-        )
+        self.chunk_size = int(chunk_size_raw) if isinstance(chunk_size_raw, str) else chunk_size_raw
 
         # Initialize components
         self.parquet_reader = ParquetReader(config)
@@ -161,17 +159,13 @@ class OCPAWSAggregator:
             self.logger.info("Using IN-MEMORY mode (faster, more memory)")
             return self._aggregate_inmemory(year, month, cluster_id, aws_provider_uuid)
 
-    def _aggregate_inmemory(
-        self, year: str, month: str, cluster_id: str, aws_provider_uuid: str
-    ) -> pd.DataFrame:
+    def _aggregate_inmemory(self, year: str, month: str, cluster_id: str, aws_provider_uuid: str) -> pd.DataFrame:
         """
         Run aggregation in-memory (loads all data at once).
 
         Faster but uses more memory. Best for smaller datasets.
         """
-        with PerformanceTimer(
-            f"OCP-AWS aggregation IN-MEMORY ({year}-{month})", self.logger
-        ):
+        with PerformanceTimer(f"OCP-AWS aggregation IN-MEMORY ({year}-{month})", self.logger):
             # Phase 1: Load OCP data
             self.logger.info(
                 "Phase 1: Loading OCP data",
@@ -210,9 +204,7 @@ class OCPAWSAggregator:
 
             # Phase 7: Format output
             self.logger.info("Phase 7: Formatting output")
-            final_output = self._format_output(
-                attributed, cluster_id, self.cluster_alias, self.provider_uuid
-            )
+            final_output = self._format_output(attributed, cluster_id, self.cluster_alias, self.provider_uuid)
 
             # Log summary
             self.logger.info(
@@ -221,12 +213,8 @@ class OCPAWSAggregator:
                 total_unblended_cost=final_output["unblended_cost"].sum()
                 if "unblended_cost" in final_output.columns
                 else 0,
-                unique_namespaces=final_output["namespace"].nunique()
-                if "namespace" in final_output.columns
-                else 0,
-                unique_nodes=final_output["node"].nunique()
-                if "node" in final_output.columns
-                else 0,
+                unique_namespaces=final_output["namespace"].nunique() if "namespace" in final_output.columns else 0,
+                unique_nodes=final_output["node"].nunique() if "node" in final_output.columns else 0,
             )
 
             return final_output
@@ -256,9 +244,7 @@ class OCPAWSAggregator:
         """
         import gc
 
-        with PerformanceTimer(
-            f"OCP-AWS aggregation STREAMING ({year}-{month})", self.logger
-        ):
+        with PerformanceTimer(f"OCP-AWS aggregation STREAMING ({year}-{month})", self.logger):
             # Phase 1: Load reference data (kept in memory - typically small)
             self.logger.info("Phase 1: Loading reference data (labels, AWS)")
 
@@ -278,15 +264,9 @@ class OCPAWSAggregator:
                 streaming=False,
             )
             if not storage_usage.empty:
-                if (
-                    "cluster_id" not in storage_usage.columns
-                    or storage_usage["cluster_id"].isnull().all()
-                ):
+                if "cluster_id" not in storage_usage.columns or storage_usage["cluster_id"].isnull().all():
                     storage_usage["cluster_id"] = cluster_id
-                if (
-                    "cluster_alias" not in storage_usage.columns
-                    or storage_usage["cluster_alias"].isnull().all()
-                ):
+                if "cluster_alias" not in storage_usage.columns or storage_usage["cluster_alias"].isnull().all():
                     storage_usage["cluster_alias"] = self.cluster_alias
 
             # Phase 2: Load AWS data (typically small, keep in memory)
@@ -322,16 +302,12 @@ class OCPAWSAggregator:
             }
 
             # Phase 4-6: Process each chunk
-            self.logger.info(
-                "Phase 4-6: Processing OCP chunks with AWS matching and attribution"
-            )
+            self.logger.info("Phase 4-6: Processing OCP chunks with AWS matching and attribution")
 
             # INCREMENTAL DB WRITES MODE
             # Instead of collecting all chunks in memory, write each chunk to DB immediately
             if incremental_db_writes and db_writer is not None:
-                self.logger.info(
-                    "Using INCREMENTAL DB WRITES (true memory-bounded streaming)"
-                )
+                self.logger.info("Using INCREMENTAL DB WRITES (true memory-bounded streaming)")
 
                 streaming_db = db_writer.create_streaming_writer("ocp_aws")
                 total_rows = 0
@@ -342,9 +318,7 @@ class OCPAWSAggregator:
                             continue
 
                         # Process this chunk
-                        attributed = self._process_ocp_chunk(
-                            chunk_df, reference_data, chunk_idx
-                        )
+                        attributed = self._process_ocp_chunk(chunk_df, reference_data, chunk_idx)
 
                         if attributed is not None and not attributed.empty:
                             # Format and write immediately
@@ -388,9 +362,7 @@ class OCPAWSAggregator:
             if processed_chunks.empty:
                 final_output = pd.DataFrame()
             else:
-                final_output = self._format_output(
-                    processed_chunks, cluster_id, self.cluster_alias, self.provider_uuid
-                )
+                final_output = self._format_output(processed_chunks, cluster_id, self.cluster_alias, self.provider_uuid)
 
             # Clean up
             gc.collect()
@@ -402,12 +374,8 @@ class OCPAWSAggregator:
                 total_unblended_cost=final_output["unblended_cost"].sum()
                 if "unblended_cost" in final_output.columns
                 else 0,
-                unique_namespaces=final_output["namespace"].nunique()
-                if "namespace" in final_output.columns
-                else 0,
-                unique_nodes=final_output["node"].nunique()
-                if "node" in final_output.columns
-                else 0,
+                unique_namespaces=final_output["namespace"].nunique() if "namespace" in final_output.columns else 0,
+                unique_nodes=final_output["node"].nunique() if "node" in final_output.columns else 0,
             )
 
             return final_output
@@ -446,15 +414,9 @@ class OCPAWSAggregator:
         aws_provider_uuid = reference_data["aws_provider_uuid"]
 
         # Add cluster metadata to chunk
-        if (
-            "cluster_id" not in chunk_df.columns
-            or chunk_df["cluster_id"].isnull().all()
-        ):
+        if "cluster_id" not in chunk_df.columns or chunk_df["cluster_id"].isnull().all():
             chunk_df["cluster_id"] = cluster_id
-        if (
-            "cluster_alias" not in chunk_df.columns
-            or chunk_df["cluster_alias"].isnull().all()
-        ):
+        if "cluster_alias" not in chunk_df.columns or chunk_df["cluster_alias"].isnull().all():
             chunk_df["cluster_alias"] = cluster_alias
 
         # Create OCP data dict for this chunk
@@ -474,9 +436,7 @@ class OCPAWSAggregator:
         matched_aws = self._match_tags(matched_aws, ocp_chunk_data, cluster_id)
 
         # Calculate disk capacities (uses storage from reference data)
-        disk_capacities = self._calculate_disk_capacities(
-            matched_aws, storage_usage, year, month, aws_provider_uuid
-        )
+        disk_capacities = self._calculate_disk_capacities(matched_aws, storage_usage, year, month, aws_provider_uuid)
 
         # Attribute costs
         attributed = self._attribute_costs(ocp_chunk_data, matched_aws, disk_capacities)
@@ -487,9 +447,7 @@ class OCPAWSAggregator:
 
         return attributed
 
-    def _load_ocp_data(
-        self, year: str, month: str, cluster_id: str
-    ) -> Dict[str, pd.DataFrame]:
+    def _load_ocp_data(self, year: str, month: str, cluster_id: str) -> Dict[str, pd.DataFrame]:
         """
         Load all OCP data sources.
 
@@ -535,41 +493,25 @@ class OCPAWSAggregator:
             # This is required for Trino parity (matches cluster-level tags)
             # CRITICAL: Do NOT overwrite cluster_id if it already exists (multi-cluster scenario)
             if not pod_usage.empty:
-                if (
-                    "cluster_id" not in pod_usage.columns
-                    or pod_usage["cluster_id"].isnull().all()
-                ):
+                if "cluster_id" not in pod_usage.columns or pod_usage["cluster_id"].isnull().all():
                     pod_usage["cluster_id"] = cluster_id
                     self.logger.info(f"Added cluster_id to pod_usage: {cluster_id}")
                 else:
                     unique_clusters = pod_usage["cluster_id"].unique()
-                    self.logger.info(
-                        f"Preserving existing cluster_id(s) in pod_usage: {list(unique_clusters)}"
-                    )
+                    self.logger.info(f"Preserving existing cluster_id(s) in pod_usage: {list(unique_clusters)}")
 
-                if (
-                    "cluster_alias" not in pod_usage.columns
-                    or pod_usage["cluster_alias"].isnull().all()
-                ):
+                if "cluster_alias" not in pod_usage.columns or pod_usage["cluster_alias"].isnull().all():
                     pod_usage["cluster_alias"] = self.cluster_alias
 
             if not storage_usage.empty:
-                if (
-                    "cluster_id" not in storage_usage.columns
-                    or storage_usage["cluster_id"].isnull().all()
-                ):
+                if "cluster_id" not in storage_usage.columns or storage_usage["cluster_id"].isnull().all():
                     storage_usage["cluster_id"] = cluster_id
                     self.logger.info(f"Added cluster_id to storage_usage: {cluster_id}")
                 else:
                     unique_clusters = storage_usage["cluster_id"].unique()
-                    self.logger.info(
-                        f"Preserving existing cluster_id(s) in storage_usage: {list(unique_clusters)}"
-                    )
+                    self.logger.info(f"Preserving existing cluster_id(s) in storage_usage: {list(unique_clusters)}")
 
-                if (
-                    "cluster_alias" not in storage_usage.columns
-                    or storage_usage["cluster_alias"].isnull().all()
-                ):
+                if "cluster_alias" not in storage_usage.columns or storage_usage["cluster_alias"].isnull().all():
                     storage_usage["cluster_alias"] = self.cluster_alias
 
             self.logger.info(
@@ -617,9 +559,7 @@ class OCPAWSAggregator:
 
             return aws_data
 
-    def _match_resources(
-        self, aws_df: pd.DataFrame, ocp_data: Dict[str, pd.DataFrame]
-    ) -> pd.DataFrame:
+    def _match_resources(self, aws_df: pd.DataFrame, ocp_data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
         """
         Match AWS resources to OCP by resource ID.
 
@@ -638,9 +578,7 @@ class OCPAWSAggregator:
             )
 
             # Match
-            matched_aws = self.resource_matcher.match_by_resource_id(
-                aws_df=aws_df, ocp_resource_ids=ocp_resource_ids
-            )
+            matched_aws = self.resource_matcher.match_by_resource_id(aws_df=aws_df, ocp_resource_ids=ocp_resource_ids)
 
             # Validate
             self.resource_matcher.validate_matching_results(matched_aws)
@@ -652,24 +590,19 @@ class OCPAWSAggregator:
             # DEBUG: Check for cost columns after matching
             cost_cols = [c for c in matched_aws.columns if "cost" in c.lower()]
             cost_sum = (
-                matched_aws["lineitem_unblendedcost"].sum()
-                if "lineitem_unblendedcost" in matched_aws.columns
-                else 0
+                matched_aws["lineitem_unblendedcost"].sum() if "lineitem_unblendedcost" in matched_aws.columns else 0
             )
             self.logger.info(
                 "DEBUG: After resource ID matching",
                 matched_rows=len(matched_aws),
                 cost_columns=cost_cols[:5],  # Show first 5
                 lineitem_unblendedcost_sum=cost_sum,
-                has_lineitem_unblendedcost="lineitem_unblendedcost"
-                in matched_aws.columns,
+                has_lineitem_unblendedcost="lineitem_unblendedcost" in matched_aws.columns,
             )
 
             return matched_aws
 
-    def _match_tags(
-        self, aws_df: pd.DataFrame, ocp_data: Dict[str, pd.DataFrame], cluster_id: str
-    ) -> pd.DataFrame:
+    def _match_tags(self, aws_df: pd.DataFrame, ocp_data: Dict[str, pd.DataFrame], cluster_id: str) -> pd.DataFrame:
         """
         Match AWS resources to OCP by tags.
 
@@ -686,9 +619,7 @@ class OCPAWSAggregator:
             ocp_tag_values = self.tag_matcher.extract_ocp_tag_values(
                 cluster_id=cluster_id,
                 pod_usage_df=ocp_data["pod_usage"],
-                storage_usage_df=ocp_data.get(
-                    "storage_usage"
-                ),  # For volume_labels extraction
+                storage_usage_df=ocp_data.get("storage_usage"),  # For volume_labels extraction
                 cluster_alias=self.cluster_alias,  # For cluster_alias matching
             )
 
@@ -735,15 +666,11 @@ class OCPAWSAggregator:
         with PerformanceTimer("Disk capacity calculation", self.logger):
             # If matched AWS data is empty, nothing to calculate
             if matched_aws_df.empty:
-                self.logger.info(
-                    "No matched AWS data, skipping disk capacity calculation"
-                )
+                self.logger.info("No matched AWS data, skipping disk capacity calculation")
                 return pd.DataFrame(columns=["resource_id", "capacity", "usage_start"])
 
             # Extract CSI volume handles from OCP storage
-            csi_handles = self.disk_calculator.extract_matched_volumes(
-                ocp_storage_usage
-            )
+            csi_handles = self.disk_calculator.extract_matched_volumes(ocp_storage_usage)
 
             if not csi_handles:
                 self.logger.info("No storage volumes to calculate capacity for")
@@ -757,17 +684,13 @@ class OCPAWSAggregator:
             # Filter matched AWS data to only storage volumes
             # Nise generates EBS with ProductCode=AmazonEC2 and UsageType contains "EBS:"
             # Also match by resource ID (use suffix matching like koku does)
-            is_ebs_by_usage = matched_aws_df["lineitem_usagetype"].str.contains(
-                "EBS:", na=False
-            )
+            is_ebs_by_usage = matched_aws_df["lineitem_usagetype"].str.contains("EBS:", na=False)
             is_ebs_by_product = matched_aws_df["lineitem_productcode"] == "AmazonEBS"
 
             # Use matched_resource_id if available (set by resource matcher)
             # Otherwise use suffix matching on lineitem_resourceid
             if "matched_resource_id" in matched_aws_df.columns:
-                is_matched_by_resource_id = matched_aws_df["matched_resource_id"].isin(
-                    csi_handles
-                )
+                is_matched_by_resource_id = matched_aws_df["matched_resource_id"].isin(csi_handles)
                 self.logger.debug("Using matched_resource_id for CSI handle matching")
             else:
                 # Fallback: suffix matching on lineitem_resourceid
@@ -780,16 +703,10 @@ class OCPAWSAggregator:
                             return True
                     return False
 
-                is_matched_by_resource_id = matched_aws_df["lineitem_resourceid"].apply(
-                    matches_csi_handle_suffix
-                )
-                self.logger.debug(
-                    "Using suffix matching on lineitem_resourceid for CSI handle matching"
-                )
+                is_matched_by_resource_id = matched_aws_df["lineitem_resourceid"].apply(matches_csi_handle_suffix)
+                self.logger.debug("Using suffix matching on lineitem_resourceid for CSI handle matching")
 
-            storage_aws = matched_aws_df[
-                is_ebs_by_usage | is_ebs_by_product | is_matched_by_resource_id
-            ].copy()
+            storage_aws = matched_aws_df[is_ebs_by_usage | is_ebs_by_product | is_matched_by_resource_id].copy()
 
             self.logger.info(
                 f"Filtered AWS data for storage volumes",
@@ -800,9 +717,7 @@ class OCPAWSAggregator:
             )
 
             if storage_aws.empty:
-                self.logger.warning(
-                    "No AWS storage line items found for matched volumes"
-                )
+                self.logger.warning("No AWS storage line items found for matched volumes")
                 return pd.DataFrame(columns=["resource_id", "capacity", "usage_start"])
 
             # Calculate capacities
@@ -861,9 +776,7 @@ class OCPAWSAggregator:
 
             # Separate network costs from regular costs
             # Network costs are handled differently (assigned to "Network unattributed" namespace)
-            non_network_aws, network_aws = self.network_handler.filter_network_costs(
-                matched_aws_df
-            )
+            non_network_aws, network_aws = self.network_handler.filter_network_costs(matched_aws_df)
 
             # DEBUG: Check cost after network filtering
             cost_sum_non_network = (
@@ -885,9 +798,7 @@ class OCPAWSAggregator:
             compute_aws = non_network_aws.copy()
             if "lineitem_usagetype" in compute_aws.columns:
                 # Filter out EBS storage - only keep EC2 instance costs for compute attribution
-                is_ebs = compute_aws["lineitem_usagetype"].str.contains(
-                    "EBS:", na=False
-                )
+                is_ebs = compute_aws["lineitem_usagetype"].str.contains("EBS:", na=False)
                 compute_aws = compute_aws[~is_ebs]
                 self.logger.info(
                     f"Filtered EBS from compute attribution: {is_ebs.sum()} EBS rows excluded, {len(compute_aws)} compute rows remaining"
@@ -898,9 +809,7 @@ class OCPAWSAggregator:
                 aws_matched_df=compute_aws,  # Only non-network, non-EBS costs
             )
 
-            self.logger.info(
-                "✓ Computed compute cost attribution", rows=len(compute_attributed)
-            )
+            self.logger.info("✓ Computed compute cost attribution", rows=len(compute_attributed))
 
             # Attribute network costs to "Network unattributed" namespace
             # Groups by node and data_transfer_direction
@@ -934,19 +843,12 @@ class OCPAWSAggregator:
             tag_attributed_resource_ids = set()
 
             # Get resource_ids from CSI-attributed storage
-            if (
-                not storage_attributed.empty
-                and "resource_id" in storage_attributed.columns
-            ):
-                csi_attributed_resource_ids = set(
-                    storage_attributed["resource_id"].dropna().unique()
-                )
+            if not storage_attributed.empty and "resource_id" in storage_attributed.columns:
+                csi_attributed_resource_ids = set(storage_attributed["resource_id"].dropna().unique())
 
             # Attribute tag-matched storage costs (non-CSI - openshift_project tag)
             # SCENARIO 19 FIX: EBS volumes tagged with openshift_project but no CSI handle
-            tag_matched_storage = self.cost_attributor.attribute_tag_matched_storage(
-                matched_aws_df=matched_aws_df
-            )
+            tag_matched_storage = self.cost_attributor.attribute_tag_matched_storage(matched_aws_df=matched_aws_df)
 
             if not tag_matched_storage.empty:
                 self.logger.info(
@@ -957,23 +859,16 @@ class OCPAWSAggregator:
                 # Track tag-attributed resource_ids (from matched_ocp_namespace)
                 if "lineitem_resourceid" in matched_aws_df.columns:
                     tag_matched_rows = matched_aws_df[
-                        matched_aws_df.get("matched_ocp_namespace", pd.Series([""]))
-                        .fillna("")
-                        .astype(str)
-                        .str.len()
+                        matched_aws_df.get("matched_ocp_namespace", pd.Series([""])).fillna("").astype(str).str.len()
                         > 0
                     ]
-                    tag_attributed_resource_ids = set(
-                        tag_matched_rows["lineitem_resourceid"].unique()
-                    )
+                    tag_attributed_resource_ids = set(tag_matched_rows["lineitem_resourceid"].unique())
 
             # Attribute untagged storage costs (EBS matched but no openshift_project tag)
             # SCENARIO 19 FIX: EBS volumes without openshift_project tags → "Storage unattributed"
             # Only attribute untagged storage when there's an OCP context (pod_usage or storage_usage)
             untagged_storage = pd.DataFrame()
-            has_ocp_context = (
-                not ocp_data["pod_usage"].empty or not ocp_data["storage_usage"].empty
-            )
+            has_ocp_context = not ocp_data["pod_usage"].empty or not ocp_data["storage_usage"].empty
             if has_ocp_context:
                 untagged_storage = self.cost_attributor.attribute_untagged_storage(
                     matched_aws_df=matched_aws_df,
@@ -1001,9 +896,7 @@ class OCPAWSAggregator:
                     "lineitem_usagestartdate",
                     "lineitem_usageenddate",
                 ]:
-                    if col in df.columns and pd.api.types.is_datetime64tz_dtype(
-                        df[col]
-                    ):
+                    if col in df.columns and pd.api.types.is_datetime64tz_dtype(df[col]):
                         df[col] = df[col].dt.tz_localize(None)
                 return df
 
@@ -1018,17 +911,13 @@ class OCPAWSAggregator:
                 frames_to_combine.append(normalize_timestamps(untagged_storage))
 
             combined = (
-                pd.concat(frames_to_combine, ignore_index=True)
-                if len(frames_to_combine) > 1
-                else compute_attributed
+                pd.concat(frames_to_combine, ignore_index=True) if len(frames_to_combine) > 1 else compute_attributed
             )
 
             # Log summary
             summary = self.cost_attributor.get_cost_summary(compute_attributed)
             if not network_attributed.empty:
-                network_summary = self.network_handler.get_network_summary(
-                    network_attributed
-                )
+                network_summary = self.network_handler.get_network_summary(network_attributed)
                 summary["network_costs"] = network_summary
             self.logger.info("✓ Cost attribution complete", **summary)
 
@@ -1091,9 +980,7 @@ class OCPAWSAggregator:
                         # Object dtype: might contain datetime objects with mixed timezones
                         # Convert to datetime first, then normalize
                         try:
-                            output_df[col] = pd.to_datetime(
-                                output_df[col], utc=True
-                            ).dt.tz_localize(None)
+                            output_df[col] = pd.to_datetime(output_df[col], utc=True).dt.tz_localize(None)
                         except Exception:
                             # If conversion fails, try element-wise normalization
                             output_df[col] = normalize_mixed_timezones(output_df[col])
@@ -1104,10 +991,7 @@ class OCPAWSAggregator:
             # Add metadata columns
             # BUGFIX: Only set cluster_id if not already present (multi-cluster support)
             # In multi-cluster scenarios, attributed_df already has correct cluster_id per row
-            if (
-                "cluster_id" not in output_df.columns
-                or output_df["cluster_id"].isnull().all()
-            ):
+            if "cluster_id" not in output_df.columns or output_df["cluster_id"].isnull().all():
                 output_df["cluster_id"] = cluster_id
             else:
                 self.logger.info(
@@ -1128,9 +1012,7 @@ class OCPAWSAggregator:
                 output_df["usage_end"] = usage_date
             elif "usage_date" in output_df.columns:
                 # Fallback: handle old 'usage_date' column if present
-                output_df["usage_start"] = pd.to_datetime(
-                    output_df["usage_date"]
-                ).dt.date
+                output_df["usage_start"] = pd.to_datetime(output_df["usage_date"]).dt.date
                 output_df["usage_end"] = pd.to_datetime(output_df["usage_date"]).dt.date
 
             # Ensure required columns exist (with defaults)

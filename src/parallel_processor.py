@@ -176,9 +176,7 @@ class ChunkBatcher:
             if len(batch) >= self.batch_size:
                 # Combine batch into single DataFrame
                 combined = pd.concat(batch, ignore_index=True)
-                self.logger.debug(
-                    f"Created batch", num_chunks=len(batch), total_rows=batch_rows
-                )
+                self.logger.debug(f"Created batch", num_chunks=len(batch), total_rows=batch_rows)
                 yield combined
                 batch = []
                 batch_rows = 0
@@ -186,9 +184,7 @@ class ChunkBatcher:
         # Yield remaining chunks
         if batch:
             combined = pd.concat(batch, ignore_index=True)
-            self.logger.debug(
-                f"Created final batch", num_chunks=len(batch), total_rows=batch_rows
-            )
+            self.logger.debug(f"Created final batch", num_chunks=len(batch), total_rows=batch_rows)
             yield combined
 
 
@@ -238,9 +234,7 @@ if __name__ == "__main__":
 
     if PARALLEL_PROCESSING_AVAILABLE:
         # Create test chunks
-        test_chunks = [
-            pd.DataFrame({"x": range(i * 100, (i + 1) * 100)}) for i in range(8)
-        ]
+        test_chunks = [pd.DataFrame({"x": range(i * 100, (i + 1) * 100)}) for i in range(8)]
 
         def test_process_func(chunk: pd.DataFrame) -> pd.DataFrame:
             """Simulate some processing work."""
@@ -258,9 +252,7 @@ if __name__ == "__main__":
         print("\nParallel processing...")
         processor = ParallelChunkProcessor(max_workers=4)
         start = time.time()
-        parallel_results = processor.process_chunks_parallel(
-            iter(test_chunks), test_process_func
-        )
+        parallel_results = processor.process_chunks_parallel(iter(test_chunks), test_process_func)
         parallel_time = time.time() - start
         print(f"Parallel time: {parallel_time:.2f}s")
 

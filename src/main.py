@@ -132,9 +132,7 @@ def run_ocp_aws_aggregation(
         # Pipeline summary
         pipeline_duration = (datetime.now() - pipeline_start).total_seconds()
         logger.info("=" * 80)
-        logger.info(
-            f"✓ OCP-AWS aggregation complete in {format_duration(pipeline_duration)}"
-        )
+        logger.info(f"✓ OCP-AWS aggregation complete in {format_duration(pipeline_duration)}")
         logger.info(f"✓ Output: {output_rows} OCP-AWS summary rows")
         logger.info(
             "Memory usage",
@@ -208,9 +206,7 @@ def run_poc(args):
         # The actual S3 operations (reads/writes) work fine
         try:
             if not parquet_reader.test_connectivity():
-                logger.warning(
-                    "S3 connectivity test failed (time sync issue), but continuing..."
-                )
+                logger.warning("S3 connectivity test failed (time sync issue), but continuing...")
         except Exception as e:
             logger.warning(f"S3 connectivity test error: {e}, but continuing...")
 
@@ -240,9 +236,7 @@ def run_poc(args):
         run_ocp_aws = False
 
         if aws_provider_uuid:
-            logger.info(
-                f"AWS_PROVIDER_UUID detected - will attempt OCP-on-AWS aggregation"
-            )
+            logger.info(f"AWS_PROVIDER_UUID detected - will attempt OCP-on-AWS aggregation")
             run_ocp_aws = True
         else:
             logger.info("AWS_PROVIDER_UUID not set - will run OCP-only aggregation")
@@ -277,9 +271,7 @@ def run_poc(args):
         else:
             use_streaming = bool(use_streaming_raw)
         chunk_size_raw = config.get("performance", {}).get("chunk_size", 50000)
-        chunk_size = (
-            int(chunk_size_raw) if isinstance(chunk_size_raw, str) else chunk_size_raw
-        )
+        chunk_size = int(chunk_size_raw) if isinstance(chunk_size_raw, str) else chunk_size_raw
 
         if use_streaming:
             logger.info(f"Streaming mode ENABLED (chunk_size={chunk_size})")
@@ -307,9 +299,7 @@ def run_poc(args):
             if pod_usage_daily_df.empty:
                 logger.error("No daily pod usage data found")
                 return 1
-            logger.info(
-                f"✓ Loaded daily pod usage data: {len(pod_usage_daily_df)} rows"
-            )
+            logger.info(f"✓ Loaded daily pod usage data: {len(pod_usage_daily_df)} rows")
 
         # Read hourly pod usage for capacity calculation (Trino lines 143-171)
         # Try hourly first, fall back to daily if not available
@@ -322,14 +312,10 @@ def run_poc(args):
         )
 
         if pod_usage_hourly_df.empty:
-            logger.warning(
-                "No hourly pod usage data found, using daily for capacity calculation"
-            )
+            logger.warning("No hourly pod usage data found, using daily for capacity calculation")
             # If streaming mode, we need to re-read daily data non-streaming for capacity
             if use_streaming:
-                logger.info(
-                    "Reading daily data (non-streaming) for capacity calculation..."
-                )
+                logger.info("Reading daily data (non-streaming) for capacity calculation...")
                 pod_usage_for_capacity = parquet_reader.read_pod_usage_line_items(
                     provider_uuid=provider_uuid,
                     year=year,
@@ -340,15 +326,11 @@ def run_poc(args):
             else:
                 pod_usage_for_capacity = pod_usage_daily_df
         else:
-            logger.info(
-                f"✓ Loaded hourly pod usage data: {len(pod_usage_hourly_df)} rows"
-            )
+            logger.info(f"✓ Loaded hourly pod usage data: {len(pod_usage_hourly_df)} rows")
             pod_usage_for_capacity = pod_usage_hourly_df
 
         # Read node labels (optional)
-        node_labels_df = parquet_reader.read_node_labels_line_items(
-            provider_uuid=provider_uuid, year=year, month=month
-        )
+        node_labels_df = parquet_reader.read_node_labels_line_items(provider_uuid=provider_uuid, year=year, month=month)
         logger.info(f"✓ Loaded node labels: {len(node_labels_df)} rows")
 
         # Read namespace labels (optional)
@@ -364,13 +346,10 @@ def run_poc(args):
 
         # CRITICAL: Use hourly data for proper two-level aggregation
         # Trino SQL lines 143-171: max(interval) then sum(day)
-        node_capacity_df, cluster_capacity_df = calculate_node_capacity(
-            pod_usage_for_capacity
-        )
+        node_capacity_df, cluster_capacity_df = calculate_node_capacity(pod_usage_for_capacity)
 
         logger.info(
-            f"✓ Calculated capacity for {len(node_capacity_df)} node-days, "
-            f"{len(cluster_capacity_df)} cluster-days"
+            f"✓ Calculated capacity for {len(node_capacity_df)} node-days, " f"{len(cluster_capacity_df)} cluster-days"
         )
 
         # ====================================================================
@@ -421,9 +400,7 @@ def run_poc(args):
                 daily=True,
                 streaming=False,  # Need DataFrame for join
             )
-            logger.info(
-                f"✓ Re-loaded pod data for storage join: {len(pod_df_for_storage)} rows"
-            )
+            logger.info(f"✓ Re-loaded pod data for storage join: {len(pod_df_for_storage)} rows")
 
         # Read storage data
         storage_usage_daily = parquet_reader.read_storage_usage_line_items(
@@ -448,16 +425,12 @@ def run_poc(args):
                 namespace_labels_df=namespace_labels_df,
             )
 
-            logger.info(
-                f"✓ Generated {len(storage_aggregated_df)} storage summary rows"
-            )
+            logger.info(f"✓ Generated {len(storage_aggregated_df)} storage summary rows")
 
             # Combine pod + storage results
             import pandas as pd
 
-            aggregated_df = pd.concat(
-                [aggregated_df, storage_aggregated_df], ignore_index=True
-            )
+            aggregated_df = pd.concat([aggregated_df, storage_aggregated_df], ignore_index=True)
 
             logger.info(
                 f"✓ Combined results: {len(aggregated_df)} total rows "
@@ -491,23 +464,14 @@ def run_poc(args):
             )
 
             if not unallocated_df.empty:
-                logger.info(
-                    f"✓ Generated {len(unallocated_df)} unallocated capacity rows"
-                )
+                logger.info(f"✓ Generated {len(unallocated_df)} unallocated capacity rows")
 
                 # Add to combined results
-                aggregated_df = pd.concat(
-                    [aggregated_df, unallocated_df], ignore_index=True
-                )
+                aggregated_df = pd.concat([aggregated_df, unallocated_df], ignore_index=True)
 
-                logger.info(
-                    f"✓ Combined results: {len(aggregated_df)} total rows "
-                    f"(including unallocated capacity)"
-                )
+                logger.info(f"✓ Combined results: {len(aggregated_df)} total rows " f"(including unallocated capacity)")
             else:
-                logger.info(
-                    "No unallocated capacity rows generated (all capacity used)"
-                )
+                logger.info("No unallocated capacity rows generated (all capacity used)")
 
         # ====================================================================
         # Phase 6: Write to PostgreSQL
@@ -520,9 +484,7 @@ def run_poc(args):
 
             if use_bulk_copy:
                 logger.info("Using bulk COPY for database write (10-50x faster)")
-                rows_inserted = db_writer.write_summary_data_bulk_copy(
-                    df=aggregated_df, truncate=args.truncate
-                )
+                rows_inserted = db_writer.write_summary_data_bulk_copy(df=aggregated_df, truncate=args.truncate)
             else:
                 logger.info("Using batch INSERT for database write")
                 rows_inserted = db_writer.write_summary_data(
@@ -539,9 +501,7 @@ def run_poc(args):
         logger.info("Phase 7: Validating results...")
 
         with db_writer:
-            validation_result = db_writer.validate_summary_data(
-                provider_uuid=provider_uuid, year=year, month=month
-            )
+            validation_result = db_writer.validate_summary_data(provider_uuid=provider_uuid, year=year, month=month)
 
         logger.info("✓ Validation complete")
         logger.info("Validation Results:")
@@ -579,12 +539,8 @@ def run_poc(args):
                 logger.error(
                     f"Matched {comparison_result['match_count']}/{comparison_result['total_comparisons']} comparisons"
                 )
-                logger.error(
-                    f"Missing in actual: {comparison_result['missing_in_actual_count']}"
-                )
-                logger.error(
-                    f"Extra in actual: {comparison_result['extra_in_actual_count']}"
-                )
+                logger.error(f"Missing in actual: {comparison_result['missing_in_actual_count']}")
+                logger.error(f"Extra in actual: {comparison_result['extra_in_actual_count']}")
                 logger.error(f"Issues found: {len(comparison_result['issues'])}")
 
                 # Exit with error if validation fails
@@ -605,12 +561,8 @@ def run_poc(args):
             logger.info("Mode: Streaming (constant memory)")
         else:
             logger.info(f"Input rows: {len(pod_usage_daily_df):,}")
-            logger.info(
-                f"Compression ratio: {len(pod_usage_daily_df) / rows_inserted:.1f}x"
-            )
-            logger.info(
-                f"Processing rate: {len(pod_usage_daily_df) / total_duration:.0f} rows/sec"
-            )
+            logger.info(f"Compression ratio: {len(pod_usage_daily_df) / rows_inserted:.1f}x")
+            logger.info(f"Processing rate: {len(pod_usage_daily_df) / total_duration:.0f} rows/sec")
 
         logger.info(f"Output rows: {rows_inserted:,}")
 
@@ -642,9 +594,7 @@ def run_poc(args):
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="OCP Parquet Aggregator POC - Validate Trino + Hive replacement"
-    )
+    parser = argparse.ArgumentParser(description="OCP Parquet Aggregator POC - Validate Trino + Hive replacement")
 
     parser.add_argument(
         "--config",

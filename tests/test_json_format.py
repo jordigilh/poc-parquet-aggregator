@@ -27,9 +27,7 @@ def test_single_label():
 
 def test_multiple_labels_sorted():
     """Test multiple labels are sorted by key."""
-    result = labels_to_json_string(
-        {"environment": "prod", "app": "nginx", "version": "1.0"}
-    )
+    result = labels_to_json_string({"environment": "prod", "app": "nginx", "version": "1.0"})
 
     # Keys should be sorted alphabetically
     parsed = json.loads(result)

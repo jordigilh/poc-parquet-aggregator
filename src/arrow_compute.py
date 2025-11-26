@@ -75,11 +75,7 @@ class ArrowLabelProcessor:
         """
         # Check if data is already dict objects (not JSON strings)
         if len(labels_series) > 0:
-            first_non_null = (
-                labels_series.dropna().iloc[0]
-                if not labels_series.dropna().empty
-                else None
-            )
+            first_non_null = labels_series.dropna().iloc[0] if not labels_series.dropna().empty else None
             if isinstance(first_non_null, dict):
                 # Data is already parsed - no need to JSON decode
                 return [x if isinstance(x, dict) else {} for x in labels_series]
@@ -123,10 +119,7 @@ class ArrowLabelProcessor:
         Performance: 3-5x faster than pandas .apply(axis=1)
         """
         # Use zip for efficient parallel iteration
-        return [
-            merge_func(n, ns, p)
-            for n, ns, p in zip(node_labels, namespace_labels, pod_labels)
-        ]
+        return [merge_func(n, ns, p) for n, ns, p in zip(node_labels, namespace_labels, pod_labels)]
 
     def labels_to_json_vectorized(self, labels_list: List[Dict]) -> List[str]:
         """
@@ -184,9 +177,7 @@ class ArrowLabelProcessor:
 
         Performance: 10-50x faster than pandas operations
         """
-        self.logger.info(
-            "Processing labels with Arrow compute", rows=len(node_labels_series)
-        )
+        self.logger.info("Processing labels with Arrow compute", rows=len(node_labels_series))
 
         # Step 1: Parse JSON strings to dicts (vectorized)
         node_dicts = self.parse_json_labels_vectorized(node_labels_series)
@@ -203,9 +194,7 @@ class ArrowLabelProcessor:
             self.logger.info("✓ Filtered labels")
 
         # Step 3: Merge labels (vectorized)
-        merged_dicts = self.merge_labels_vectorized(
-            node_dicts, namespace_dicts, pod_dicts, merge_func
-        )
+        merged_dicts = self.merge_labels_vectorized(node_dicts, namespace_dicts, pod_dicts, merge_func)
         self.logger.info("✓ Merged labels")
 
         # Step 4: Convert to JSON strings (vectorized)

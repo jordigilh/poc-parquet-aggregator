@@ -170,9 +170,7 @@ def sample_aws_data():
                 "{}",
                 "{}",
                 "{}",
-                json.dumps(
-                    {"openshift_cluster": "integration-test-cluster", "app": "database"}
-                ),
+                json.dumps({"openshift_cluster": "integration-test-cluster", "app": "database"}),
                 "{}",
             ],
             "lineitem_usageamount": [100.0, 100.0, 100.0, 100.0, 24.0, 100.0],
@@ -252,16 +250,10 @@ class TestOCPAWSIntegration:
             assert col in result.columns, f"Missing required column: {col}"
 
         # Verify metadata (excluding "Storage unattributed" which may not have cluster_id)
-        regular_namespaces = result[
-            ~result["namespace"].isin(["Storage unattributed", "Network unattributed"])
-        ]
+        regular_namespaces = result[~result["namespace"].isin(["Storage unattributed", "Network unattributed"])]
         if not regular_namespaces.empty:
-            assert (
-                regular_namespaces["cluster_id"] == "integration-test-cluster"
-            ).all()
-            assert (
-                regular_namespaces["cluster_alias"] == "Integration Test Cluster"
-            ).all()
+            assert (regular_namespaces["cluster_id"] == "integration-test-cluster").all()
+            assert (regular_namespaces["cluster_alias"] == "Integration Test Cluster").all()
 
         # Verify UUIDs are unique
         assert result["uuid"].nunique() == len(result)
@@ -309,9 +301,7 @@ class TestOCPAWSIntegration:
         assert matched["resource_id_matched"].sum() >= 4
 
         # Verify specific matches
-        matched_ids = matched[matched["resource_id_matched"]][
-            "lineitem_resourceid"
-        ].tolist()
+        matched_ids = matched[matched["resource_id_matched"]]["lineitem_resourceid"].tolist()
         assert "i-node1" in matched_ids
         assert "i-node2" in matched_ids
         assert "vol-storage1" in matched_ids
@@ -495,15 +485,11 @@ class TestOCPAWSIntegration:
         # Verify no NaN in critical columns
         assert result["uuid"].notna().all()
         # cluster_id may be NaN for "Storage unattributed" and "Network unattributed" namespaces
-        regular_namespaces = result[
-            ~result["namespace"].isin(["Storage unattributed", "Network unattributed"])
-        ]
+        regular_namespaces = result[~result["namespace"].isin(["Storage unattributed", "Network unattributed"])]
         if not regular_namespaces.empty:
             assert regular_namespaces["cluster_id"].notna().all()
 
-    def test_empty_ocp_data_handling(
-        self, integration_config, sample_aws_data, monkeypatch
-    ):
+    def test_empty_ocp_data_handling(self, integration_config, sample_aws_data, monkeypatch):
         """Test pipeline handles empty OCP data gracefully."""
 
         # Mock with empty OCP data
@@ -585,9 +571,7 @@ def test_network_cost_attribution_end_to_end(
 
     # OCP data
     mock_reader_instance.read_pod_usage_line_items.return_value = sample_ocp_pod_usage
-    mock_reader_instance.read_storage_usage_line_items.return_value = (
-        sample_ocp_storage_usage
-    )
+    mock_reader_instance.read_storage_usage_line_items.return_value = sample_ocp_storage_usage
 
     # Mock AWS data loader to return data with network costs
     mock_aws_loader = mocker.patch("src.aggregator_ocp_aws.AWSDataLoader")
@@ -666,12 +650,8 @@ def test_network_cost_attribution_end_to_end(
     )
 
     # AWS loader returns this data (network detection will happen automatically)
-    mock_aws_instance.read_aws_line_items_for_matching.return_value = (
-        aws_data_with_network
-    )
-    mock_aws_instance.read_aws_line_items_hourly.return_value = (
-        pd.DataFrame()
-    )  # No hourly data needed
+    mock_aws_instance.read_aws_line_items_for_matching.return_value = aws_data_with_network
+    mock_aws_instance.read_aws_line_items_hourly.return_value = pd.DataFrame()  # No hourly data needed
 
     # Mock resource matcher to return matched AWS data
     mock_resource_matcher = mocker.patch("src.aggregator_ocp_aws.ResourceMatcher")
@@ -689,9 +669,7 @@ def test_network_cost_attribution_end_to_end(
         "node_names": {"node1", "node2"},
         "namespaces": {"backend", "frontend"},
     }
-    mock_tag_instance.match_by_tags.return_value = (
-        aws_data_with_network  # Pass through, already matched
-    )
+    mock_tag_instance.match_by_tags.return_value = aws_data_with_network  # Pass through, already matched
 
     # Mock disk calculator to return empty (no EBS volumes in this test)
     mock_disk_calc = mocker.patch("src.aggregator_ocp_aws.DiskCapacityCalculator")
@@ -699,9 +677,7 @@ def test_network_cost_attribution_end_to_end(
     mock_disk_instance.calculate_disk_capacities.return_value = pd.DataFrame()
 
     # Create aggregator
-    aggregator = OCPAWSAggregator(
-        integration_config, ["openshift_cluster", "openshift_node"]
-    )
+    aggregator = OCPAWSAggregator(integration_config, ["openshift_cluster", "openshift_node"])
 
     # Run full pipeline
     result = aggregator.aggregate("2024", "10")
@@ -711,9 +687,7 @@ def test_network_cost_attribution_end_to_end(
 
     # Verify "Network unattributed" namespace exists
     namespaces = result["namespace"].unique()
-    assert (
-        "Network unattributed" in namespaces
-    ), f"'Network unattributed' namespace should exist. Found: {namespaces}"
+    assert "Network unattributed" in namespaces, f"'Network unattributed' namespace should exist. Found: {namespaces}"
 
     # Verify network costs are separated from regular costs
     network_rows = result[result["namespace"] == "Network unattributed"]
@@ -745,9 +719,7 @@ def test_network_cost_attribution_end_to_end(
     # Verify regular rows do NOT have network direction set to 'IN' or 'OUT'
     # (They may have None/NaN, which is acceptable)
     if "data_transfer_direction" in regular_rows.columns:
-        network_directions_in_regular = (
-            regular_rows["data_transfer_direction"].isin(["IN", "OUT"]).sum()
-        )
+        network_directions_in_regular = regular_rows["data_transfer_direction"].isin(["IN", "OUT"]).sum()
         assert (
             network_directions_in_regular == 0
         ), "Regular (non-network) rows should not have data_transfer_direction='IN' or 'OUT'"
@@ -930,9 +902,7 @@ class TestDistributionMethodsIntegration:
         assert weighted_cost != memory_cost
 
 
-def test_timezone_mixing_in_network_costs(
-    integration_config, sample_ocp_pod_usage, sample_ocp_storage_usage, mocker
-):
+def test_timezone_mixing_in_network_costs(integration_config, sample_ocp_pod_usage, sample_ocp_storage_usage, mocker):
     """
     TDD TEST: Verify output formatting handles mixed timezone-aware and timezone-naive timestamps.
 
@@ -952,9 +922,7 @@ def test_timezone_mixing_in_network_costs(
 
     # OCP data with timezone-naive timestamps
     mock_reader_instance.read_pod_usage_line_items.return_value = sample_ocp_pod_usage
-    mock_reader_instance.read_storage_usage_line_items.return_value = (
-        sample_ocp_storage_usage
-    )
+    mock_reader_instance.read_storage_usage_line_items.return_value = sample_ocp_storage_usage
 
     # Mock AWS data loader
     mock_aws_loader = mocker.patch("src.aggregator_ocp_aws.AWSDataLoader")
@@ -1021,9 +989,7 @@ def test_timezone_mixing_in_network_costs(
         }
     )
 
-    mock_aws_instance.read_aws_line_items_for_matching.return_value = (
-        aws_data_with_tz_aware
-    )
+    mock_aws_instance.read_aws_line_items_for_matching.return_value = aws_data_with_tz_aware
     mock_aws_instance.read_aws_line_items_hourly.return_value = pd.DataFrame()
 
     # Mock resource matcher
@@ -1048,9 +1014,7 @@ def test_timezone_mixing_in_network_costs(
     mock_disk_instance.calculate_disk_capacities.return_value = {}
 
     # Create aggregator and run - THIS SHOULD NOT RAISE ValueError
-    aggregator = OCPAWSAggregator(
-        integration_config, ["openshift_cluster", "openshift_node"]
-    )
+    aggregator = OCPAWSAggregator(integration_config, ["openshift_cluster", "openshift_node"])
 
     try:
         result = aggregator.aggregate(2024, 10)
@@ -1065,9 +1029,7 @@ def test_timezone_mixing_in_network_costs(
         raise
 
 
-def test_tag_matched_storage_attribution_no_csi(
-    integration_config, sample_ocp_pod_usage, mocker
-):
+def test_tag_matched_storage_attribution_no_csi(integration_config, sample_ocp_pod_usage, mocker):
     """
     TDD INTEGRATION TEST: Tag-matched EBS storage attribution when no CSI handles exist.
 
@@ -1085,9 +1047,7 @@ def test_tag_matched_storage_attribution_no_csi(
 
     # OCP data: Pods but NO storage (simulating non-CSI environment)
     mock_reader_instance.read_pod_usage_line_items.return_value = sample_ocp_pod_usage
-    mock_reader_instance.read_storage_usage_line_items.return_value = (
-        pd.DataFrame()
-    )  # EMPTY!
+    mock_reader_instance.read_storage_usage_line_items.return_value = pd.DataFrame()  # EMPTY!
 
     # Mock AWS data loader
     mock_aws_loader = mocker.patch("src.aggregator_ocp_aws.AWSDataLoader")
@@ -1144,9 +1104,7 @@ def test_tag_matched_storage_attribution_no_csi(
         }
     )
 
-    mock_aws_instance.read_aws_line_items_for_matching.return_value = (
-        aws_data_with_tagged_ebs
-    )
+    mock_aws_instance.read_aws_line_items_for_matching.return_value = aws_data_with_tagged_ebs
     mock_aws_instance.read_aws_line_items_hourly.return_value = pd.DataFrame()
 
     # Mock resource matcher
@@ -1171,9 +1129,7 @@ def test_tag_matched_storage_attribution_no_csi(
     mock_disk_instance.calculate_disk_capacities.return_value = pd.DataFrame()
 
     # Create aggregator
-    aggregator = OCPAWSAggregator(
-        integration_config, ["openshift_cluster", "openshift_node", "openshift_project"]
-    )
+    aggregator = OCPAWSAggregator(integration_config, ["openshift_cluster", "openshift_node", "openshift_project"])
 
     result = aggregator.aggregate(2024, 10)
 
@@ -1198,9 +1154,7 @@ def test_tag_matched_storage_attribution_no_csi(
     # After fix, verify EBS is attributed to 'backend'
     backend_costs = result[result["namespace"] == "backend"]["unblended_cost"].sum()
     # Backend should be ~$60: $50 compute + $10 EBS (with some floating point tolerance)
-    assert (
-        backend_costs >= 59.9
-    ), f"Backend should include EBS cost (~$60), got ${backend_costs:.2f}"
+    assert backend_costs >= 59.9, f"Backend should include EBS cost (~$60), got ${backend_costs:.2f}"
 
 
 if __name__ == "__main__":

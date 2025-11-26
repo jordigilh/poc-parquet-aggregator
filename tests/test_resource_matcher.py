@@ -85,15 +85,11 @@ class TestResourceMatcher:
         assert matcher.config == mock_config
         assert matcher.logger is not None
 
-    def test_extract_ocp_resource_ids_complete(
-        self, mock_config, sample_pod_usage, sample_storage_usage
-    ):
+    def test_extract_ocp_resource_ids_complete(self, mock_config, sample_pod_usage, sample_storage_usage):
         """Test extraction of OCP resource IDs from complete datasets."""
         matcher = ResourceMatcher(mock_config)
 
-        resource_ids = matcher.extract_ocp_resource_ids(
-            sample_pod_usage, sample_storage_usage
-        )
+        resource_ids = matcher.extract_ocp_resource_ids(sample_pod_usage, sample_storage_usage)
 
         # Check node resource IDs
         assert "node_resource_ids" in resource_ids
@@ -123,16 +119,12 @@ class TestResourceMatcher:
         assert len(resource_ids["pv_names"]) == 0
         assert len(resource_ids["csi_volume_handles"]) == 0
 
-    def test_match_by_resource_id_complete(
-        self, mock_config, sample_pod_usage, sample_storage_usage, sample_aws_data
-    ):
+    def test_match_by_resource_id_complete(self, mock_config, sample_pod_usage, sample_storage_usage, sample_aws_data):
         """Test complete resource ID matching."""
         matcher = ResourceMatcher(mock_config)
 
         # Extract OCP resource IDs
-        ocp_resource_ids = matcher.extract_ocp_resource_ids(
-            sample_pod_usage, sample_storage_usage
-        )
+        ocp_resource_ids = matcher.extract_ocp_resource_ids(sample_pod_usage, sample_storage_usage)
 
         # Match AWS resources
         result = matcher.match_by_resource_id(sample_aws_data, ocp_resource_ids)
@@ -161,16 +153,12 @@ class TestResourceMatcher:
         unmatched_mask = result["lineitem_resourceid"] == "i-9999999999999999"
         assert not result.loc[unmatched_mask, "resource_id_matched"].iloc[0]
 
-    def test_match_by_resource_id_node_only(
-        self, mock_config, sample_pod_usage, sample_aws_data
-    ):
+    def test_match_by_resource_id_node_only(self, mock_config, sample_pod_usage, sample_aws_data):
         """Test matching with only node resource IDs."""
         matcher = ResourceMatcher(mock_config)
 
         # Extract only node resource IDs
-        ocp_resource_ids = matcher.extract_ocp_resource_ids(
-            sample_pod_usage, pd.DataFrame()  # No storage data
-        )
+        ocp_resource_ids = matcher.extract_ocp_resource_ids(sample_pod_usage, pd.DataFrame())  # No storage data
 
         # Match AWS resources
         result = matcher.match_by_resource_id(sample_aws_data, ocp_resource_ids)
@@ -183,16 +171,12 @@ class TestResourceMatcher:
         matched_rows = result[result["resource_id_matched"]]
         assert (matched_rows["match_type"] == "node").all()
 
-    def test_match_by_resource_id_storage_only(
-        self, mock_config, sample_storage_usage, sample_aws_data
-    ):
+    def test_match_by_resource_id_storage_only(self, mock_config, sample_storage_usage, sample_aws_data):
         """Test matching with only storage resource IDs."""
         matcher = ResourceMatcher(mock_config)
 
         # Extract only storage resource IDs
-        ocp_resource_ids = matcher.extract_ocp_resource_ids(
-            pd.DataFrame(), sample_storage_usage  # No pod data
-        )
+        ocp_resource_ids = matcher.extract_ocp_resource_ids(pd.DataFrame(), sample_storage_usage)  # No pod data
 
         # Match AWS resources
         result = matcher.match_by_resource_id(sample_aws_data, ocp_resource_ids)
@@ -259,16 +243,12 @@ class TestResourceMatcher:
         with pytest.raises(ValueError, match="missing 'lineitem_resourceid'"):
             matcher.match_by_resource_id(aws_data, ocp_resource_ids)
 
-    def test_get_matched_resources_summary(
-        self, mock_config, sample_pod_usage, sample_storage_usage, sample_aws_data
-    ):
+    def test_get_matched_resources_summary(self, mock_config, sample_pod_usage, sample_storage_usage, sample_aws_data):
         """Test generation of matching summary."""
         matcher = ResourceMatcher(mock_config)
 
         # Extract and match
-        ocp_resource_ids = matcher.extract_ocp_resource_ids(
-            sample_pod_usage, sample_storage_usage
-        )
+        ocp_resource_ids = matcher.extract_ocp_resource_ids(sample_pod_usage, sample_storage_usage)
         matched_aws = matcher.match_by_resource_id(sample_aws_data, ocp_resource_ids)
 
         # Get summary
@@ -288,41 +268,29 @@ class TestResourceMatcher:
         """Test summary with DataFrame that hasn't been matched."""
         matcher = ResourceMatcher(mock_config)
 
-        aws_data = pd.DataFrame(
-            {"lineitem_resourceid": ["i-0123"], "lineitem_productcode": ["AmazonEC2"]}
-        )
+        aws_data = pd.DataFrame({"lineitem_resourceid": ["i-0123"], "lineitem_productcode": ["AmazonEC2"]})
 
         summary = matcher.get_matched_resources_summary(aws_data)
 
         assert summary["status"] == "not_matched"
 
-    def test_validate_matching_results_pass(
-        self, mock_config, sample_pod_usage, sample_storage_usage, sample_aws_data
-    ):
+    def test_validate_matching_results_pass(self, mock_config, sample_pod_usage, sample_storage_usage, sample_aws_data):
         """Test validation of matching results (pass case)."""
         matcher = ResourceMatcher(mock_config)
 
         # Extract and match
-        ocp_resource_ids = matcher.extract_ocp_resource_ids(
-            sample_pod_usage, sample_storage_usage
-        )
+        ocp_resource_ids = matcher.extract_ocp_resource_ids(sample_pod_usage, sample_storage_usage)
         matched_aws = matcher.match_by_resource_id(sample_aws_data, ocp_resource_ids)
 
         # Validation should pass with 50% match rate
-        assert matcher.validate_matching_results(
-            matched_aws, expected_match_rate_min=0.5
-        )
+        assert matcher.validate_matching_results(matched_aws, expected_match_rate_min=0.5)
 
-    def test_validate_matching_results_fail(
-        self, mock_config, sample_pod_usage, sample_storage_usage, sample_aws_data
-    ):
+    def test_validate_matching_results_fail(self, mock_config, sample_pod_usage, sample_storage_usage, sample_aws_data):
         """Test validation of matching results (fail case)."""
         matcher = ResourceMatcher(mock_config)
 
         # Extract and match
-        ocp_resource_ids = matcher.extract_ocp_resource_ids(
-            sample_pod_usage, sample_storage_usage
-        )
+        ocp_resource_ids = matcher.extract_ocp_resource_ids(sample_pod_usage, sample_storage_usage)
         matched_aws = matcher.match_by_resource_id(sample_aws_data, ocp_resource_ids)
 
         # Validation should fail with 90% minimum requirement

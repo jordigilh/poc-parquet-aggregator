@@ -74,27 +74,19 @@ class ResourceMatcher:
             if not pod_usage_df.empty and "resource_id" in pod_usage_df.columns:
                 node_ids = pod_usage_df["resource_id"].dropna().unique()
                 resource_ids["node_resource_ids"] = set(node_ids)
-                self.logger.info(
-                    f"Extracted {len(resource_ids['node_resource_ids'])} unique node resource IDs"
-                )
+                self.logger.info(f"Extracted {len(resource_ids['node_resource_ids'])} unique node resource IDs")
 
             # Extract PV names and CSI volume handles from storage usage
             if not storage_usage_df.empty:
                 if "persistentvolume" in storage_usage_df.columns:
                     pv_names = storage_usage_df["persistentvolume"].dropna().unique()
                     resource_ids["pv_names"] = set(pv_names)
-                    self.logger.info(
-                        f"Extracted {len(resource_ids['pv_names'])} unique PV names"
-                    )
+                    self.logger.info(f"Extracted {len(resource_ids['pv_names'])} unique PV names")
 
                 if "csi_volume_handle" in storage_usage_df.columns:
-                    csi_handles = (
-                        storage_usage_df["csi_volume_handle"].dropna().unique()
-                    )
+                    csi_handles = storage_usage_df["csi_volume_handle"].dropna().unique()
                     resource_ids["csi_volume_handles"] = set(csi_handles)
-                    self.logger.info(
-                        f"Extracted {len(resource_ids['csi_volume_handles'])} unique CSI volume handles"
-                    )
+                    self.logger.info(f"Extracted {len(resource_ids['csi_volume_handles'])} unique CSI volume handles")
 
             total_resources = (
                 len(resource_ids["node_resource_ids"])
@@ -112,9 +104,7 @@ class ResourceMatcher:
 
             return resource_ids
 
-    def match_by_resource_id(
-        self, aws_df: pd.DataFrame, ocp_resource_ids: Dict[str, Set[str]]
-    ) -> pd.DataFrame:
+    def match_by_resource_id(self, aws_df: pd.DataFrame, ocp_resource_ids: Dict[str, Set[str]]) -> pd.DataFrame:
         """
         Match AWS resources to OCP by resource ID suffix matching.
 
@@ -172,15 +162,11 @@ class ResourceMatcher:
             # Get AWS resource IDs (drop nulls)
             aws_resources = aws_df["lineitem_resourceid"].dropna()
 
-            self.logger.info(
-                f"Starting resource ID matching for {len(aws_resources)} AWS resources"
-            )
+            self.logger.info(f"Starting resource ID matching for {len(aws_resources)} AWS resources")
 
             # Match 1: AWS EC2 instances → OCP nodes
             if ocp_resource_ids["node_resource_ids"]:
-                self.logger.debug(
-                    f"Matching against {len(ocp_resource_ids['node_resource_ids'])} node resource IDs"
-                )
+                self.logger.debug(f"Matching against {len(ocp_resource_ids['node_resource_ids'])} node resource IDs")
 
                 for node_id in ocp_resource_ids["node_resource_ids"]:
                     # Find AWS resources that end with this node ID
@@ -193,23 +179,17 @@ class ResourceMatcher:
                         aws_df.loc[matched_indices, "match_type"] = "node"
                         stats["matched_by_node"] += len(matched_indices)
 
-                        self.logger.debug(
-                            f"Matched {len(matched_indices)} AWS resources to node {node_id}"
-                        )
+                        self.logger.debug(f"Matched {len(matched_indices)} AWS resources to node {node_id}")
 
             # Match 2: AWS EBS volumes → OCP PV names
             # Trino SQL: substr(resource_id, -length(pv_name)) = pv_name (SUFFIX matching)
             if ocp_resource_ids["pv_names"]:
-                self.logger.debug(
-                    f"Matching against {len(ocp_resource_ids['pv_names'])} PV names"
-                )
+                self.logger.debug(f"Matching against {len(ocp_resource_ids['pv_names'])} PV names")
 
                 for pv_name in ocp_resource_ids["pv_names"]:
                     # Find AWS resources that END WITH this PV name (Trino-compliant)
                     # Only match if not already matched
-                    mask = aws_resources.str.endswith(pv_name, na=False) & (
-                        ~aws_df["resource_id_matched"]
-                    )
+                    mask = aws_resources.str.endswith(pv_name, na=False) & (~aws_df["resource_id_matched"])
                     matched_indices = aws_df[mask].index
 
                     if len(matched_indices) > 0:
@@ -218,15 +198,11 @@ class ResourceMatcher:
                         aws_df.loc[matched_indices, "match_type"] = "pv"
                         stats["matched_by_pv"] += len(matched_indices)
 
-                        self.logger.debug(
-                            f"Matched {len(matched_indices)} AWS resources to PV {pv_name}"
-                        )
+                        self.logger.debug(f"Matched {len(matched_indices)} AWS resources to PV {pv_name}")
 
             # Match 3: AWS EBS volumes → OCP CSI volume handles
             if ocp_resource_ids["csi_volume_handles"]:
-                self.logger.debug(
-                    f"Matching against {len(ocp_resource_ids['csi_volume_handles'])} CSI volume handles"
-                )
+                self.logger.debug(f"Matching against {len(ocp_resource_ids['csi_volume_handles'])} CSI volume handles")
 
                 for csi_handle in ocp_resource_ids["csi_volume_handles"]:
                     # Skip empty CSI handles
@@ -235,9 +211,7 @@ class ResourceMatcher:
 
                     # Find AWS resources that end with this CSI handle
                     # Only match if not already matched
-                    mask = aws_resources.str.endswith(csi_handle, na=False) & (
-                        ~aws_df["resource_id_matched"]
-                    )
+                    mask = aws_resources.str.endswith(csi_handle, na=False) & (~aws_df["resource_id_matched"])
                     matched_indices = aws_df[mask].index
 
                     if len(matched_indices) > 0:
@@ -246,16 +220,12 @@ class ResourceMatcher:
                         aws_df.loc[matched_indices, "match_type"] = "csi_handle"
                         stats["matched_by_csi"] += len(matched_indices)
 
-                        self.logger.debug(
-                            f"Matched {len(matched_indices)} AWS resources to CSI handle {csi_handle}"
-                        )
+                        self.logger.debug(f"Matched {len(matched_indices)} AWS resources to CSI handle {csi_handle}")
 
             # Calculate total matched
             stats["total_matched"] = aws_df["resource_id_matched"].sum()
             stats["match_rate"] = (
-                stats["total_matched"] / stats["total_aws_resources"] * 100
-                if stats["total_aws_resources"] > 0
-                else 0
+                stats["total_matched"] / stats["total_aws_resources"] * 100 if stats["total_aws_resources"] > 0 else 0
             )
 
             self.logger.info(
@@ -294,34 +264,22 @@ class ResourceMatcher:
             "total_resources": len(aws_df),
             "matched": aws_df["resource_id_matched"].sum(),
             "unmatched": (~aws_df["resource_id_matched"]).sum(),
-            "match_rate": (
-                aws_df["resource_id_matched"].sum() / len(aws_df) * 100
-                if len(aws_df) > 0
-                else 0
-            ),
+            "match_rate": (aws_df["resource_id_matched"].sum() / len(aws_df) * 100 if len(aws_df) > 0 else 0),
             "by_match_type": {},
         }
 
         if "match_type" in aws_df.columns:
-            summary["by_match_type"] = (
-                aws_df[aws_df["resource_id_matched"]]["match_type"]
-                .value_counts()
-                .to_dict()
-            )
+            summary["by_match_type"] = aws_df[aws_df["resource_id_matched"]]["match_type"].value_counts().to_dict()
 
         if "lineitem_productcode" in aws_df.columns:
             summary["matched_by_product"] = (
-                aws_df[aws_df["resource_id_matched"]]["lineitem_productcode"]
-                .value_counts()
-                .to_dict()
+                aws_df[aws_df["resource_id_matched"]]["lineitem_productcode"].value_counts().to_dict()
             )
 
         self.logger.info("Resource matching summary", **summary)
         return summary
 
-    def validate_matching_results(
-        self, aws_df: pd.DataFrame, expected_match_rate_min: float = 0.0
-    ) -> bool:
+    def validate_matching_results(self, aws_df: pd.DataFrame, expected_match_rate_min: float = 0.0) -> bool:
         """
         Validate that resource matching results are reasonable.
 
@@ -341,8 +299,7 @@ class ResourceMatcher:
 
         if match_rate < expected_match_rate_min:
             error_msg = (
-                f"Resource ID match rate ({match_rate:.2%}) below minimum "
-                f"expected ({expected_match_rate_min:.2%})"
+                f"Resource ID match rate ({match_rate:.2%}) below minimum " f"expected ({expected_match_rate_min:.2%})"
             )
             self.logger.error(error_msg)
             raise ValueError(error_msg)

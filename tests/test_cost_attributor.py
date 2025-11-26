@@ -75,9 +75,7 @@ def sample_ocp_pod_usage():
                 "i-0123456789abcdef1",
                 "i-0123456789abcdef0",
             ],
-            "interval_start": pd.to_datetime(
-                ["2025-10-01 00:00:00", "2025-10-01 00:00:00", "2025-10-01 00:00:00"]
-            ),
+            "interval_start": pd.to_datetime(["2025-10-01 00:00:00", "2025-10-01 00:00:00", "2025-10-01 00:00:00"]),
             "pod_usage_cpu_core_hours": [1.5, 2.0, 1.0],
             "pod_usage_memory_gigabyte_hours": [4.0, 8.0, 2.0],
             "node_capacity_cpu_core_hours": [4.0, 8.0, 4.0],
@@ -180,9 +178,7 @@ class TestCostAttributor:
         assert unknown_attributor.cpu_weight == 0.70
         assert unknown_attributor.memory_weight == 0.30
 
-    def test_join_ocp_with_aws_by_resource_id(
-        self, mock_config, sample_ocp_pod_usage, sample_aws_matched
-    ):
+    def test_join_ocp_with_aws_by_resource_id(self, mock_config, sample_ocp_pod_usage, sample_aws_matched):
         """Test joining OCP with AWS by resource ID."""
         attributor = CostAttributor(mock_config)
 
@@ -266,9 +262,7 @@ class TestCostAttributor:
 
         df = pd.DataFrame(
             {
-                "pod_usage_cpu_core_hours": [
-                    5.0
-                ],  # 125% (over capacity) -> capped to 100%
+                "pod_usage_cpu_core_hours": [5.0],  # 125% (over capacity) -> capped to 100%
                 "node_capacity_cpu_core_hours": [4.0],
                 "pod_usage_memory_gigabyte_hours": [8.0],  # 50%
                 "node_capacity_memory_gigabyte_hours": [16.0],
@@ -319,9 +313,7 @@ class TestCostAttributor:
         expected_cost = 10.0 * expected_ratio
         expected_markup = expected_cost * 0.10
 
-        assert result["unblended_cost"].iloc[0] == pytest.approx(
-            expected_cost, rel=0.01
-        )
+        assert result["unblended_cost"].iloc[0] == pytest.approx(expected_cost, rel=0.01)
         assert result["markup_cost"].iloc[0] == pytest.approx(expected_markup, rel=0.01)
 
     def test_attribute_costs_all_types(self, mock_config, sample_merged_data):
@@ -373,15 +365,11 @@ class TestCostAttributor:
         assert result["unblended_cost"].iloc[0] == pytest.approx(50.0)
         assert result["markup_cost"].iloc[0] == pytest.approx(5.0)
 
-    def test_attribute_compute_costs_complete(
-        self, mock_config, sample_ocp_pod_usage, sample_aws_matched
-    ):
+    def test_attribute_compute_costs_complete(self, mock_config, sample_ocp_pod_usage, sample_aws_matched):
         """Test complete compute cost attribution workflow."""
         attributor = CostAttributor(mock_config)
 
-        result = attributor.attribute_compute_costs(
-            sample_ocp_pod_usage, sample_aws_matched
-        )
+        result = attributor.attribute_compute_costs(sample_ocp_pod_usage, sample_aws_matched)
 
         # Should have attributed costs
         if not result.empty:
@@ -445,9 +433,7 @@ class TestCostAttributor:
         # Weighted: 0.875 * 0.73 + 0.125 * 0.27 = 0.63875 + 0.03375 = 0.6725
         expected_ratio = 0.875 * 0.73 + 0.125 * 0.27
         expected_cost = 100.0 * expected_ratio
-        assert result["unblended_cost"].iloc[0] == pytest.approx(
-            expected_cost, rel=0.01
-        )
+        assert result["unblended_cost"].iloc[0] == pytest.approx(expected_cost, rel=0.01)
 
     def test_cpu_only_attribution(self, mock_config_cpu_only):
         """Test CPU-only attribution method (Trino-compatible)."""
@@ -470,9 +456,7 @@ class TestCostAttributor:
 
         # CPU-only: uses only CPU ratio (87.5%)
         expected_cost = 100.0 * 0.875
-        assert result["unblended_cost"].iloc[0] == pytest.approx(
-            expected_cost, rel=0.01
-        )
+        assert result["unblended_cost"].iloc[0] == pytest.approx(expected_cost, rel=0.01)
 
     def test_memory_only_attribution(self, mock_config_memory_only):
         """Test memory-only attribution method."""
@@ -495,9 +479,7 @@ class TestCostAttributor:
 
         # Memory-only: uses only memory ratio (12.5%)
         expected_cost = 100.0 * 0.125
-        assert result["unblended_cost"].iloc[0] == pytest.approx(
-            expected_cost, rel=0.01
-        )
+        assert result["unblended_cost"].iloc[0] == pytest.approx(expected_cost, rel=0.01)
 
     def test_multiple_pods_same_node(self, mock_config):
         """Test attribution for multiple pods on the same node."""
@@ -589,9 +571,7 @@ class TestStorageCostAttribution:
                 "lineitem_resourceid": ["vol-shared-disk-001"] * 24,  # 24 hours
                 "lineitem_productcode": ["AmazonEC2"] * 24,
                 "lineitem_usagetype": ["EBS:VolumeUsage.gp3"] * 24,
-                "lineitem_usagestartdate": pd.date_range(
-                    "2025-10-01", periods=24, freq="h"
-                ),
+                "lineitem_usagestartdate": pd.date_range("2025-10-01", periods=24, freq="h"),
                 "lineitem_unblendedcost": [1.277 / 24] * 24,  # ~$0.0532/hr
                 "lineitem_blendedcost": [1.277 / 24] * 24,
                 "lineitem_unblendedrate": [0.08 / 744] * 24,  # Rate per GB-hr
@@ -610,20 +590,14 @@ class TestStorageCostAttribution:
             }
         )
 
-        result = attributor.attribute_storage_costs(
-            ocp_storage_df, matched_aws_df, disk_capacities
-        )
+        result = attributor.attribute_storage_costs(ocp_storage_df, matched_aws_df, disk_capacities)
 
         # Should NOT be empty - suffix matching should work
-        assert (
-            not result.empty
-        ), "Storage attribution failed - suffix matching not working"
+        assert not result.empty, "Storage attribution failed - suffix matching not working"
 
         # Should have 4 rows: 2 regular namespaces + 2 "Storage unattributed" (one per cluster)
         # This is correct behavior: 100 GB disk with 70 GB claimed = 30 GB unattributed
-        assert (
-            len(result) == 4
-        ), f"Expected 4 rows (2 regular + 2 unattributed), got {len(result)}"
+        assert len(result) == 4, f"Expected 4 rows (2 regular + 2 unattributed), got {len(result)}"
 
         # Regular namespace cost should be proportional to PVC size
         # Alpha: (40/100) * $1.277 = $0.5108
@@ -664,9 +638,7 @@ class TestStorageCostAttribution:
                 "lineitem_resourceid": ["vol-legacy-001"] * 24,
                 "lineitem_productcode": ["AmazonEC2"] * 24,
                 "lineitem_usagetype": ["EBS:VolumeUsage.gp3"] * 24,
-                "lineitem_usagestartdate": pd.date_range(
-                    "2025-10-01", periods=24, freq="h"
-                ),
+                "lineitem_usagestartdate": pd.date_range("2025-10-01", periods=24, freq="h"),
                 "lineitem_unblendedcost": [0.6383 / 24] * 24,  # ~$0.0266/hr for 50GB
                 "lineitem_blendedcost": [0.6383 / 24] * 24,
                 "lineitem_unblendedrate": [0.08 / 744] * 24,
@@ -674,13 +646,9 @@ class TestStorageCostAttribution:
                 "lineitem_normalizedusageamount": [50.0] * 24,
                 "lineitem_usageamount": [50.0] * 24,
                 # KEY: Tagged with openshift_project for tag-based attribution
-                "resourcetags": [
-                    '{"openshift_cluster": "my-cluster", "openshift_project": "legacy-app"}'
-                ]
-                * 24,
+                "resourcetags": ['{"openshift_cluster": "my-cluster", "openshift_project": "legacy-app"}'] * 24,
                 "tag_matched": [True] * 24,  # Tag matcher found this
-                "matched_ocp_namespace": ["legacy-app"]
-                * 24,  # The namespace from openshift_project tag
+                "matched_ocp_namespace": ["legacy-app"] * 24,  # The namespace from openshift_project tag
             }
         )
 
@@ -702,9 +670,7 @@ class TestStorageCostAttribution:
         ), "Tag-matched storage should be attributed to 'legacy-app' namespace"
 
         total_cost = result["unblended_cost"].sum()
-        assert total_cost == pytest.approx(
-            0.6383, rel=0.1
-        ), f"Expected ~$0.64, got ${total_cost:.2f}"
+        assert total_cost == pytest.approx(0.6383, rel=0.1), f"Expected ~$0.64, got ${total_cost:.2f}"
 
     def test_storage_unattributed_multi_cluster_shared_disk(self, mock_config):
         """
@@ -750,11 +716,8 @@ class TestStorageCostAttribution:
                 "lineitem_resourceid": ["vol-shared-disk-001"] * 24,
                 "lineitem_productcode": ["AmazonEC2"] * 24,
                 "lineitem_usagetype": ["EBS:VolumeUsage.gp3"] * 24,
-                "lineitem_usagestartdate": pd.date_range(
-                    "2025-10-01", periods=24, freq="h"
-                ),
-                "lineitem_unblendedcost": [1.277 / 24]
-                * 24,  # $1.277/day split across 24 hours
+                "lineitem_usagestartdate": pd.date_range("2025-10-01", periods=24, freq="h"),
+                "lineitem_unblendedcost": [1.277 / 24] * 24,  # $1.277/day split across 24 hours
                 "lineitem_blendedcost": [1.277 / 24] * 24,
                 "lineitem_unblendedrate": [0.08 / 744] * 24,
                 "savingsplan_savingsplaneffectivecost": [0.0] * 24,
@@ -769,17 +732,13 @@ class TestStorageCostAttribution:
         # (the code renames lineitem_resourceid to resource_id, so use the full AWS resource ID)
         disk_capacities = pd.DataFrame(
             {
-                "resource_id": [
-                    "vol-shared-disk-001"
-                ],  # Must match AWS resource_id (with vol- prefix)
+                "resource_id": ["vol-shared-disk-001"],  # Must match AWS resource_id (with vol- prefix)
                 "capacity": [100],  # 100 GB disk
                 "usage_date": [date(2025, 10, 1)],  # Must be date object
             }
         )
 
-        result = attributor.attribute_storage_costs(
-            ocp_storage_df, matched_aws_df, disk_capacities
-        )
+        result = attributor.attribute_storage_costs(ocp_storage_df, matched_aws_df, disk_capacities)
 
         # EXPECTED: Should have attributed costs PLUS "Storage unattributed" records
         assert not result.empty, "Storage attribution should return results"
@@ -788,9 +747,7 @@ class TestStorageCostAttribution:
         namespaces = result["namespace"].unique().tolist()
 
         # Regular namespaces should have their proportional costs
-        regular_cost = result[result["namespace"] != "Storage unattributed"][
-            "unblended_cost"
-        ].sum()
+        regular_cost = result[result["namespace"] != "Storage unattributed"]["unblended_cost"].sum()
         expected_regular = (40 / 100 + 30 / 100) * 1.277  # 70% of disk = $0.8939
         assert regular_cost == pytest.approx(
             expected_regular, rel=0.1
@@ -801,9 +758,7 @@ class TestStorageCostAttribution:
             "Storage unattributed" in namespaces
         ), "Should have 'Storage unattributed' namespace for unused disk capacity"
 
-        unattributed_cost = result[result["namespace"] == "Storage unattributed"][
-            "unblended_cost"
-        ].sum()
+        unattributed_cost = result[result["namespace"] == "Storage unattributed"]["unblended_cost"].sum()
         expected_unattributed = (30 / 100) * 1.277  # 30% of disk = $0.3831
         assert unattributed_cost == pytest.approx(
             expected_unattributed, rel=0.1

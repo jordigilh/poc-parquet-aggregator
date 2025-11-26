@@ -153,23 +153,13 @@ class TestUnallocatedCapacityAggregator:
         aggregator = UnallocatedCapacityAggregator(config)
 
         # Mock the database reader
-        with patch.object(
-            aggregator, "_fetch_node_roles", return_value=sample_node_roles
-        ):
+        with patch.object(aggregator, "_fetch_node_roles", return_value=sample_node_roles):
             node_roles = aggregator.get_node_roles()
 
         assert len(node_roles) == 6
-        assert (
-            node_roles[node_roles["node"] == "master-0"]["node_role"].iloc[0]
-            == "master"
-        )
-        assert (
-            node_roles[node_roles["node"] == "infra-0"]["node_role"].iloc[0] == "infra"
-        )
-        assert (
-            node_roles[node_roles["node"] == "worker-0"]["node_role"].iloc[0]
-            == "worker"
-        )
+        assert node_roles[node_roles["node"] == "master-0"]["node_role"].iloc[0] == "master"
+        assert node_roles[node_roles["node"] == "infra-0"]["node_role"].iloc[0] == "infra"
+        assert node_roles[node_roles["node"] == "worker-0"]["node_role"].iloc[0] == "worker"
 
     def test_node_role_lookup_with_max_aggregation(self, config):
         """Test that MAX(node_role) is used when multiple roles exist for same node.
@@ -203,9 +193,7 @@ class TestUnallocatedCapacityAggregator:
     # =========================================================================
     # Test 2: Platform Unallocated Namespace
     # =========================================================================
-    def test_platform_unallocated_for_master_nodes(
-        self, sample_daily_summary, sample_node_roles, config
-    ):
+    def test_platform_unallocated_for_master_nodes(self, sample_daily_summary, sample_node_roles, config):
         """Test that master nodes get 'Platform unallocated' namespace.
 
         Trino SQL lines 507-511:
@@ -228,9 +216,7 @@ class TestUnallocatedCapacityAggregator:
         assert len(master_unallocated) == 1
         assert master_unallocated["namespace"].iloc[0] == "Platform unallocated"
 
-    def test_platform_unallocated_for_infra_nodes(
-        self, sample_daily_summary, sample_node_roles, config
-    ):
+    def test_platform_unallocated_for_infra_nodes(self, sample_daily_summary, sample_node_roles, config):
         """Test that infra nodes get 'Platform unallocated' namespace."""
         from src.aggregator_unallocated import UnallocatedCapacityAggregator
 
@@ -248,9 +234,7 @@ class TestUnallocatedCapacityAggregator:
     # =========================================================================
     # Test 3: Worker Unallocated Namespace
     # =========================================================================
-    def test_worker_unallocated_for_worker_nodes(
-        self, sample_daily_summary, sample_node_roles, config
-    ):
+    def test_worker_unallocated_for_worker_nodes(self, sample_daily_summary, sample_node_roles, config):
         """Test that worker nodes get 'Worker unallocated' namespace."""
         from src.aggregator_unallocated import UnallocatedCapacityAggregator
 
@@ -268,9 +252,7 @@ class TestUnallocatedCapacityAggregator:
     # =========================================================================
     # Test 4: Capacity Minus Usage Calculation
     # =========================================================================
-    def test_unallocated_cpu_calculation(
-        self, sample_daily_summary, sample_node_roles, config
-    ):
+    def test_unallocated_cpu_calculation(self, sample_daily_summary, sample_node_roles, config):
         """Test: unallocated_cpu = node_capacity - sum(pod_usage).
 
         Trino SQL lines 514-516:
@@ -292,9 +274,7 @@ class TestUnallocatedCapacityAggregator:
         worker_0 = result[result["node"] == "worker-0"].iloc[0]
         assert worker_0["pod_usage_cpu_core_hours"] == pytest.approx(86.0, rel=0.01)
 
-    def test_unallocated_memory_calculation(
-        self, sample_daily_summary, sample_node_roles, config
-    ):
+    def test_unallocated_memory_calculation(self, sample_daily_summary, sample_node_roles, config):
         """Test: unallocated_memory = node_capacity - sum(pod_usage)."""
         from src.aggregator_unallocated import UnallocatedCapacityAggregator
 
@@ -306,19 +286,13 @@ class TestUnallocatedCapacityAggregator:
 
         # master-0: capacity=64, usage=0.5+1.0=1.5, unallocated=62.5
         master_0 = result[result["node"] == "master-0"].iloc[0]
-        assert master_0["pod_usage_memory_gigabyte_hours"] == pytest.approx(
-            62.5, rel=0.01
-        )
+        assert master_0["pod_usage_memory_gigabyte_hours"] == pytest.approx(62.5, rel=0.01)
 
         # worker-0: capacity=256, usage=5, unallocated=251
         worker_0 = result[result["node"] == "worker-0"].iloc[0]
-        assert worker_0["pod_usage_memory_gigabyte_hours"] == pytest.approx(
-            251.0, rel=0.01
-        )
+        assert worker_0["pod_usage_memory_gigabyte_hours"] == pytest.approx(251.0, rel=0.01)
 
-    def test_unallocated_request_calculation(
-        self, sample_daily_summary, sample_node_roles, config
-    ):
+    def test_unallocated_request_calculation(self, sample_daily_summary, sample_node_roles, config):
         """Test: unallocated_request = node_capacity - sum(pod_request)."""
         from src.aggregator_unallocated import UnallocatedCapacityAggregator
 
@@ -332,9 +306,7 @@ class TestUnallocatedCapacityAggregator:
         master_0 = result[result["node"] == "master-0"].iloc[0]
         assert master_0["pod_request_cpu_core_hours"] == pytest.approx(19.0, rel=0.01)
 
-    def test_unallocated_effective_usage_calculation(
-        self, sample_daily_summary, sample_node_roles, config
-    ):
+    def test_unallocated_effective_usage_calculation(self, sample_daily_summary, sample_node_roles, config):
         """Test: unallocated_effective = node_capacity - sum(pod_effective_usage)."""
         from src.aggregator_unallocated import UnallocatedCapacityAggregator
 
@@ -346,9 +318,7 @@ class TestUnallocatedCapacityAggregator:
 
         # master-0: capacity=24, effective=2+3=5, unallocated=19
         master_0 = result[result["node"] == "master-0"].iloc[0]
-        assert master_0["pod_effective_usage_cpu_core_hours"] == pytest.approx(
-            19.0, rel=0.01
-        )
+        assert master_0["pod_effective_usage_cpu_core_hours"] == pytest.approx(19.0, rel=0.01)
 
     # =========================================================================
     # Test 5: Exclusion of Already-Unallocated Rows
@@ -390,9 +360,7 @@ class TestUnallocatedCapacityAggregator:
 
         aggregator = UnallocatedCapacityAggregator(config)
 
-        result = aggregator.calculate_unallocated(
-            daily_summary_df=daily_summary, node_roles_df=sample_node_roles
-        )
+        result = aggregator.calculate_unallocated(daily_summary_df=daily_summary, node_roles_df=sample_node_roles)
 
         # Should only calculate unallocated for worker-0 (app-a namespace)
         # The existing Platform/Worker unallocated rows should be excluded
@@ -430,9 +398,7 @@ class TestUnallocatedCapacityAggregator:
 
         aggregator = UnallocatedCapacityAggregator(config)
 
-        result = aggregator.calculate_unallocated(
-            daily_summary_df=daily_summary, node_roles_df=sample_node_roles
-        )
+        result = aggregator.calculate_unallocated(daily_summary_df=daily_summary, node_roles_df=sample_node_roles)
 
         # Should only count app-a usage (10), not Network unattributed (5)
         worker_0 = result[result["node"] == "worker-0"].iloc[0]
@@ -467,9 +433,7 @@ class TestUnallocatedCapacityAggregator:
 
         aggregator = UnallocatedCapacityAggregator(config)
 
-        result = aggregator.calculate_unallocated(
-            daily_summary_df=daily_summary, node_roles_df=sample_node_roles
-        )
+        result = aggregator.calculate_unallocated(daily_summary_df=daily_summary, node_roles_df=sample_node_roles)
 
         # Should only count app-a usage (10), not Storage unattributed (5)
         worker_0 = result[result["node"] == "worker-0"].iloc[0]
@@ -508,9 +472,7 @@ class TestUnallocatedCapacityAggregator:
 
         aggregator = UnallocatedCapacityAggregator(config)
 
-        result = aggregator.calculate_unallocated(
-            daily_summary_df=daily_summary, node_roles_df=sample_node_roles
-        )
+        result = aggregator.calculate_unallocated(daily_summary_df=daily_summary, node_roles_df=sample_node_roles)
 
         # Should only count Pod data_source usage (10), not Storage (5)
         worker_0 = result[result["node"] == "worker-0"].iloc[0]
@@ -519,9 +481,7 @@ class TestUnallocatedCapacityAggregator:
     # =========================================================================
     # Test 6: Output Schema
     # =========================================================================
-    def test_output_has_required_columns(
-        self, sample_daily_summary, sample_node_roles, config
-    ):
+    def test_output_has_required_columns(self, sample_daily_summary, sample_node_roles, config):
         """Test that output has all required columns for PostgreSQL insert."""
         from src.aggregator_unallocated import UnallocatedCapacityAggregator
 
@@ -559,9 +519,7 @@ class TestUnallocatedCapacityAggregator:
         for col in required_columns:
             assert col in result.columns, f"Missing required column: {col}"
 
-    def test_output_data_source_is_pod(
-        self, sample_daily_summary, sample_node_roles, config
-    ):
+    def test_output_data_source_is_pod(self, sample_daily_summary, sample_node_roles, config):
         """Test that output data_source is 'Pod' (like Trino line 526)."""
         from src.aggregator_unallocated import UnallocatedCapacityAggregator
 
@@ -591,9 +549,7 @@ class TestUnallocatedCapacityAggregator:
 
         aggregator = UnallocatedCapacityAggregator(config)
 
-        result = aggregator.calculate_unallocated(
-            daily_summary_df=sample_daily_summary, node_roles_df=incomplete_roles
-        )
+        result = aggregator.calculate_unallocated(daily_summary_df=sample_daily_summary, node_roles_df=incomplete_roles)
 
         # Only worker-0 should have unallocated capacity
         assert len(result) == 1
@@ -607,9 +563,7 @@ class TestUnallocatedCapacityAggregator:
 
         aggregator = UnallocatedCapacityAggregator(config)
 
-        result = aggregator.calculate_unallocated(
-            daily_summary_df=empty_summary, node_roles_df=sample_node_roles
-        )
+        result = aggregator.calculate_unallocated(daily_summary_df=empty_summary, node_roles_df=sample_node_roles)
 
         assert len(result) == 0
 
@@ -621,9 +575,7 @@ class TestUnallocatedCapacityAggregator:
 
         aggregator = UnallocatedCapacityAggregator(config)
 
-        result = aggregator.calculate_unallocated(
-            daily_summary_df=sample_daily_summary, node_roles_df=empty_roles
-        )
+        result = aggregator.calculate_unallocated(daily_summary_df=sample_daily_summary, node_roles_df=empty_roles)
 
         assert len(result) == 0
 
@@ -657,9 +609,7 @@ class TestUnallocatedCapacityAggregator:
 
         aggregator = UnallocatedCapacityAggregator(config)
 
-        result = aggregator.calculate_unallocated(
-            daily_summary_df=over_provisioned, node_roles_df=sample_node_roles
-        )
+        result = aggregator.calculate_unallocated(daily_summary_df=over_provisioned, node_roles_df=sample_node_roles)
 
         # Should either be 0 or negative (depending on design choice)
         # Trino doesn't explicitly handle this, so we allow negative

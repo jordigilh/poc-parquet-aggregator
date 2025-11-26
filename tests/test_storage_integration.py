@@ -146,9 +146,7 @@ def complete_test_dataset():
 class TestStorageIntegration:
     """Integration tests for storage aggregation."""
 
-    def test_storage_aggregation_produces_valid_output(
-        self, integration_config, complete_test_dataset
-    ):
+    def test_storage_aggregation_produces_valid_output(self, integration_config, complete_test_dataset):
         """Verify storage aggregation produces valid output."""
         aggregator = StorageAggregator(integration_config)
 
@@ -169,9 +167,7 @@ class TestStorageIntegration:
         actual_handles = set(result["csi_volume_handle"].unique())
         assert expected_handles == actual_handles, "CSI handles must be preserved"
 
-    def test_pod_and_storage_combined_have_different_data_sources(
-        self, integration_config, complete_test_dataset
-    ):
+    def test_pod_and_storage_combined_have_different_data_sources(self, integration_config, complete_test_dataset):
         """Verify pod and storage aggregations have different data_source values."""
         pod_aggregator = PodAggregator(integration_config, enabled_tag_keys=[])
         storage_aggregator = StorageAggregator(integration_config)
@@ -206,12 +202,8 @@ class TestStorageIntegration:
         )
 
         # Verify different data sources
-        assert (
-            pod_result["data_source"] == "Pod"
-        ).all(), "Pod rows should have data_source='Pod'"
-        assert (
-            storage_result["data_source"] == "Storage"
-        ).all(), "Storage rows should have data_source='Storage'"
+        assert (pod_result["data_source"] == "Pod").all(), "Pod rows should have data_source='Pod'"
+        assert (storage_result["data_source"] == "Storage").all(), "Storage rows should have data_source='Storage'"
 
         # Combine results
         combined = pd.concat([pod_result, storage_result], ignore_index=True)
@@ -220,9 +212,7 @@ class TestStorageIntegration:
         assert len(combined) == len(pod_result) + len(storage_result)
         assert set(combined["data_source"].unique()) == {"Pod", "Storage"}
 
-    def test_storage_rows_can_be_filtered_by_data_source(
-        self, integration_config, complete_test_dataset
-    ):
+    def test_storage_rows_can_be_filtered_by_data_source(self, integration_config, complete_test_dataset):
         """Verify storage rows can be filtered by data_source='Storage'."""
         storage_aggregator = StorageAggregator(integration_config)
 
@@ -240,17 +230,13 @@ class TestStorageIntegration:
 
         # Verify storage columns are populated
         assert storage_only["persistentvolumeclaim"].notna().all()
-        assert (
-            storage_only["persistentvolumeclaim_capacity_gigabyte_months"].notna().all()
-        )
+        assert storage_only["persistentvolumeclaim_capacity_gigabyte_months"].notna().all()
 
         # Verify CPU/memory columns are NULL
         assert storage_only["pod_usage_cpu_core_hours"].isna().all()
         assert storage_only["pod_usage_memory_gigabyte_hours"].isna().all()
 
-    def test_storage_aggregation_preserves_label_hierarchy(
-        self, integration_config, complete_test_dataset
-    ):
+    def test_storage_aggregation_preserves_label_hierarchy(self, integration_config, complete_test_dataset):
         """Verify label precedence is preserved (Volume > Namespace > Node)."""
         storage_aggregator = StorageAggregator(integration_config)
 
@@ -268,18 +254,14 @@ class TestStorageIntegration:
         labels = json.loads(first_row["pod_labels"])
 
         # Should have all three levels
-        assert (
-            "storage" in labels
-        ), "Volume label should be present (highest precedence)"
+        assert "storage" in labels, "Volume label should be present (highest precedence)"
         assert "team" in labels, "Namespace label should be present"
         assert "zone" in labels, "Node label should be present"
 
         # Volume label should win if there's a conflict
         # (In our test data, labels don't conflict, but they should all be present)
 
-    def test_storage_metrics_are_positive(
-        self, integration_config, complete_test_dataset
-    ):
+    def test_storage_metrics_are_positive(self, integration_config, complete_test_dataset):
         """Verify storage metrics are positive values."""
         storage_aggregator = StorageAggregator(integration_config)
 
@@ -326,9 +308,7 @@ class TestStorageIntegration:
         )
 
         aggregator = StorageAggregator(integration_config)
-        result = aggregator.aggregate(
-            storage_data, pod_data, pd.DataFrame(), pd.DataFrame()
-        )
+        result = aggregator.aggregate(storage_data, pod_data, pd.DataFrame(), pd.DataFrame())
 
         # Should still produce output
         assert not result.empty, "Should produce output even without pod match"
@@ -341,9 +321,7 @@ class TestStorageIntegration:
 class TestStoragePodCombinedOutput:
     """Test combined pod + storage output behavior."""
 
-    def test_combined_output_schema_is_consistent(
-        self, integration_config, complete_test_dataset
-    ):
+    def test_combined_output_schema_is_consistent(self, integration_config, complete_test_dataset):
         """Verify pod and storage outputs have consistent schemas."""
         pod_aggregator = PodAggregator(integration_config, enabled_tag_keys=[])
         storage_aggregator = StorageAggregator(integration_config)
@@ -400,9 +378,7 @@ class TestStoragePodCombinedOutput:
         combined = pd.concat([pod_result, storage_result], ignore_index=True)
         assert len(combined) == len(pod_result) + len(storage_result)
 
-    def test_combined_output_can_be_written_to_same_table(
-        self, integration_config, complete_test_dataset
-    ):
+    def test_combined_output_can_be_written_to_same_table(self, integration_config, complete_test_dataset):
         """
         Verify pod and storage outputs can be written to the same PostgreSQL table.
 
@@ -448,19 +424,14 @@ class TestStoragePodCombinedOutput:
         # Pod rows should have CPU/memory, NULL storage
         pod_rows = combined[combined["data_source"] == "Pod"]
         assert pod_rows["pod_usage_cpu_core_hours"].notna().all()
-        assert (
-            pod_rows["persistentvolumeclaim"].isna().all()
-            or (pod_rows["persistentvolumeclaim"] == "").all()
-        )
+        assert pod_rows["persistentvolumeclaim"].isna().all() or (pod_rows["persistentvolumeclaim"] == "").all()
 
         # Storage rows should have storage metrics, NULL CPU/memory
         storage_rows = combined[combined["data_source"] == "Storage"]
         assert storage_rows["persistentvolumeclaim"].notna().all()
         assert storage_rows["pod_usage_cpu_core_hours"].isna().all()
 
-    def test_no_duplicate_keys_in_combined_output(
-        self, integration_config, complete_test_dataset
-    ):
+    def test_no_duplicate_keys_in_combined_output(self, integration_config, complete_test_dataset):
         """Verify no duplicate rows in combined pod + storage output."""
         pod_aggregator = PodAggregator(integration_config, enabled_tag_keys=[])
         storage_aggregator = StorageAggregator(integration_config)

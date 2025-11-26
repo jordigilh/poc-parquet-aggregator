@@ -35,9 +35,7 @@ class ParquetReader:
         # Initialize s3fs filesystem
         self.fs = self._create_s3_filesystem()
 
-        self.logger.info(
-            "Initialized Parquet reader", endpoint=self.endpoint, bucket=self.bucket
-        )
+        self.logger.info("Initialized Parquet reader", endpoint=self.endpoint, bucket=self.bucket)
 
     def _create_s3_filesystem(self) -> s3fs.S3FileSystem:
         """Create S3 filesystem client.
@@ -75,14 +73,10 @@ class ParquetReader:
 
         try:
             files = self.fs.glob(f"{full_prefix}/**/*.parquet")
-            self.logger.info(
-                f"Found {len(files)} Parquet files", prefix=s3_prefix, count=len(files)
-            )
+            self.logger.info(f"Found {len(files)} Parquet files", prefix=s3_prefix, count=len(files))
             return [f"s3://{f}" for f in files]
         except Exception as e:
-            self.logger.error(
-                "Failed to list Parquet files", prefix=s3_prefix, error=str(e)
-            )
+            self.logger.error("Failed to list Parquet files", prefix=s3_prefix, error=str(e))
             raise
 
     def read_parquet_file(
@@ -107,9 +101,7 @@ class ParquetReader:
         with PerformanceTimer(f"Read Parquet: {Path(s3_uri).name}", self.logger):
             try:
                 # Read with PyArrow for better performance
-                table = pq.read_table(
-                    s3_path, filesystem=self.fs, columns=columns, filters=filters
-                )
+                table = pq.read_table(s3_path, filesystem=self.fs, columns=columns, filters=filters)
 
                 df = table.to_pandas()
 
@@ -131,9 +123,7 @@ class ParquetReader:
                 return df
 
             except Exception as e:
-                self.logger.error(
-                    "Failed to read Parquet file", file=s3_uri, error=str(e)
-                )
+                self.logger.error("Failed to read Parquet file", file=s3_uri, error=str(e))
                 raise
 
     def read_parquet_streaming(
@@ -151,9 +141,7 @@ class ParquetReader:
         """
         s3_path = s3_uri.replace("s3://", "")
 
-        self.logger.info(
-            "Starting streaming read", file=Path(s3_uri).name, chunk_size=chunk_size
-        )
+        self.logger.info("Starting streaming read", file=Path(s3_uri).name, chunk_size=chunk_size)
 
         try:
             # Open Parquet file
@@ -162,26 +150,18 @@ class ParquetReader:
             total_rows = parquet_file.metadata.num_rows
             chunks_count = (total_rows + chunk_size - 1) // chunk_size
 
-            self.logger.info(
-                "Parquet file metadata", total_rows=total_rows, chunks=chunks_count
-            )
+            self.logger.info("Parquet file metadata", total_rows=total_rows, chunks=chunks_count)
 
             # Read in batches
-            for batch_idx, batch in enumerate(
-                parquet_file.iter_batches(batch_size=chunk_size, columns=columns)
-            ):
+            for batch_idx, batch in enumerate(parquet_file.iter_batches(batch_size=chunk_size, columns=columns)):
                 df = batch.to_pandas()
 
-                self.logger.debug(
-                    f"Read chunk {batch_idx + 1}/{chunks_count}", rows=len(df)
-                )
+                self.logger.debug(f"Read chunk {batch_idx + 1}/{chunks_count}", rows=len(df))
 
                 yield df
 
         except Exception as e:
-            self.logger.error(
-                "Failed to stream Parquet file", file=s3_uri, error=str(e)
-            )
+            self.logger.error("Failed to stream Parquet file", file=s3_uri, error=str(e))
             raise
 
     def read_pod_usage_line_items(
@@ -213,13 +193,9 @@ class ParquetReader:
         else:
             # Hourly intervals: openshift_pod_usage_line_items/
             # Replace '_daily' with '' to get hourly path
-            path_template = self.config["ocp"]["parquet_path_pod"].replace(
-                "_daily/", "/"
-            )
+            path_template = self.config["ocp"]["parquet_path_pod"].replace("_daily/", "/")
 
-        s3_prefix = path_template.format(
-            provider_uuid=provider_uuid, year=year, month=month
-        )
+        s3_prefix = path_template.format(provider_uuid=provider_uuid, year=year, month=month)
 
         files = self.list_parquet_files(s3_prefix)
 
@@ -240,29 +216,21 @@ class ParquetReader:
         columns = None
         if self.config.get("performance", {}).get("column_filtering", True):
             columns = self.get_optimal_columns_pod_usage()
-            self.logger.info(
-                f"Column filtering enabled: reading {len(columns)} of ~50 columns"
-            )
+            self.logger.info(f"Column filtering enabled: reading {len(columns)} of ~50 columns")
 
         if streaming:
             # For streaming, yield chunks from all files sequentially
             def stream_all_files():
                 for file in files:
-                    yield from self.read_parquet_streaming(
-                        file, chunk_size, columns=columns
-                    )
+                    yield from self.read_parquet_streaming(file, chunk_size, columns=columns)
 
             return stream_all_files()
         else:
             # Use parallel reading for better performance
-            parallel_workers = self.config.get("performance", {}).get(
-                "parallel_readers", 4
-            )
+            parallel_workers = self.config.get("performance", {}).get("parallel_readers", 4)
             return self._read_files_parallel(files, parallel_workers, columns=columns)
 
-    def read_node_labels_line_items(
-        self, provider_uuid: str, year: str, month: str
-    ) -> pd.DataFrame:
+    def read_node_labels_line_items(self, provider_uuid: str, year: str, month: str) -> pd.DataFrame:
         """Read OCP node labels line items (daily).
 
         Args:
@@ -274,9 +242,7 @@ class ParquetReader:
             DataFrame
         """
         path_template = self.config["ocp"]["parquet_path_node_labels"]
-        s3_prefix = path_template.format(
-            provider_uuid=provider_uuid, year=year, month=month
-        )
+        s3_prefix = path_template.format(provider_uuid=provider_uuid, year=year, month=month)
 
         files = self.list_parquet_files(s3_prefix)
 
@@ -295,14 +261,10 @@ class ParquetReader:
             return pd.DataFrame()
 
         combined_df = pd.concat(dfs, ignore_index=True)
-        self.logger.info(
-            f"Combined {len(dfs)} node label files", total_rows=len(combined_df)
-        )
+        self.logger.info(f"Combined {len(dfs)} node label files", total_rows=len(combined_df))
         return combined_df
 
-    def read_namespace_labels_line_items(
-        self, provider_uuid: str, year: str, month: str
-    ) -> pd.DataFrame:
+    def read_namespace_labels_line_items(self, provider_uuid: str, year: str, month: str) -> pd.DataFrame:
         """Read OCP namespace labels line items (daily).
 
         Args:
@@ -314,9 +276,7 @@ class ParquetReader:
             DataFrame
         """
         path_template = self.config["ocp"]["parquet_path_namespace_labels"]
-        s3_prefix = path_template.format(
-            provider_uuid=provider_uuid, year=year, month=month
-        )
+        s3_prefix = path_template.format(provider_uuid=provider_uuid, year=year, month=month)
 
         files = self.list_parquet_files(s3_prefix)
 
@@ -335,9 +295,7 @@ class ParquetReader:
             return pd.DataFrame()
 
         combined_df = pd.concat(dfs, ignore_index=True)
-        self.logger.info(
-            f"Combined {len(dfs)} namespace label files", total_rows=len(combined_df)
-        )
+        self.logger.info(f"Combined {len(dfs)} namespace label files", total_rows=len(combined_df))
         return combined_df
 
     def read_storage_usage_line_items(
@@ -373,9 +331,7 @@ class ParquetReader:
             "cost-management/data/{provider_uuid}/{year}/{month}/openshift_storage_usage_line_items_daily",
         )
 
-        s3_prefix = path_template.format(
-            provider_uuid=provider_uuid, year=year, month=month
-        )
+        s3_prefix = path_template.format(provider_uuid=provider_uuid, year=year, month=month)
 
         files = self.list_parquet_files(s3_prefix)
 
@@ -391,24 +347,18 @@ class ParquetReader:
         columns = None
         if self.config.get("performance", {}).get("column_filtering", False):
             columns = self.get_optimal_columns_storage_usage()
-            self.logger.info(
-                f"Column filtering enabled: reading {len(columns)} columns for storage"
-            )
+            self.logger.info(f"Column filtering enabled: reading {len(columns)} columns for storage")
 
         if streaming:
             # For streaming, yield chunks from all files sequentially
             def stream_all_files():
                 for file in files:
-                    yield from self.read_parquet_streaming(
-                        file, chunk_size, columns=columns
-                    )
+                    yield from self.read_parquet_streaming(file, chunk_size, columns=columns)
 
             return stream_all_files()
         else:
             # Use parallel reading for better performance
-            parallel_workers = self.config.get("performance", {}).get(
-                "parallel_readers", 4
-            )
+            parallel_workers = self.config.get("performance", {}).get("parallel_readers", 4)
             return self._read_files_parallel(files, parallel_workers, columns=columns)
 
     def _read_files_parallel(
@@ -436,10 +386,7 @@ class ParquetReader:
         with PerformanceTimer(f"Parallel read ({len(files)} files)", self.logger):
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 # Submit all file reads
-                future_to_file = {
-                    executor.submit(self.read_parquet_file, file, columns): file
-                    for file in files
-                }
+                future_to_file = {executor.submit(self.read_parquet_file, file, columns): file for file in files}
 
                 # Collect results as they complete
                 for future in as_completed(future_to_file):
@@ -449,9 +396,7 @@ class ParquetReader:
                         if not df.empty:
                             dfs.append(df)
                     except Exception as e:
-                        self.logger.error(
-                            f"Failed to read file in parallel", file=file, error=str(e)
-                        )
+                        self.logger.error(f"Failed to read file in parallel", file=file, error=str(e))
                         # Continue with other files
 
         if not dfs:
@@ -560,7 +505,5 @@ class ParquetReader:
             self.logger.info("S3 connectivity test: SUCCESS", bucket=self.bucket)
             return True
         except Exception as e:
-            self.logger.error(
-                "S3 connectivity test: FAILED", bucket=self.bucket, error=str(e)
-            )
+            self.logger.error("S3 connectivity test: FAILED", bucket=self.bucket, error=str(e))
             return False

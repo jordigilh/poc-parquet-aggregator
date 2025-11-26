@@ -33,9 +33,7 @@ def sample_ocp_storage():
                 "vol-0123456789abcdeg",
                 "vol-0123456789abcdeh",
             ],
-            "interval_start": pd.to_datetime(
-                ["2025-10-01", "2025-10-01", "2025-10-01"]
-            ),
+            "interval_start": pd.to_datetime(["2025-10-01", "2025-10-01", "2025-10-01"]),
         }
     )
 
@@ -164,9 +162,7 @@ class TestDiskCapacityCalculator:
         """Test extraction when csi_volume_handle column is missing."""
         calculator = DiskCapacityCalculator(mock_config)
 
-        df = pd.DataFrame(
-            {"namespace": ["backend"], "persistentvolumeclaim": ["api-pvc"]}
-        )
+        df = pd.DataFrame({"namespace": ["backend"], "persistentvolumeclaim": ["api-pvc"]})
 
         volumes = calculator.extract_matched_volumes(df)
 
@@ -176,9 +172,7 @@ class TestDiskCapacityCalculator:
         """Test extraction filters out null/empty CSI handles."""
         calculator = DiskCapacityCalculator(mock_config)
 
-        df = pd.DataFrame(
-            {"csi_volume_handle": ["vol-123", None, "", "vol-456", pd.NA]}
-        )
+        df = pd.DataFrame({"csi_volume_handle": ["vol-123", None, "", "vol-456", pd.NA]})
 
         volumes = calculator.extract_matched_volumes(df)
 
@@ -186,15 +180,11 @@ class TestDiskCapacityCalculator:
         assert "vol-123" in volumes
         assert "vol-456" in volumes
 
-    def test_calculate_disk_capacities_basic(
-        self, mock_config, sample_ocp_storage, sample_aws_ebs_data
-    ):
+    def test_calculate_disk_capacities_basic(self, mock_config, sample_ocp_storage, sample_aws_ebs_data):
         """Test basic disk capacity calculation."""
         calculator = DiskCapacityCalculator(mock_config)
 
-        result = calculator.calculate_disk_capacities(
-            sample_aws_ebs_data, sample_ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(sample_aws_ebs_data, sample_ocp_storage, year=2025, month=10)
 
         # Should have calculated capacities
         assert not result.empty
@@ -226,9 +216,7 @@ class TestDiskCapacityCalculator:
             }
         )
 
-        result = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         assert len(result) == 1
         # Expected: 10 / (0.0134 / 744) = 555,556 GB (rounded)
@@ -257,24 +245,18 @@ class TestDiskCapacityCalculator:
             }
         )
 
-        result = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         assert len(result) == 1
         # Should use MAX(cost) = 3.0 and MAX(rate) = 0.03
         expected_capacity = round(3.0 / (0.03 / 744))
         assert result["capacity"].iloc[0] == expected_capacity
 
-    def test_calculate_disk_capacities_empty_ocp(
-        self, mock_config, sample_aws_ebs_data
-    ):
+    def test_calculate_disk_capacities_empty_ocp(self, mock_config, sample_aws_ebs_data):
         """Test with empty OCP storage DataFrame."""
         calculator = DiskCapacityCalculator(mock_config)
 
-        result = calculator.calculate_disk_capacities(
-            sample_aws_ebs_data, pd.DataFrame(), year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(sample_aws_ebs_data, pd.DataFrame(), year=2025, month=10)
 
         assert result.empty
 
@@ -282,9 +264,7 @@ class TestDiskCapacityCalculator:
         """Test with empty AWS line items DataFrame."""
         calculator = DiskCapacityCalculator(mock_config)
 
-        result = calculator.calculate_disk_capacities(
-            pd.DataFrame(), sample_ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(pd.DataFrame(), sample_ocp_storage, year=2025, month=10)
 
         assert result.empty
 
@@ -303,9 +283,7 @@ class TestDiskCapacityCalculator:
             }
         )
 
-        result = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         assert result.empty
 
@@ -324,9 +302,7 @@ class TestDiskCapacityCalculator:
             }
         )
 
-        result = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         # Should handle gracefully and return empty (filtered out)
         assert result.empty
@@ -335,24 +311,18 @@ class TestDiskCapacityCalculator:
         """Test that only positive capacities are returned."""
         calculator = DiskCapacityCalculator(mock_config)
 
-        ocp_storage = pd.DataFrame(
-            {"csi_volume_handle": ["vol-positive", "vol-zero", "vol-negative"]}
-        )
+        ocp_storage = pd.DataFrame({"csi_volume_handle": ["vol-positive", "vol-zero", "vol-negative"]})
 
         aws_data = pd.DataFrame(
             {
                 "lineitem_resourceid": ["vol-positive", "vol-zero", "vol-negative"],
-                "lineitem_usagestartdate": pd.to_datetime(
-                    ["2025-10-01", "2025-10-01", "2025-10-01"]
-                ),
+                "lineitem_usagestartdate": pd.to_datetime(["2025-10-01", "2025-10-01", "2025-10-01"]),
                 "lineitem_unblendedcost": [10.0, 0.0, -5.0],
                 "lineitem_unblendedrate": [0.0134, 0.0134, 0.0134],
             }
         )
 
-        result = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         # Only positive capacity should be returned
         assert len(result) == 1
@@ -487,17 +457,13 @@ class TestDiskCapacityCalculator:
         aws_data = pd.DataFrame(
             {
                 "lineitem_resourceid": ["vol-multiday", "vol-multiday", "vol-multiday"],
-                "lineitem_usagestartdate": pd.to_datetime(
-                    ["2025-10-01", "2025-10-02", "2025-10-03"]
-                ),
+                "lineitem_usagestartdate": pd.to_datetime(["2025-10-01", "2025-10-02", "2025-10-03"]),
                 "lineitem_unblendedcost": [10.0, 12.0, 15.0],
                 "lineitem_unblendedrate": [0.0134, 0.0134, 0.0134],
             }
         )
 
-        result = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         # Should have 3 rows (one per day)
         assert len(result) == 3
@@ -531,8 +497,7 @@ class TestDiskCapacityCalculator:
                     {
                         "lineitem_resourceid": vol,
                         "lineitem_usagestartdate": date,
-                        "lineitem_unblendedcost": 5.0
-                        + (hash(vol + str(date)) % 10),  # Vary cost
+                        "lineitem_unblendedcost": 5.0 + (hash(vol + str(date)) % 10),  # Vary cost
                         "lineitem_unblendedrate": 0.0134,
                     }
                 )
@@ -544,9 +509,7 @@ class TestDiskCapacityCalculator:
 
         start = time.time()
 
-        result = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         elapsed = time.time() - start
 
@@ -583,8 +546,7 @@ class TestDiskCapacityCalculator:
                     {
                         "lineitem_resourceid": vol,
                         "lineitem_usagestartdate": date,
-                        "lineitem_unblendedcost": 5.0
-                        + ((i + hash(str(date))) % 10),  # Vary cost
+                        "lineitem_unblendedcost": 5.0 + ((i + hash(str(date))) % 10),  # Vary cost
                         "lineitem_unblendedrate": 0.0134,
                     }
                 )
@@ -598,9 +560,7 @@ class TestDiskCapacityCalculator:
 
         self.logger.info(f"Processing {len(aws_data):,} rows at production scale...")
 
-        result = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         elapsed = time.time() - start
 
@@ -613,9 +573,7 @@ class TestDiskCapacityCalculator:
 
         # Verify all capacities are positive integers
         assert all(result["capacity"] > 0)
-        assert all(
-            isinstance(c, (int, np.integer)) for c in result["capacity"].head(100)
-        )
+        assert all(isinstance(c, (int, np.integer)) for c in result["capacity"].head(100))
 
         # Performance reporting
         rows_per_second = len(result) / elapsed
@@ -629,9 +587,7 @@ class TestDiskCapacityCalculator:
         """Test rounding at exact .5 boundaries - CRITICAL for billing accuracy."""
         calculator = DiskCapacityCalculator(mock_config)
 
-        ocp_storage = pd.DataFrame(
-            {"csi_volume_handle": ["vol-round-down", "vol-round-up", "vol-exact"]}
-        )
+        ocp_storage = pd.DataFrame({"csi_volume_handle": ["vol-round-down", "vol-round-up", "vol-exact"]})
 
         # Create scenarios with exact .5 rounding
         # Capacity = Cost / (Rate / 744)
@@ -641,9 +597,7 @@ class TestDiskCapacityCalculator:
         aws_data = pd.DataFrame(
             {
                 "lineitem_resourceid": ["vol-round-down", "vol-round-up", "vol-exact"],
-                "lineitem_usagestartdate": pd.to_datetime(
-                    ["2025-10-01", "2025-10-01", "2025-10-01"]
-                ),
+                "lineitem_usagestartdate": pd.to_datetime(["2025-10-01", "2025-10-01", "2025-10-01"]),
                 "lineitem_unblendedcost": [
                     1.7938,
                     1.8120,
@@ -653,9 +607,7 @@ class TestDiskCapacityCalculator:
             }
         )
 
-        result = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         # Check rounding behavior
         assert len(result) == 3
@@ -672,9 +624,7 @@ class TestDiskCapacityCalculator:
         """Test handling of AWS credits (negative costs) - CRITICAL business logic."""
         calculator = DiskCapacityCalculator(mock_config)
 
-        ocp_storage = pd.DataFrame(
-            {"csi_volume_handle": ["vol-positive", "vol-negative-credit", "vol-mixed"]}
-        )
+        ocp_storage = pd.DataFrame({"csi_volume_handle": ["vol-positive", "vol-negative-credit", "vol-mixed"]})
 
         # AWS can have negative line items for credits/refunds
         aws_data = pd.DataFrame(
@@ -684,9 +634,7 @@ class TestDiskCapacityCalculator:
                     "vol-negative-credit",
                     "vol-mixed",
                 ],
-                "lineitem_usagestartdate": pd.to_datetime(
-                    ["2025-10-01", "2025-10-01", "2025-10-01"]
-                ),
+                "lineitem_usagestartdate": pd.to_datetime(["2025-10-01", "2025-10-01", "2025-10-01"]),
                 "lineitem_unblendedcost": [
                     10.0,
                     -5.0,
@@ -696,9 +644,7 @@ class TestDiskCapacityCalculator:
             }
         )
 
-        result = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         # Negative costs result in negative capacity, which is filtered out
         # Only positive and small positive should remain
@@ -716,9 +662,7 @@ class TestDiskCapacityCalculator:
         """Test batch with mixed valid/invalid volumes."""
         calculator = DiskCapacityCalculator(mock_config)
 
-        ocp_storage = pd.DataFrame(
-            {"csi_volume_handle": [f"vol-{i}" for i in range(10)]}
-        )
+        ocp_storage = pd.DataFrame({"csi_volume_handle": [f"vol-{i}" for i in range(10)]})
 
         # 10 volumes: 7 valid, 2 with zero rate, 1 negative cost
         aws_rows = []
@@ -756,9 +700,7 @@ class TestDiskCapacityCalculator:
 
         aws_data = pd.DataFrame(aws_rows)
 
-        result = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         # Should process only the 7 valid volumes
         assert len(result) == 7
@@ -768,16 +710,12 @@ class TestDiskCapacityCalculator:
         """Test very large and very small cost values."""
         calculator = DiskCapacityCalculator(mock_config)
 
-        ocp_storage = pd.DataFrame(
-            {"csi_volume_handle": ["vol-huge", "vol-tiny", "vol-normal"]}
-        )
+        ocp_storage = pd.DataFrame({"csi_volume_handle": ["vol-huge", "vol-tiny", "vol-normal"]})
 
         aws_data = pd.DataFrame(
             {
                 "lineitem_resourceid": ["vol-huge", "vol-tiny", "vol-normal"],
-                "lineitem_usagestartdate": pd.to_datetime(
-                    ["2025-10-01", "2025-10-01", "2025-10-01"]
-                ),
+                "lineitem_usagestartdate": pd.to_datetime(["2025-10-01", "2025-10-01", "2025-10-01"]),
                 "lineitem_unblendedcost": [
                     1_000_000.0,
                     0.0001,
@@ -787,9 +725,7 @@ class TestDiskCapacityCalculator:
             }
         )
 
-        result = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         # All should process successfully
         assert len(result) == 3
@@ -817,16 +753,12 @@ class TestDiskCapacityCalculator:
             {
                 "lineitem_resourceid": volumes,
                 "lineitem_usagestartdate": [pd.Timestamp("2025-10-01")] * num_volumes,
-                "lineitem_unblendedcost": [
-                    10.0 + i for i in range(num_volumes)
-                ],  # Vary slightly
+                "lineitem_unblendedcost": [10.0 + i for i in range(num_volumes)],  # Vary slightly
                 "lineitem_unblendedrate": [0.0134] * num_volumes,
             }
         )
 
-        result = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         # Should handle all volumes
         assert len(result) == num_volumes
@@ -861,9 +793,7 @@ class TestDiskCapacityCalculator:
             }
         )
 
-        result = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         # NULL cost and NULL/zero rate should be filtered out
         # Zero cost with valid rate might produce 0 capacity (filtered)
@@ -903,9 +833,7 @@ class TestDiskCapacityCalculator:
             }
         )
 
-        result = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         # All formats should be processed
         assert len(result) == 4
@@ -932,9 +860,7 @@ class TestDiskCapacityCalculator:
             }
         )
 
-        result = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         # Should aggregate to one row per day
         assert len(result) == 1
@@ -964,14 +890,10 @@ class TestDiskCapacityCalculator:
         # only for hours calculation. So both Oct 31 and Nov 1 will be included.
 
         # Calculate with October hours (744 hours)
-        result_oct = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result_oct = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         # Calculate with November hours (720 hours)
-        result_nov = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=11
-        )
+        result_nov = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=11)
 
         # Both should process both dates (Oct 31 and Nov 1)
         assert len(result_oct) == 2
@@ -1010,9 +932,7 @@ class TestDiskCapacityCalculator:
             }
         )
 
-        result = calculator.calculate_disk_capacities(
-            aws_data, ocp_storage, year=2025, month=10
-        )
+        result = calculator.calculate_disk_capacities(aws_data, ocp_storage, year=2025, month=10)
 
         # Should aggregate to 1 row
         assert len(result) == 1

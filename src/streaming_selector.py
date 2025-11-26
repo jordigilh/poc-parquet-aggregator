@@ -76,18 +76,14 @@ def determine_streaming_mode(
         if estimated_rows is not None:
             if estimated_rows > row_threshold:
                 should_stream = True
-                reasons.append(
-                    f"estimated {estimated_rows:,} rows > {row_threshold:,} threshold"
-                )
+                reasons.append(f"estimated {estimated_rows:,} rows > {row_threshold:,} threshold")
                 logger.info(
                     "📊 Row count exceeds threshold",
                     estimated_rows=estimated_rows,
                     threshold=row_threshold,
                 )
             else:
-                reasons.append(
-                    f"estimated {estimated_rows:,} rows <= {row_threshold:,} threshold"
-                )
+                reasons.append(f"estimated {estimated_rows:,} rows <= {row_threshold:,} threshold")
                 logger.debug(
                     "📊 Row count within threshold",
                     estimated_rows=estimated_rows,
@@ -112,51 +108,37 @@ def determine_streaming_mode(
 
             if available_memory_gb < memory_threshold_gb:
                 should_stream = True
-                reasons.append(
-                    f"available memory {available_memory_gb:.1f} GB < {memory_threshold_gb} GB threshold"
-                )
+                reasons.append(f"available memory {available_memory_gb:.1f} GB < {memory_threshold_gb} GB threshold")
                 logger.warning(
                     "⚠️  Low memory detected, enabling streaming",
                     available_gb=f"{available_memory_gb:.2f}",
                     threshold_gb=memory_threshold_gb,
                 )
             else:
-                reasons.append(
-                    f"available memory {available_memory_gb:.1f} GB >= {memory_threshold_gb} GB"
-                )
+                reasons.append(f"available memory {available_memory_gb:.1f} GB >= {memory_threshold_gb} GB")
                 logger.debug(
                     "✅ Sufficient memory available",
                     available_gb=f"{available_memory_gb:.2f}",
                     threshold_gb=memory_threshold_gb,
                 )
         except Exception as e:
-            logger.warning(
-                f"Could not check system memory: {e}. Defaulting based on row count only."
-            )
+            logger.warning(f"Could not check system memory: {e}. Defaulting based on row count only.")
             reasons.append("memory check unavailable")
 
         # Make decision
         if should_stream:
-            logger.info(
-                f"✅ AUTO-SELECTED: Streaming mode (reasons: {'; '.join(reasons)})"
-            )
+            logger.info(f"✅ AUTO-SELECTED: Streaming mode (reasons: {'; '.join(reasons)})")
         else:
-            logger.info(
-                f"✅ AUTO-SELECTED: In-memory mode (reasons: {'; '.join(reasons)})"
-            )
+            logger.info(f"✅ AUTO-SELECTED: In-memory mode (reasons: {'; '.join(reasons)})")
 
         return should_stream
 
     # 4. Fallback (shouldn't reach here)
-    logger.warning(
-        f"Unknown use_streaming value: {use_streaming_config}. Defaulting to in-memory."
-    )
+    logger.warning(f"Unknown use_streaming value: {use_streaming_config}. Defaulting to in-memory.")
     return False
 
 
-def estimate_parquet_rows(
-    s3_filesystem, bucket: str, prefix: str, sample_files: int = 5
-) -> Optional[int]:
+def estimate_parquet_rows(s3_filesystem, bucket: str, prefix: str, sample_files: int = 5) -> Optional[int]:
     """
     Estimate total row count by sampling Parquet files.
 
@@ -181,9 +163,7 @@ def estimate_parquet_rows(
             return None
 
         total_files = len(files)
-        logger.debug(
-            f"Found {total_files} Parquet files, sampling {min(sample_files, total_files)}"
-        )
+        logger.debug(f"Found {total_files} Parquet files, sampling {min(sample_files, total_files)}")
 
         # Sample a few files to estimate average rows per file
         sample_count = min(sample_files, total_files)

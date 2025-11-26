@@ -94,9 +94,7 @@ def parse_json_labels(labels_str: Optional[str]) -> Dict[str, str]:
         return {}
 
 
-def filter_labels_by_enabled_keys(
-    labels: Dict[str, str], enabled_keys: List[str]
-) -> Dict[str, str]:
+def filter_labels_by_enabled_keys(labels: Dict[str, str], enabled_keys: List[str]) -> Dict[str, str]:
     """Filter labels to only include enabled keys.
 
     Args:
@@ -150,9 +148,7 @@ def labels_to_json_string(labels: Dict[str, str]) -> str:
     # - UTF-8 encoding
     # - Compact format (no extra whitespace) - use separators=(',', ':')
     # - Proper escaping of special characters
-    result = json.dumps(
-        labels, sort_keys=True, ensure_ascii=False, separators=(",", ":")
-    )
+    result = json.dumps(labels, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
 
     # Validate it's valid JSON
     try:
@@ -266,9 +262,7 @@ def parse_date(date_str: str) -> date:
     return datetime.strptime(date_str, "%Y-%m-%d").date()
 
 
-def calculate_effective_usage(
-    usage: Optional[float], request: Optional[float]
-) -> Optional[float]:
+def calculate_effective_usage(usage: Optional[float], request: Optional[float]) -> Optional[float]:
     """Calculate effective usage (max of usage and request).
 
     This replicates Trino's GREATEST(usage, request) logic.
@@ -325,9 +319,7 @@ class PerformanceTimer:
         duration = (self.end_time - self.start_time).total_seconds()
 
         if exc_type is None:
-            self.logger.info(
-                f"Completed: {self.name}", duration_seconds=round(duration, 3)
-            )
+            self.logger.info(f"Completed: {self.name}", duration_seconds=round(duration, 3))
         else:
             self.logger.error(
                 f"Failed: {self.name}",

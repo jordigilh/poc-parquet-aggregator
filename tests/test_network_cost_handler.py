@@ -162,9 +162,7 @@ class TestNetworkCostHandler:
         assert len(non_network) == 2
         assert len(network) == 0
 
-    def test_attribute_network_costs_basic(
-        self, mock_config, sample_aws_with_network, sample_ocp_pod_usage
-    ):
+    def test_attribute_network_costs_basic(self, mock_config, sample_aws_with_network, sample_ocp_pod_usage):
         """Test basic network cost attribution."""
         handler = NetworkCostHandler(mock_config)
 
@@ -189,9 +187,7 @@ class TestNetworkCostHandler:
         assert "unblended_cost" in result.columns
         assert result["unblended_cost"].sum() == 30.0  # 10 + 20
 
-    def test_attribute_network_costs_empty_network(
-        self, mock_config, sample_ocp_pod_usage
-    ):
+    def test_attribute_network_costs_empty_network(self, mock_config, sample_ocp_pod_usage):
         """Test attribution with no network costs."""
         handler = NetworkCostHandler(mock_config)
 
@@ -214,18 +210,14 @@ class TestNetworkCostHandler:
             }
         )
 
-        ocp_data = pd.DataFrame(
-            {"node": ["node1"], "resource_id": ["different-suffix"]}
-        )
+        ocp_data = pd.DataFrame({"node": ["node1"], "resource_id": ["different-suffix"]})
 
         result = handler.attribute_network_costs(network_df, ocp_data)
 
         # Should return empty DataFrame when no matches
         assert len(result) == 0
 
-    def test_attribute_network_costs_missing_aws_columns(
-        self, mock_config, sample_ocp_pod_usage
-    ):
+    def test_attribute_network_costs_missing_aws_columns(self, mock_config, sample_ocp_pod_usage):
         """Test attribution with missing required AWS columns."""
         handler = NetworkCostHandler(mock_config)
 
@@ -264,9 +256,7 @@ class TestNetworkCostHandler:
         with pytest.raises(ValueError, match="missing required columns"):
             handler.attribute_network_costs(network_df, incomplete_ocp)
 
-    def test_attribute_network_costs_markup_calculation(
-        self, mock_config, sample_ocp_pod_usage
-    ):
+    def test_attribute_network_costs_markup_calculation(self, mock_config, sample_ocp_pod_usage):
         """Test that markup is correctly calculated for network costs."""
         handler = NetworkCostHandler(mock_config)
 
@@ -287,12 +277,8 @@ class TestNetworkCostHandler:
         # Verify markup calculations (10% markup)
         assert result["markup_cost"].iloc[0] == pytest.approx(10.0)  # 10% of 100
         assert result["markup_cost_blended"].iloc[0] == pytest.approx(9.5)  # 10% of 95
-        assert result["markup_cost_savingsplan"].iloc[0] == pytest.approx(
-            9.0
-        )  # 10% of 90
-        assert result["markup_cost_amortized"].iloc[0] == pytest.approx(
-            9.2
-        )  # 10% of 92
+        assert result["markup_cost_savingsplan"].iloc[0] == pytest.approx(9.0)  # 10% of 90
+        assert result["markup_cost_amortized"].iloc[0] == pytest.approx(9.2)  # 10% of 92
 
     def test_attribute_network_costs_grouping_by_node_and_direction(self, mock_config):
         """Test that network costs are grouped by node and direction."""
@@ -326,17 +312,13 @@ class TestNetworkCostHandler:
         assert len(result) == 2
 
         # Verify node1+IN aggregation (output uses clean column names)
-        node1_in = result[
-            (result["node"] == "node1") & (result["data_transfer_direction"] == "IN")
-        ]
+        node1_in = result[(result["node"] == "node1") & (result["data_transfer_direction"] == "IN")]
         assert len(node1_in) == 1
         assert node1_in["unblended_cost"].iloc[0] == 25.0  # 10 + 15
         assert node1_in["usage_amount"].iloc[0] == 250.0  # 100 + 150
 
         # Verify node2+OUT
-        node2_out = result[
-            (result["node"] == "node2") & (result["data_transfer_direction"] == "OUT")
-        ]
+        node2_out = result[(result["node"] == "node2") & (result["data_transfer_direction"] == "OUT")]
         assert len(node2_out) == 1
         assert node2_out["unblended_cost"].iloc[0] == 20.0
 

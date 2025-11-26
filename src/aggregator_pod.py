@@ -52,24 +52,14 @@ class PodAggregator:
         self.provider_uuid = self.ocp_config["provider_uuid"]
 
         # Performance configuration
-        self.use_arrow = (
-            config.get("performance", {}).get("use_arrow_compute", False)
-            and ARROW_AVAILABLE
-        )
+        self.use_arrow = config.get("performance", {}).get("use_arrow_compute", False) and ARROW_AVAILABLE
         if self.use_arrow:
             self.arrow_processor = get_arrow_processor()
-            self.logger.info(
-                "✓ Arrow compute enabled (10-100x faster label processing)"
-            )
+            self.logger.info("✓ Arrow compute enabled (10-100x faster label processing)")
         else:
             self.arrow_processor = None
-            if (
-                config.get("performance", {}).get("use_arrow_compute", False)
-                and not ARROW_AVAILABLE
-            ):
-                self.logger.warning(
-                    "Arrow compute requested but not available, using fallback"
-                )
+            if config.get("performance", {}).get("use_arrow_compute", False) and not ARROW_AVAILABLE:
+                self.logger.warning("Arrow compute requested but not available, using fallback")
 
         self.logger.info(
             "Initialized pod aggregator",
@@ -106,9 +96,7 @@ class PodAggregator:
             pod_usage_rows=len(pod_usage_df),
             node_capacity_rows=len(node_capacity_df),
             node_labels_rows=len(node_labels_df) if node_labels_df is not None else 0,
-            namespace_labels_rows=len(namespace_labels_df)
-            if namespace_labels_df is not None
-            else 0,
+            namespace_labels_rows=len(namespace_labels_df) if namespace_labels_df is not None else 0,
         )
         with PerformanceTimer("Pod usage aggregation", self.logger):
             # Step 1: Pre-process labels
@@ -136,12 +124,8 @@ class PodAggregator:
                     pod_rows=len(pod_usage_df),
                     namespace_label_rows=len(namespace_labels_df),
                 )
-                pod_usage_df = self._join_namespace_labels(
-                    pod_usage_df, namespace_labels_df
-                )
-                self.logger.info(
-                    "✓ Namespace labels joined", result_rows=len(pod_usage_df)
-                )
+                pod_usage_df = self._join_namespace_labels(pod_usage_df, namespace_labels_df)
+                self.logger.info("✓ Namespace labels joined", result_rows=len(pod_usage_df))
             else:
                 # No namespace labels - use empty JSON object (not None to avoid NaN issues)
                 pod_usage_df["namespace_labels"] = "{}"
@@ -158,9 +142,7 @@ class PodAggregator:
 
             # Add processed label columns to DataFrame
             pod_usage_df["node_labels_dict"] = label_results["node_labels_dict"]
-            pod_usage_df["namespace_labels_dict"] = label_results[
-                "namespace_labels_dict"
-            ]
+            pod_usage_df["namespace_labels_dict"] = label_results["namespace_labels_dict"]
             pod_usage_df["pod_labels_dict"] = label_results["pod_labels_dict"]
             pod_usage_df["merged_labels_dict"] = label_results["merged_labels_dict"]
             pod_usage_df["merged_labels"] = label_results["merged_labels"]
@@ -175,9 +157,7 @@ class PodAggregator:
 
             # Step 7: Join with cost category (if available)
             if cost_category_df is not None and not cost_category_df.empty:
-                aggregated_df = self._join_cost_category(
-                    aggregated_df, cost_category_df
-                )
+                aggregated_df = self._join_cost_category(aggregated_df, cost_category_df)
             else:
                 aggregated_df["cost_category_id"] = None
 
@@ -220,9 +200,7 @@ class PodAggregator:
                 chunk_prepared["node_labels"] = "{}"
 
             if namespace_labels_df is not None and not namespace_labels_df.empty:
-                chunk_prepared = self._join_namespace_labels(
-                    chunk_prepared, namespace_labels_df
-                )
+                chunk_prepared = self._join_namespace_labels(chunk_prepared, namespace_labels_df)
             else:
                 # No namespace labels - use empty JSON object (not None to avoid NaN issues)
                 chunk_prepared["namespace_labels"] = "{}"
@@ -231,9 +209,7 @@ class PodAggregator:
             # (Arrow compute if available, otherwise list comprehension)
             label_results = self._process_labels_optimized(chunk_prepared)
             chunk_prepared["node_labels_dict"] = label_results["node_labels_dict"]
-            chunk_prepared["namespace_labels_dict"] = label_results[
-                "namespace_labels_dict"
-            ]
+            chunk_prepared["namespace_labels_dict"] = label_results["namespace_labels_dict"]
             chunk_prepared["pod_labels_dict"] = label_results["pod_labels_dict"]
             chunk_prepared["merged_labels_dict"] = label_results["merged_labels_dict"]
             chunk_prepared["merged_labels"] = label_results["merged_labels"]
@@ -280,9 +256,7 @@ class PodAggregator:
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
         # Check if parallel processing is enabled
-        parallel_enabled = self.config.get("performance", {}).get(
-            "parallel_chunks", False
-        )
+        parallel_enabled = self.config.get("performance", {}).get("parallel_chunks", False)
         max_workers = self.config.get("performance", {}).get("max_workers", 4)
 
         with PerformanceTimer("Pod usage aggregation (streaming mode)", self.logger):
@@ -306,17 +280,14 @@ class PodAggregator:
 
                 # Prepare chunk data tuples
                 chunk_data_list = [
-                    (idx, chunk, node_labels_df, namespace_labels_df)
-                    for idx, chunk in enumerate(chunk_list)
+                    (idx, chunk, node_labels_df, namespace_labels_df) for idx, chunk in enumerate(chunk_list)
                 ]
 
                 # Process chunks in parallel
                 with ThreadPoolExecutor(max_workers=max_workers) as executor:
                     # Submit all chunks for processing
                     future_to_chunk = {
-                        executor.submit(
-                            self._process_single_chunk, chunk_data
-                        ): chunk_data[0]
+                        executor.submit(self._process_single_chunk, chunk_data): chunk_data[0]
                         for chunk_data in chunk_data_list
                     }
 
@@ -384,9 +355,7 @@ class PodAggregator:
             # Final aggregation to merge duplicate keys across chunks
             # (Same (date, namespace, node) might appear in multiple chunks)
             aggregated_df = self._final_aggregation_across_chunks(combined_df)
-            self.logger.info(
-                f"Final aggregation complete", final_rows=len(aggregated_df)
-            )
+            self.logger.info(f"Final aggregation complete", final_rows=len(aggregated_df))
 
             # Free memory
             del combined_df
@@ -396,9 +365,7 @@ class PodAggregator:
             aggregated_df = self._join_node_capacity(aggregated_df, node_capacity_df)
 
             if cost_category_df is not None and not cost_category_df.empty:
-                aggregated_df = self._join_cost_category(
-                    aggregated_df, cost_category_df
-                )
+                aggregated_df = self._join_cost_category(aggregated_df, cost_category_df)
             else:
                 aggregated_df["cost_category_id"] = None
 
@@ -409,9 +376,7 @@ class PodAggregator:
                 input_rows=total_input_rows,
                 output_rows=len(result_df),
                 chunks_processed=chunk_count,
-                compression_ratio=f"{total_input_rows / len(result_df):.1f}x"
-                if len(result_df) > 0
-                else "N/A",
+                compression_ratio=f"{total_input_rows / len(result_df):.1f}x" if len(result_df) > 0 else "N/A",
             )
 
             return result_df
@@ -451,11 +416,7 @@ class PodAggregator:
         }
 
         # Note: observed=True is critical when columns are categorical
-        return (
-            df.groupby(group_keys, dropna=False, observed=True)
-            .agg(agg_funcs)
-            .reset_index()
-        )
+        return df.groupby(group_keys, dropna=False, observed=True).agg(agg_funcs).reset_index()
 
     def _prepare_pod_usage_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Prepare pod usage data (parse dates, parse labels).
@@ -485,9 +446,7 @@ class PodAggregator:
         if "interval_start" in df.columns:
             if pd.api.types.is_string_dtype(df["interval_start"]):
                 # Handle nise string format: "2025-11-01 00:00:00 +0000 UTC"
-                df["interval_start_clean"] = df["interval_start"].str.replace(
-                    r" \+\d{4} UTC$", "", regex=True
-                )
+                df["interval_start_clean"] = df["interval_start"].str.replace(r" \+\d{4} UTC$", "", regex=True)
                 df["usage_start"] = pd.to_datetime(df["interval_start_clean"]).dt.date
                 df.drop("interval_start_clean", axis=1, inplace=True)
             elif pd.api.types.is_datetime64_any_dtype(df["interval_start"]):
@@ -532,22 +491,13 @@ class PodAggregator:
             pod_labels_values = pod_usage_df["pod_labels"].values
 
             # Parse JSON labels
-            node_dicts = [
-                parse_json_labels(x) if x is not None else {}
-                for x in node_labels_values
-            ]
-            namespace_dicts = [
-                parse_json_labels(x) if x is not None else {}
-                for x in namespace_labels_values
-            ]
-            pod_dicts = [
-                parse_json_labels(x) if x is not None else {} for x in pod_labels_values
-            ]
+            node_dicts = [parse_json_labels(x) if x is not None else {} for x in node_labels_values]
+            namespace_dicts = [parse_json_labels(x) if x is not None else {} for x in namespace_labels_values]
+            pod_dicts = [parse_json_labels(x) if x is not None else {} for x in pod_labels_values]
 
             # Merge labels
             merged_dicts = [
-                self._merge_all_labels(n, ns, p)
-                for n, ns, p in zip(node_dicts, namespace_dicts, pod_dicts)
+                self._merge_all_labels(n, ns, p) for n, ns, p in zip(node_dicts, namespace_dicts, pod_dicts)
             ]
 
             # Convert to JSON strings
@@ -563,9 +513,7 @@ class PodAggregator:
                 }
             )
 
-    def _join_node_labels(
-        self, pod_df: pd.DataFrame, node_labels_df: pd.DataFrame
-    ) -> pd.DataFrame:
+    def _join_node_labels(self, pod_df: pd.DataFrame, node_labels_df: pd.DataFrame) -> pd.DataFrame:
         """Join with node labels.
 
         Args:
@@ -581,46 +529,34 @@ class PodAggregator:
         # Handle both interval_start (from parquet) and usage_start (from tests)
         if "interval_start" in node_labels_df.columns:
             if pd.api.types.is_string_dtype(node_labels_df["interval_start"]):
-                node_labels_df["interval_start_clean"] = node_labels_df[
-                    "interval_start"
-                ].str.replace(r" \+\d{4} UTC$", "", regex=True)
-                node_labels_df["usage_start"] = pd.to_datetime(
-                    node_labels_df["interval_start_clean"]
-                ).dt.date
+                node_labels_df["interval_start_clean"] = node_labels_df["interval_start"].str.replace(
+                    r" \+\d{4} UTC$", "", regex=True
+                )
+                node_labels_df["usage_start"] = pd.to_datetime(node_labels_df["interval_start_clean"]).dt.date
                 node_labels_df.drop("interval_start_clean", axis=1, inplace=True)
             elif pd.api.types.is_datetime64_any_dtype(node_labels_df["interval_start"]):
                 node_labels_df["usage_start"] = node_labels_df["interval_start"].dt.date
             else:
-                node_labels_df["usage_start"] = pd.to_datetime(
-                    node_labels_df["interval_start"]
-                ).dt.date
+                node_labels_df["usage_start"] = pd.to_datetime(node_labels_df["interval_start"]).dt.date
         elif "usage_start" not in node_labels_df.columns:
-            self.logger.warning(
-                "Node labels missing both 'interval_start' and 'usage_start' columns"
-            )
+            self.logger.warning("Node labels missing both 'interval_start' and 'usage_start' columns")
             return pod_df
 
-        node_labels_df["node_labels_dict"] = node_labels_df["node_labels"].apply(
-            parse_json_labels
-        )
+        node_labels_df["node_labels_dict"] = node_labels_df["node_labels"].apply(parse_json_labels)
 
         # Filter by enabled keys
-        node_labels_df["node_labels_filtered"] = node_labels_df[
-            "node_labels_dict"
-        ].apply(
+        node_labels_df["node_labels_filtered"] = node_labels_df["node_labels_dict"].apply(
             lambda labels: filter_labels_by_enabled_keys(labels, self.enabled_tag_keys)
         )
 
         # Select columns for join
-        node_labels_join = node_labels_df[
-            ["usage_start", "node", "node_labels_filtered"]
-        ].rename(columns={"node_labels_filtered": "node_labels"})
+        node_labels_join = node_labels_df[["usage_start", "node", "node_labels_filtered"]].rename(
+            columns={"node_labels_filtered": "node_labels"}
+        )
 
         # CRITICAL: Deduplicate before join to avoid Cartesian product
         # Label data may have multiple rows per (usage_start, node) due to hourly intervals
-        node_labels_join = node_labels_join.drop_duplicates(
-            subset=["usage_start", "node"], keep="last"
-        )
+        node_labels_join = node_labels_join.drop_duplicates(subset=["usage_start", "node"], keep="last")
         self.logger.info(
             f"Deduplicated node labels",
             before_rows=len(node_labels_df),
@@ -630,9 +566,7 @@ class PodAggregator:
         # Left join
         return pod_df.merge(node_labels_join, on=["usage_start", "node"], how="left")
 
-    def _join_namespace_labels(
-        self, pod_df: pd.DataFrame, namespace_labels_df: pd.DataFrame
-    ) -> pd.DataFrame:
+    def _join_namespace_labels(self, pod_df: pd.DataFrame, namespace_labels_df: pd.DataFrame) -> pd.DataFrame:
         """Join with namespace labels.
 
         Args:
@@ -648,50 +582,34 @@ class PodAggregator:
         # Handle both interval_start (from parquet) and usage_start (from tests)
         if "interval_start" in namespace_labels_df.columns:
             if pd.api.types.is_string_dtype(namespace_labels_df["interval_start"]):
-                namespace_labels_df["interval_start_clean"] = namespace_labels_df[
-                    "interval_start"
-                ].str.replace(r" \+\d{4} UTC$", "", regex=True)
-                namespace_labels_df["usage_start"] = pd.to_datetime(
-                    namespace_labels_df["interval_start_clean"]
-                ).dt.date
+                namespace_labels_df["interval_start_clean"] = namespace_labels_df["interval_start"].str.replace(
+                    r" \+\d{4} UTC$", "", regex=True
+                )
+                namespace_labels_df["usage_start"] = pd.to_datetime(namespace_labels_df["interval_start_clean"]).dt.date
                 namespace_labels_df.drop("interval_start_clean", axis=1, inplace=True)
-            elif pd.api.types.is_datetime64_any_dtype(
-                namespace_labels_df["interval_start"]
-            ):
-                namespace_labels_df["usage_start"] = namespace_labels_df[
-                    "interval_start"
-                ].dt.date
+            elif pd.api.types.is_datetime64_any_dtype(namespace_labels_df["interval_start"]):
+                namespace_labels_df["usage_start"] = namespace_labels_df["interval_start"].dt.date
             else:
-                namespace_labels_df["usage_start"] = pd.to_datetime(
-                    namespace_labels_df["interval_start"]
-                ).dt.date
+                namespace_labels_df["usage_start"] = pd.to_datetime(namespace_labels_df["interval_start"]).dt.date
         elif "usage_start" not in namespace_labels_df.columns:
-            self.logger.warning(
-                "Namespace labels missing both 'interval_start' and 'usage_start' columns"
-            )
+            self.logger.warning("Namespace labels missing both 'interval_start' and 'usage_start' columns")
             return pod_df
 
-        namespace_labels_df["namespace_labels_dict"] = namespace_labels_df[
-            "namespace_labels"
-        ].apply(parse_json_labels)
+        namespace_labels_df["namespace_labels_dict"] = namespace_labels_df["namespace_labels"].apply(parse_json_labels)
 
         # Filter by enabled keys
-        namespace_labels_df["namespace_labels_filtered"] = namespace_labels_df[
-            "namespace_labels_dict"
-        ].apply(
+        namespace_labels_df["namespace_labels_filtered"] = namespace_labels_df["namespace_labels_dict"].apply(
             lambda labels: filter_labels_by_enabled_keys(labels, self.enabled_tag_keys)
         )
 
         # Select columns for join
-        namespace_labels_join = namespace_labels_df[
-            ["usage_start", "namespace", "namespace_labels_filtered"]
-        ].rename(columns={"namespace_labels_filtered": "namespace_labels"})
+        namespace_labels_join = namespace_labels_df[["usage_start", "namespace", "namespace_labels_filtered"]].rename(
+            columns={"namespace_labels_filtered": "namespace_labels"}
+        )
 
         # CRITICAL: Deduplicate before join to avoid Cartesian product
         # Label data may have multiple rows per (usage_start, namespace) due to hourly intervals
-        namespace_labels_join = namespace_labels_join.drop_duplicates(
-            subset=["usage_start", "namespace"], keep="last"
-        )
+        namespace_labels_join = namespace_labels_join.drop_duplicates(subset=["usage_start", "namespace"], keep="last")
         self.logger.info(
             f"Deduplicated namespace labels",
             before_rows=len(namespace_labels_df),
@@ -699,9 +617,7 @@ class PodAggregator:
         )
 
         # Left join
-        return pod_df.merge(
-            namespace_labels_join, on=["usage_start", "namespace"], how="left"
-        )
+        return pod_df.merge(namespace_labels_join, on=["usage_start", "namespace"], how="left")
 
     def _merge_all_labels(
         self,
@@ -755,19 +671,11 @@ class PodAggregator:
             "pod_request_cpu_core_seconds": lambda x: convert_seconds_to_hours(x.sum()),
             "pod_limit_cpu_core_seconds": lambda x: convert_seconds_to_hours(x.sum()),
             # Memory metrics (convert byte-seconds to GB-hours)
-            "pod_usage_memory_byte_seconds": lambda x: convert_bytes_to_gigabytes(
-                convert_seconds_to_hours(x.sum())
-            ),
-            "pod_request_memory_byte_seconds": lambda x: convert_bytes_to_gigabytes(
-                convert_seconds_to_hours(x.sum())
-            ),
-            "pod_limit_memory_byte_seconds": lambda x: convert_bytes_to_gigabytes(
-                convert_seconds_to_hours(x.sum())
-            ),
+            "pod_usage_memory_byte_seconds": lambda x: convert_bytes_to_gigabytes(convert_seconds_to_hours(x.sum())),
+            "pod_request_memory_byte_seconds": lambda x: convert_bytes_to_gigabytes(convert_seconds_to_hours(x.sum())),
+            "pod_limit_memory_byte_seconds": lambda x: convert_bytes_to_gigabytes(convert_seconds_to_hours(x.sum())),
             # Capacity metrics from raw Parquet data (max)
-            "node_capacity_cpu_core_seconds": lambda x: convert_seconds_to_hours(
-                x.max()
-            ),
+            "node_capacity_cpu_core_seconds": lambda x: convert_seconds_to_hours(x.max()),
             "node_capacity_memory_byte_seconds": lambda x: convert_bytes_to_gigabytes(
                 convert_seconds_to_hours(x.max())
             ),
@@ -800,21 +708,15 @@ class PodAggregator:
         )
 
         # Add effective usage to aggregation
-        agg_funcs[
-            "pod_effective_usage_cpu_core_seconds"
-        ] = lambda x: convert_seconds_to_hours(x.sum())
-        agg_funcs[
-            "pod_effective_usage_memory_byte_seconds"
-        ] = lambda x: convert_bytes_to_gigabytes(convert_seconds_to_hours(x.sum()))
+        agg_funcs["pod_effective_usage_cpu_core_seconds"] = lambda x: convert_seconds_to_hours(x.sum())
+        agg_funcs["pod_effective_usage_memory_byte_seconds"] = lambda x: convert_bytes_to_gigabytes(
+            convert_seconds_to_hours(x.sum())
+        )
 
         # Group and aggregate
         # Note: observed=True is critical when columns are categorical to avoid
         # creating rows for all category combinations (Cartesian product)
-        aggregated = (
-            df.groupby(group_keys, dropna=False, observed=True)
-            .agg(agg_funcs)
-            .reset_index()
-        )
+        aggregated = df.groupby(group_keys, dropna=False, observed=True).agg(agg_funcs).reset_index()
 
         # Rename columns to match output schema
         aggregated = aggregated.rename(
@@ -836,9 +738,7 @@ class PodAggregator:
 
         return aggregated
 
-    def _join_node_capacity(
-        self, aggregated_df: pd.DataFrame, node_capacity_df: pd.DataFrame
-    ) -> pd.DataFrame:
+    def _join_node_capacity(self, aggregated_df: pd.DataFrame, node_capacity_df: pd.DataFrame) -> pd.DataFrame:
         """Join with pre-calculated node capacity.
 
         Args:
@@ -858,9 +758,7 @@ class PodAggregator:
             return aggregated_df
 
         # Join with node capacity
-        result = aggregated_df.merge(
-            node_capacity_df, on=["usage_start", "node"], how="left"
-        )
+        result = aggregated_df.merge(node_capacity_df, on=["usage_start", "node"], how="left")
 
         # Add missing capacity columns with defaults if not present
         capacity_columns = [
@@ -877,9 +775,7 @@ class PodAggregator:
 
         return result
 
-    def _join_cost_category(
-        self, aggregated_df: pd.DataFrame, cost_category_df: pd.DataFrame
-    ) -> pd.DataFrame:
+    def _join_cost_category(self, aggregated_df: pd.DataFrame, cost_category_df: pd.DataFrame) -> pd.DataFrame:
         """Join with cost category namespace (LIKE matching).
 
         Args:
@@ -907,9 +803,7 @@ class PodAggregator:
             # This matches Trino SQL line 264: max(cat_ns.cost_category_id)
             return max(matching_ids) if matching_ids else None
 
-        aggregated_df["cost_category_id"] = aggregated_df["namespace"].apply(
-            match_cost_category
-        )
+        aggregated_df["cost_category_id"] = aggregated_df["namespace"].apply(match_cost_category)
 
         return aggregated_df
 
@@ -953,9 +847,7 @@ class PodAggregator:
         df["all_labels"] = df["pod_labels"]
 
         # Infrastructure cost (default JSON)
-        df[
-            "infrastructure_usage_cost"
-        ] = '{"cpu": 0.000000000, "memory": 0.000000000, "storage": 0.000000000}'
+        df["infrastructure_usage_cost"] = '{"cpu": 0.000000000, "memory": 0.000000000, "storage": 0.000000000}'
 
         # Partition columns
         # Note: Trino SQL line 665 uses lpad(month, 2, '0') for zero-padding
@@ -1039,9 +931,7 @@ def calculate_node_capacity(
 
         # Handle empty DataFrame
         if df.empty:
-            logger.warning(
-                "Empty DataFrame passed to calculate_node_capacity, returning empty capacity"
-            )
+            logger.warning("Empty DataFrame passed to calculate_node_capacity, returning empty capacity")
             empty_node_capacity = pd.DataFrame(
                 columns=[
                     "usage_start",
@@ -1064,9 +954,7 @@ def calculate_node_capacity(
         # Handle both string and datetime formats for interval_start
         if pd.api.types.is_string_dtype(df["interval_start"]):
             # Handle nise string format: "2025-11-01 00:00:00 +0000 UTC"
-            df["interval_start_clean"] = df["interval_start"].str.replace(
-                r" \+\d{4} UTC$", "", regex=True
-            )
+            df["interval_start_clean"] = df["interval_start"].str.replace(r" \+\d{4} UTC$", "", regex=True)
             df["usage_start"] = pd.to_datetime(df["interval_start_clean"]).dt.date
             df.drop("interval_start_clean", axis=1, inplace=True)
         elif pd.api.types.is_datetime64_any_dtype(df["interval_start"]):
@@ -1092,21 +980,15 @@ def calculate_node_capacity(
         # Step 2: Sum across intervals for each day + node (Trino lines 143-164)
         # Handle both string and datetime formats
         if pd.api.types.is_string_dtype(interval_capacity["interval_start"]):
-            interval_capacity["interval_start_clean"] = interval_capacity[
-                "interval_start"
-            ].str.replace(r" \+\d{4} UTC$", "", regex=True)
-            interval_capacity["usage_start"] = pd.to_datetime(
-                interval_capacity["interval_start_clean"]
-            ).dt.date
+            interval_capacity["interval_start_clean"] = interval_capacity["interval_start"].str.replace(
+                r" \+\d{4} UTC$", "", regex=True
+            )
+            interval_capacity["usage_start"] = pd.to_datetime(interval_capacity["interval_start_clean"]).dt.date
             interval_capacity.drop("interval_start_clean", axis=1, inplace=True)
         elif pd.api.types.is_datetime64_any_dtype(interval_capacity["interval_start"]):
-            interval_capacity["usage_start"] = interval_capacity[
-                "interval_start"
-            ].dt.date
+            interval_capacity["usage_start"] = interval_capacity["interval_start"].dt.date
         else:
-            interval_capacity["usage_start"] = pd.to_datetime(
-                interval_capacity["interval_start"]
-            ).dt.date
+            interval_capacity["usage_start"] = pd.to_datetime(interval_capacity["interval_start"]).dt.date
         node_capacity = (
             interval_capacity.groupby(["usage_start", "node"])
             .agg(
@@ -1125,9 +1007,7 @@ def calculate_node_capacity(
         )
 
         # Convert to hours and GB
-        node_capacity["node_capacity_cpu_core_hours"] = (
-            node_capacity["node_capacity_cpu_core_seconds"] / 3600.0
-        )
+        node_capacity["node_capacity_cpu_core_hours"] = node_capacity["node_capacity_cpu_core_seconds"] / 3600.0
         node_capacity["node_capacity_memory_gigabyte_hours"] = (
             node_capacity["node_capacity_memory_byte_seconds"] / 3600.0 * pow(2, -30)
         )
@@ -1162,9 +1042,7 @@ def calculate_node_capacity(
             "Cluster capacity summary",
             days=len(cluster_capacity),
             total_cpu_hours=cluster_capacity["cluster_capacity_cpu_core_hours"].sum(),
-            total_memory_gb_hours=cluster_capacity[
-                "cluster_capacity_memory_gigabyte_hours"
-            ].sum(),
+            total_memory_gb_hours=cluster_capacity["cluster_capacity_memory_gigabyte_hours"].sum(),
         )
 
         # Join cluster capacity back to node capacity (each node gets the same cluster total)

@@ -80,17 +80,12 @@ class AWSDataLoader:
         df["data_transfer_direction"] = None
 
         # Check if required columns exist
-        if (
-            "lineitem_productcode" not in df.columns
-            or "product_productfamily" not in df.columns
-        ):
+        if "lineitem_productcode" not in df.columns or "product_productfamily" not in df.columns:
             self.logger.warning("Missing columns for network detection, skipping")
             return df
 
         # Identify network records
-        is_network = (df["lineitem_productcode"] == "AmazonEC2") & (
-            df["product_productfamily"] == "Data Transfer"
-        )
+        is_network = (df["lineitem_productcode"] == "AmazonEC2") & (df["product_productfamily"] == "Data Transfer")
 
         if not is_network.any():
             self.logger.info("No network/data transfer costs found")
@@ -99,9 +94,7 @@ class AWSDataLoader:
         # Determine direction for network records
         usage_type_lower = df["lineitem_usagetype"].str.lower()
         operation_lower = (
-            df["lineitem_operation"].str.lower()
-            if "lineitem_operation" in df.columns
-            else pd.Series([""] * len(df))
+            df["lineitem_operation"].str.lower() if "lineitem_operation" in df.columns else pd.Series([""] * len(df))
         )
 
         # IN-bytes
@@ -164,15 +157,11 @@ class AWSDataLoader:
         """
         # Check if required columns exist
         if "lineitem_lineitemtype" not in df.columns:
-            self.logger.warning(
-                "lineitem_lineitemtype column not found, skipping SavingsPlan handling"
-            )
+            self.logger.warning("lineitem_lineitemtype column not found, skipping SavingsPlan handling")
             return df
 
         if "savingsplan_savingsplaneffectivecost" not in df.columns:
-            self.logger.info(
-                "savingsplan_savingsplaneffectivecost column not found, no SavingsPlan data to handle"
-            )
+            self.logger.info("savingsplan_savingsplaneffectivecost column not found, no SavingsPlan data to handle")
             df["savingsplan_savingsplaneffectivecost"] = 0.0
 
         # SavingsPlanCoveredUsage: set unblended/blended to 0 (COST-5098)
@@ -295,9 +284,7 @@ class AWSDataLoader:
         # Drop individual tag columns (save memory)
         df = df.drop(columns=all_tag_columns)
 
-        self.logger.info(
-            f"✓ Consolidated resourceTags/* + direct tags into 'resourcetags' JSON column"
-        )
+        self.logger.info(f"✓ Consolidated resourceTags/* + direct tags into 'resourcetags' JSON column")
         return df
 
     def get_optimal_columns_aws_cur(self) -> List[str]:
@@ -401,37 +388,25 @@ class AWSDataLoader:
             # NOTE: We disable column filtering for AWS to capture all resourcetags_* columns
             # These will be consolidated after reading
             columns = None
-            self.logger.info(
-                "Reading all AWS CUR columns (needed for resourcetags consolidation)"
-            )
+            self.logger.info("Reading all AWS CUR columns (needed for resourcetags consolidation)")
 
             # Read files (streaming or standard)
             if streaming:
-                self.logger.info(
-                    "Using streaming mode for AWS CUR", chunk_size=chunk_size
-                )
+                self.logger.info("Using streaming mode for AWS CUR", chunk_size=chunk_size)
 
                 def stream_all_files():
                     """Stream all AWS CUR files chunk by chunk."""
                     for file in files:
                         self.logger.debug(f"Streaming AWS CUR file: {file}")
-                        yield from self.parquet_reader.read_parquet_streaming(
-                            file, chunk_size, columns=columns
-                        )
+                        yield from self.parquet_reader.read_parquet_streaming(file, chunk_size, columns=columns)
 
                 return stream_all_files()
             else:
                 # Standard mode: parallel reading
-                parallel_workers = self.config.get("performance", {}).get(
-                    "parallel_readers", 4
-                )
-                self.logger.info(
-                    f"Reading AWS CUR with {parallel_workers} parallel workers"
-                )
+                parallel_workers = self.config.get("performance", {}).get("parallel_readers", 4)
+                self.logger.info(f"Reading AWS CUR with {parallel_workers} parallel workers")
 
-                df = self.parquet_reader._read_files_parallel(
-                    files, parallel_workers, columns=columns
-                )
+                df = self.parquet_reader._read_files_parallel(files, parallel_workers, columns=columns)
 
                 self.logger.info(
                     "✓ Loaded AWS CUR data",
@@ -451,11 +426,7 @@ class AWSDataLoader:
 
                 # DEBUG: Check for cost columns
                 cost_cols = [c for c in df.columns if "cost" in c.lower()]
-                cost_sum = (
-                    df["lineitem_unblendedcost"].sum()
-                    if "lineitem_unblendedcost" in df.columns
-                    else 0
-                )
+                cost_sum = df["lineitem_unblendedcost"].sum() if "lineitem_unblendedcost" in df.columns else 0
                 self.logger.info(
                     "DEBUG: AWS data loaded",
                     cost_columns=cost_cols,
@@ -586,12 +557,8 @@ class AWSDataLoader:
             "product_codes": df["lineitem_productcode"].value_counts().to_dict(),
             "total_cost_unblended": df["lineitem_unblendedcost"].sum(),
             "date_range": {
-                "min": df["lineitem_usagestartdate"].min()
-                if "lineitem_usagestartdate" in df.columns
-                else None,
-                "max": df["lineitem_usagestartdate"].max()
-                if "lineitem_usagestartdate" in df.columns
-                else None,
+                "min": df["lineitem_usagestartdate"].min() if "lineitem_usagestartdate" in df.columns else None,
+                "max": df["lineitem_usagestartdate"].max() if "lineitem_usagestartdate" in df.columns else None,
             },
         }
 

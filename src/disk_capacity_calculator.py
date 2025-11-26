@@ -105,22 +105,18 @@ class DiskCapacityCalculator:
         # Extract CSI volume handles
         if "csi_volume_handle" in ocp_storage_usage_df.columns:
             csi_handles = ocp_storage_usage_df[
-                ocp_storage_usage_df["csi_volume_handle"].notna()
-                & (ocp_storage_usage_df["csi_volume_handle"] != "")
+                ocp_storage_usage_df["csi_volume_handle"].notna() & (ocp_storage_usage_df["csi_volume_handle"] != "")
             ]["csi_volume_handle"].unique()
             volume_set.update(csi_handles)
 
         # Extract PV names (for non-CSI storage)
         if "persistentvolume" in ocp_storage_usage_df.columns:
             pv_names = ocp_storage_usage_df[
-                ocp_storage_usage_df["persistentvolume"].notna()
-                & (ocp_storage_usage_df["persistentvolume"] != "")
+                ocp_storage_usage_df["persistentvolume"].notna() & (ocp_storage_usage_df["persistentvolume"] != "")
             ]["persistentvolume"].unique()
             volume_set.update(pv_names)
 
-        self.logger.info(
-            f"Extracted {len(volume_set)} unique CSI volume handles from OCP storage"
-        )
+        self.logger.info(f"Extracted {len(volume_set)} unique CSI volume handles from OCP storage")
 
         return volume_set
 
@@ -175,9 +171,7 @@ class DiskCapacityCalculator:
             matched_volumes = self.extract_matched_volumes(ocp_storage_usage_df)
 
             if not matched_volumes:
-                self.logger.warning(
-                    "No matched volumes found, returning empty DataFrame"
-                )
+                self.logger.warning("No matched volumes found, returning empty DataFrame")
                 return pd.DataFrame(columns=["resource_id", "capacity", "usage_start"])
 
             # Step 2: Filter AWS to matched EBS volumes only
@@ -205,19 +199,13 @@ class DiskCapacityCalculator:
             # Fall back to suffix matching for EBS volumes not matched by resource matcher
             if "matched_resource_id" in aws_line_items_df.columns:
                 # Filter by matched_resource_id (for resource matcher matched volumes)
-                matched_by_id = aws_line_items_df["matched_resource_id"].isin(
-                    matched_volumes
-                )
+                matched_by_id = aws_line_items_df["matched_resource_id"].isin(matched_volumes)
 
                 # Also try suffix matching on lineitem_resourceid (for non-matched EBS volumes)
-                matched_by_suffix = aws_line_items_df["lineitem_resourceid"].apply(
-                    matches_volume_suffix
-                )
+                matched_by_suffix = aws_line_items_df["lineitem_resourceid"].apply(matches_volume_suffix)
 
                 # Combine both filters with OR
-                aws_filtered = aws_line_items_df[
-                    matched_by_id | matched_by_suffix
-                ].copy()
+                aws_filtered = aws_line_items_df[matched_by_id | matched_by_suffix].copy()
 
                 self.logger.debug(
                     f"Filtering by matched_resource_id OR suffix matching",
@@ -228,29 +216,19 @@ class DiskCapacityCalculator:
             else:
                 # No matched_resource_id column - use suffix matching only
                 aws_filtered = aws_line_items_df[
-                    aws_line_items_df["lineitem_resourceid"].apply(
-                        matches_volume_suffix
-                    )
+                    aws_line_items_df["lineitem_resourceid"].apply(matches_volume_suffix)
                 ].copy()
-                self.logger.debug(
-                    f"Filtering by suffix matching on lineitem_resourceid only"
-                )
+                self.logger.debug(f"Filtering by suffix matching on lineitem_resourceid only")
 
             if aws_filtered.empty:
-                self.logger.warning(
-                    f"No AWS line items found for {len(matched_volumes)} matched volumes"
-                )
+                self.logger.warning(f"No AWS line items found for {len(matched_volumes)} matched volumes")
                 return pd.DataFrame(columns=["resource_id", "capacity", "usage_start"])
 
-            self.logger.info(
-                f"Filtered to {len(aws_filtered)} AWS line items for {len(matched_volumes)} volumes"
-            )
+            self.logger.info(f"Filtered to {len(aws_filtered)} AWS line items for {len(matched_volumes)} volumes")
 
             # Step 3: Prepare usage_date for grouping
             if "lineitem_usagestartdate" in aws_filtered.columns:
-                aws_filtered["usage_date"] = pd.to_datetime(
-                    aws_filtered["lineitem_usagestartdate"]
-                ).dt.date
+                aws_filtered["usage_date"] = pd.to_datetime(aws_filtered["lineitem_usagestartdate"]).dt.date
             else:
                 self.logger.error("Missing 'lineitem_usagestartdate' column")
                 return pd.DataFrame(columns=["resource_id", "capacity", "usage_start"])
@@ -270,9 +248,7 @@ class DiskCapacityCalculator:
                 .reset_index()
             )
 
-            self.logger.debug(
-                f"Grouped to {len(capacity_df)} resource-date combinations"
-            )
+            self.logger.debug(f"Grouped to {len(capacity_df)} resource-date combinations")
 
             # Step 5: Calculate hours in month
             hours_in_month = self.calculate_hours_in_month(year, month)
@@ -280,17 +256,14 @@ class DiskCapacityCalculator:
             # Step 6: Apply capacity formula
             # Capacity = Cost / (Rate / Hours)
             # Handle division by zero gracefully
-            capacity_df["rate_per_hour"] = (
-                capacity_df["lineitem_unblendedrate"] / hours_in_month
-            )
+            capacity_df["rate_per_hour"] = capacity_df["lineitem_unblendedrate"] / hours_in_month
 
             # Only calculate capacity where rate > 0
             mask = capacity_df["lineitem_unblendedrate"] > 0
             capacity_df["capacity"] = 0.0  # Use float to avoid dtype warning
 
             capacity_df.loc[mask, "capacity"] = (
-                capacity_df.loc[mask, "lineitem_unblendedcost"]
-                / capacity_df.loc[mask, "rate_per_hour"]
+                capacity_df.loc[mask, "lineitem_unblendedcost"] / capacity_df.loc[mask, "rate_per_hour"]
             )
 
             # Round to nearest integer
@@ -355,16 +328,8 @@ class DiskCapacityCalculator:
         # Capacity distribution
         summary["capacity_distribution"] = {
             "< 100 GB": int((capacity_df["capacity"] < 100).sum()),
-            "100-500 GB": int(
-                (
-                    (capacity_df["capacity"] >= 100) & (capacity_df["capacity"] < 500)
-                ).sum()
-            ),
-            "500-1000 GB": int(
-                (
-                    (capacity_df["capacity"] >= 500) & (capacity_df["capacity"] < 1000)
-                ).sum()
-            ),
+            "100-500 GB": int(((capacity_df["capacity"] >= 100) & (capacity_df["capacity"] < 500)).sum()),
+            "500-1000 GB": int(((capacity_df["capacity"] >= 500) & (capacity_df["capacity"] < 1000)).sum()),
             "> 1000 GB": int((capacity_df["capacity"] >= 1000).sum()),
         }
 
@@ -394,9 +359,7 @@ class DiskCapacityCalculator:
 
         # Check for required columns
         required_columns = ["resource_id", "capacity", "usage_start"]
-        missing_columns = [
-            col for col in required_columns if col not in capacity_df.columns
-        ]
+        missing_columns = [col for col in required_columns if col not in capacity_df.columns]
 
         if missing_columns:
             error_msg = f"Missing required columns: {missing_columns}"
@@ -413,16 +376,12 @@ class DiskCapacityCalculator:
         # Check for unreasonably large capacities
         too_large = (capacity_df["capacity"] > max_capacity_gb).sum()
         if too_large > 0:
-            self.logger.warning(
-                f"Found {too_large} capacities > {max_capacity_gb} GB (may be valid for large volumes)"
-            )
+            self.logger.warning(f"Found {too_large} capacities > {max_capacity_gb} GB (may be valid for large volumes)")
 
         # Check for unreasonably small capacities
         too_small = (capacity_df["capacity"] < min_capacity_gb).sum()
         if too_small > 0:
-            self.logger.warning(
-                f"Found {too_small} capacities < {min_capacity_gb} GB (may be valid for small volumes)"
-            )
+            self.logger.warning(f"Found {too_small} capacities < {min_capacity_gb} GB (may be valid for small volumes)")
 
         self.logger.debug("✓ Capacity validation passed")
         return True

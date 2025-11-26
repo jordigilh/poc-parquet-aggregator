@@ -55,9 +55,7 @@ def sample_aws_data_with_tags():
             ],
             "resourcetags": [
                 json.dumps({"openshift_cluster": "my-cluster", "env": "prod"}),
-                json.dumps(
-                    {"openshift_node": "ip-10-0-1-100.ec2.internal", "app": "cache"}
-                ),
+                json.dumps({"openshift_node": "ip-10-0-1-100.ec2.internal", "app": "cache"}),
                 json.dumps({"openshift_project": "backend", "tier": "network"}),
                 json.dumps({}),
                 json.dumps({"openshift_cluster": "different-cluster"}),
@@ -104,9 +102,7 @@ class TestTagMatcher:
         """Test extraction of OCP tag values."""
         matcher = TagMatcher(mock_config)
 
-        tag_values = matcher.extract_ocp_tag_values(
-            cluster_id="my-cluster", pod_usage_df=sample_pod_usage
-        )
+        tag_values = matcher.extract_ocp_tag_values(cluster_id="my-cluster", pod_usage_df=sample_pod_usage)
 
         # Check cluster IDs
         assert "cluster_ids" in tag_values
@@ -128,9 +124,7 @@ class TestTagMatcher:
         """Test extraction from empty DataFrame."""
         matcher = TagMatcher(mock_config)
 
-        tag_values = matcher.extract_ocp_tag_values(
-            cluster_id="my-cluster", pod_usage_df=pd.DataFrame()
-        )
+        tag_values = matcher.extract_ocp_tag_values(cluster_id="my-cluster", pod_usage_df=pd.DataFrame())
 
         assert "my-cluster" in tag_values["cluster_ids"]
         assert len(tag_values["node_names"]) == 0
@@ -140,9 +134,7 @@ class TestTagMatcher:
         """Test parsing valid AWS tags."""
         matcher = TagMatcher(mock_config)
 
-        tags_json = json.dumps(
-            {"openshift_cluster": "my-cluster", "env": "prod", "app": "backend"}
-        )
+        tags_json = json.dumps({"openshift_cluster": "my-cluster", "env": "prod", "app": "backend"})
 
         tags = matcher.parse_aws_tags(tags_json)
 
@@ -199,16 +191,12 @@ class TestTagMatcher:
         filtered = matcher.filter_by_enabled_keys(aws_tags, set())
         assert filtered == aws_tags
 
-    def test_match_by_tags_cluster(
-        self, mock_config, sample_pod_usage, sample_aws_data_with_tags
-    ):
+    def test_match_by_tags_cluster(self, mock_config, sample_pod_usage, sample_aws_data_with_tags):
         """Test matching by openshift_cluster tag."""
         matcher = TagMatcher(mock_config)
 
         # Extract OCP tag values
-        ocp_tag_values = matcher.extract_ocp_tag_values(
-            cluster_id="my-cluster", pod_usage_df=sample_pod_usage
-        )
+        ocp_tag_values = matcher.extract_ocp_tag_values(cluster_id="my-cluster", pod_usage_df=sample_pod_usage)
 
         # Match by tags
         result = matcher.match_by_tags(sample_aws_data_with_tags, ocp_tag_values)
@@ -224,15 +212,11 @@ class TestTagMatcher:
         assert rds_row["matched_tag"] == "openshift_cluster=my-cluster"
         assert rds_row["matched_ocp_cluster"] == "my-cluster"
 
-    def test_match_by_tags_node(
-        self, mock_config, sample_pod_usage, sample_aws_data_with_tags
-    ):
+    def test_match_by_tags_node(self, mock_config, sample_pod_usage, sample_aws_data_with_tags):
         """Test matching by openshift_node tag."""
         matcher = TagMatcher(mock_config)
 
-        ocp_tag_values = matcher.extract_ocp_tag_values(
-            cluster_id="my-cluster", pod_usage_df=sample_pod_usage
-        )
+        ocp_tag_values = matcher.extract_ocp_tag_values(cluster_id="my-cluster", pod_usage_df=sample_pod_usage)
 
         result = matcher.match_by_tags(sample_aws_data_with_tags, ocp_tag_values)
 
@@ -242,15 +226,11 @@ class TestTagMatcher:
         assert cache_row["matched_tag"] == "openshift_node=ip-10-0-1-100.ec2.internal"
         assert cache_row["matched_ocp_node"] == "ip-10-0-1-100.ec2.internal"
 
-    def test_match_by_tags_namespace(
-        self, mock_config, sample_pod_usage, sample_aws_data_with_tags
-    ):
+    def test_match_by_tags_namespace(self, mock_config, sample_pod_usage, sample_aws_data_with_tags):
         """Test matching by openshift_project tag."""
         matcher = TagMatcher(mock_config)
 
-        ocp_tag_values = matcher.extract_ocp_tag_values(
-            cluster_id="my-cluster", pod_usage_df=sample_pod_usage
-        )
+        ocp_tag_values = matcher.extract_ocp_tag_values(cluster_id="my-cluster", pod_usage_df=sample_pod_usage)
 
         result = matcher.match_by_tags(sample_aws_data_with_tags, ocp_tag_values)
 
@@ -260,15 +240,11 @@ class TestTagMatcher:
         assert nat_row["matched_tag"] == "openshift_project=backend"
         assert nat_row["matched_ocp_namespace"] == "backend"
 
-    def test_match_by_tags_no_match(
-        self, mock_config, sample_pod_usage, sample_aws_data_with_tags
-    ):
+    def test_match_by_tags_no_match(self, mock_config, sample_pod_usage, sample_aws_data_with_tags):
         """Test resources that don't match."""
         matcher = TagMatcher(mock_config)
 
-        ocp_tag_values = matcher.extract_ocp_tag_values(
-            cluster_id="my-cluster", pod_usage_df=sample_pod_usage
-        )
+        ocp_tag_values = matcher.extract_ocp_tag_values(cluster_id="my-cluster", pod_usage_df=sample_pod_usage)
 
         result = matcher.match_by_tags(sample_aws_data_with_tags, ocp_tag_values)
 
@@ -280,15 +256,11 @@ class TestTagMatcher:
         ec2_row = result.iloc[4]
         assert not ec2_row["tag_matched"]
 
-    def test_match_by_tags_skip_resource_id_matched(
-        self, mock_config, sample_pod_usage, sample_mixed_matching_data
-    ):
+    def test_match_by_tags_skip_resource_id_matched(self, mock_config, sample_pod_usage, sample_mixed_matching_data):
         """Test that resources already matched by resource ID are skipped."""
         matcher = TagMatcher(mock_config)
 
-        ocp_tag_values = matcher.extract_ocp_tag_values(
-            cluster_id="my-cluster", pod_usage_df=sample_pod_usage
-        )
+        ocp_tag_values = matcher.extract_ocp_tag_values(cluster_id="my-cluster", pod_usage_df=sample_pod_usage)
 
         result = matcher.match_by_tags(sample_mixed_matching_data, ocp_tag_values)
 
@@ -324,9 +296,7 @@ class TestTagMatcher:
             }
         )
 
-        ocp_tag_values = matcher.extract_ocp_tag_values(
-            cluster_id="my-cluster", pod_usage_df=sample_pod_usage
-        )
+        ocp_tag_values = matcher.extract_ocp_tag_values(cluster_id="my-cluster", pod_usage_df=sample_pod_usage)
 
         # Only enable openshift_cluster key
         enabled_keys = {"openshift_cluster"}
@@ -366,16 +336,12 @@ class TestTagMatcher:
         with pytest.raises(ValueError, match="missing 'resourcetags'"):
             matcher.match_by_tags(aws_data, ocp_tag_values)
 
-    def test_get_tag_matching_summary(
-        self, mock_config, sample_pod_usage, sample_aws_data_with_tags
-    ):
+    def test_get_tag_matching_summary(self, mock_config, sample_pod_usage, sample_aws_data_with_tags):
         """Test generation of tag matching summary."""
         matcher = TagMatcher(mock_config)
 
         # Extract and match
-        ocp_tag_values = matcher.extract_ocp_tag_values(
-            cluster_id="my-cluster", pod_usage_df=sample_pod_usage
-        )
+        ocp_tag_values = matcher.extract_ocp_tag_values(cluster_id="my-cluster", pod_usage_df=sample_pod_usage)
         matched_aws = matcher.match_by_tags(sample_aws_data_with_tags, ocp_tag_values)
 
         # Get summary
@@ -391,46 +357,32 @@ class TestTagMatcher:
         """Test summary with DataFrame that hasn't been matched."""
         matcher = TagMatcher(mock_config)
 
-        aws_data = pd.DataFrame(
-            {"lineitem_resourceid": ["i-123"], "resourcetags": [json.dumps({})]}
-        )
+        aws_data = pd.DataFrame({"lineitem_resourceid": ["i-123"], "resourcetags": [json.dumps({})]})
 
         summary = matcher.get_tag_matching_summary(aws_data)
 
         assert summary["status"] == "not_matched"
 
-    def test_validate_tag_matching_results_pass(
-        self, mock_config, sample_pod_usage, sample_aws_data_with_tags
-    ):
+    def test_validate_tag_matching_results_pass(self, mock_config, sample_pod_usage, sample_aws_data_with_tags):
         """Test validation of tag matching results (pass case)."""
         matcher = TagMatcher(mock_config)
 
-        ocp_tag_values = matcher.extract_ocp_tag_values(
-            cluster_id="my-cluster", pod_usage_df=sample_pod_usage
-        )
+        ocp_tag_values = matcher.extract_ocp_tag_values(cluster_id="my-cluster", pod_usage_df=sample_pod_usage)
         matched_aws = matcher.match_by_tags(sample_aws_data_with_tags, ocp_tag_values)
 
         # Validation should pass with 50% match rate
-        assert matcher.validate_tag_matching_results(
-            matched_aws, expected_match_rate_min=0.5
-        )
+        assert matcher.validate_tag_matching_results(matched_aws, expected_match_rate_min=0.5)
 
-    def test_validate_tag_matching_results_fail(
-        self, mock_config, sample_pod_usage, sample_aws_data_with_tags
-    ):
+    def test_validate_tag_matching_results_fail(self, mock_config, sample_pod_usage, sample_aws_data_with_tags):
         """Test validation of tag matching results (fail case)."""
         matcher = TagMatcher(mock_config)
 
-        ocp_tag_values = matcher.extract_ocp_tag_values(
-            cluster_id="my-cluster", pod_usage_df=sample_pod_usage
-        )
+        ocp_tag_values = matcher.extract_ocp_tag_values(cluster_id="my-cluster", pod_usage_df=sample_pod_usage)
         matched_aws = matcher.match_by_tags(sample_aws_data_with_tags, ocp_tag_values)
 
         # Validation should fail with 90% minimum requirement
         with pytest.raises(ValueError, match="match rate.*below minimum"):
-            matcher.validate_tag_matching_results(
-                matched_aws, expected_match_rate_min=0.9
-            )
+            matcher.validate_tag_matching_results(matched_aws, expected_match_rate_min=0.9)
 
     def test_validate_tag_matching_results_missing_column(self, mock_config):
         """Test validation with DataFrame missing matching column."""
@@ -463,9 +415,7 @@ class TestTagMatcher:
             }
         )
 
-        ocp_tag_values = matcher.extract_ocp_tag_values(
-            cluster_id="my-cluster", pod_usage_df=sample_pod_usage
-        )
+        ocp_tag_values = matcher.extract_ocp_tag_values(cluster_id="my-cluster", pod_usage_df=sample_pod_usage)
 
         result = matcher.match_by_tags(aws_data, ocp_tag_values)
 

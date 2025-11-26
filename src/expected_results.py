@@ -242,9 +242,7 @@ class ExpectedResultsCalculator:
 
         # Effective usage = max(usage, request)
         mem_effective_gig = max(mem_usage_gig, mem_request_gig)
-        agg["pod_effective_usage_memory_gigabyte_hours"] += (
-            mem_effective_gig * pod_hours
-        )
+        agg["pod_effective_usage_memory_gigabyte_hours"] += mem_effective_gig * pod_hours
 
     def print_summary(self, df: pd.DataFrame):
         """Print a summary of expected results.
@@ -263,33 +261,17 @@ class ExpectedResultsCalculator:
         print(f"Total Rows: {len(df)}")
         print(f"Date Range: {df['usage_start'].min()} to {df['usage_start'].max()}")
         print(f"Days: {df['usage_start'].nunique()}")
-        print(
-            f"Nodes: {df['node'].nunique()} ({', '.join(sorted(df['node'].unique()))})"
-        )
-        print(
-            f"Namespaces: {df['namespace'].nunique()} ({', '.join(sorted(df['namespace'].unique()))})"
-        )
+        print(f"Nodes: {df['node'].nunique()} ({', '.join(sorted(df['node'].unique()))})")
+        print(f"Namespaces: {df['namespace'].nunique()} ({', '.join(sorted(df['namespace'].unique()))})")
         print()
 
         print("Total Metrics Across All Days:")
-        print(
-            f"  CPU Request:      {df['pod_request_cpu_core_hours'].sum():>10.2f} core-hours"
-        )
-        print(
-            f"  CPU Effective:    {df['pod_effective_usage_cpu_core_hours'].sum():>10.2f} core-hours"
-        )
-        print(
-            f"  Memory Request:   {df['pod_request_memory_gigabyte_hours'].sum():>10.2f} GB-hours"
-        )
-        print(
-            f"  Memory Effective: {df['pod_effective_usage_memory_gigabyte_hours'].sum():>10.2f} GB-hours"
-        )
-        print(
-            f"  Node CPU Capacity:{df['node_capacity_cpu_core_hours'].sum():>10.2f} core-hours"
-        )
-        print(
-            f"  Node Mem Capacity:{df['node_capacity_memory_gigabyte_hours'].sum():>10.2f} GB-hours"
-        )
+        print(f"  CPU Request:      {df['pod_request_cpu_core_hours'].sum():>10.2f} core-hours")
+        print(f"  CPU Effective:    {df['pod_effective_usage_cpu_core_hours'].sum():>10.2f} core-hours")
+        print(f"  Memory Request:   {df['pod_request_memory_gigabyte_hours'].sum():>10.2f} GB-hours")
+        print(f"  Memory Effective: {df['pod_effective_usage_memory_gigabyte_hours'].sum():>10.2f} GB-hours")
+        print(f"  Node CPU Capacity:{df['node_capacity_cpu_core_hours'].sum():>10.2f} core-hours")
+        print(f"  Node Mem Capacity:{df['node_capacity_memory_gigabyte_hours'].sum():>10.2f} GB-hours")
         print()
 
         print("Per-Day Breakdown:")
@@ -297,12 +279,8 @@ class ExpectedResultsCalculator:
             day_df = df[df["usage_start"] == date]
             print(f"\n  {date}:")
             print(f"    Namespace-Node Combinations: {len(day_df)}")
-            print(
-                f"    CPU Request:    {day_df['pod_request_cpu_core_hours'].sum():>8.2f} core-hours"
-            )
-            print(
-                f"    Memory Request: {day_df['pod_request_memory_gigabyte_hours'].sum():>8.2f} GB-hours"
-            )
+            print(f"    CPU Request:    {day_df['pod_request_cpu_core_hours'].sum():>8.2f} core-hours")
+            print(f"    Memory Request: {day_df['pod_request_memory_gigabyte_hours'].sum():>8.2f} GB-hours")
 
             # Show detail for first day only
             if date == sorted(df["usage_start"].unique())[0]:
@@ -328,9 +306,7 @@ class ExpectedResultsCalculator:
         self.logger.info(f"Saved expected results to: {output_path}")
 
 
-def compare_results(
-    expected_df: pd.DataFrame, actual_df: pd.DataFrame, tolerance: float = 0.0001
-) -> Dict:
+def compare_results(expected_df: pd.DataFrame, actual_df: pd.DataFrame, tolerance: float = 0.0001) -> Dict:
     """Compare expected vs actual aggregation results.
 
     Args:
@@ -379,16 +355,12 @@ def compare_results(
     if not missing_in_actual.empty:
         issues.append(f"Missing in actual: {len(missing_in_actual)} rows")
         for _, row in missing_in_actual.iterrows():
-            issues.append(
-                f"  - {row['usage_start']}, {row['namespace']}, {row['node']}"
-            )
+            issues.append(f"  - {row['usage_start']}, {row['namespace']}, {row['node']}")
 
     if not missing_in_expected.empty:
         issues.append(f"Extra in actual: {len(missing_in_expected)} rows")
         for _, row in missing_in_expected.iterrows():
-            issues.append(
-                f"  - {row['usage_start']}, {row['namespace']}, {row['node']}"
-            )
+            issues.append(f"  - {row['usage_start']}, {row['namespace']}, {row['node']}")
 
     # Compare values for matching rows
     both = comparison[comparison["_merge"] == "both"]
@@ -437,9 +409,7 @@ def compare_results(
         "all_match": len(issues) == 0,
         "match_count": match_count,
         "total_comparisons": total_comparisons,
-        "match_percentage": (match_count / total_comparisons * 100)
-        if total_comparisons > 0
-        else 0,
+        "match_percentage": (match_count / total_comparisons * 100) if total_comparisons > 0 else 0,
         "issues": issues,
         "missing_in_actual_count": len(missing_in_actual),
         "extra_in_actual_count": len(missing_in_expected),
@@ -451,9 +421,7 @@ def compare_results(
         logger.info(f"   {match_count}/{total_comparisons} comparisons passed")
     else:
         logger.error(f"❌ FOUND {len(issues)} DISCREPANCIES")
-        logger.error(
-            f"   {match_count}/{total_comparisons} comparisons passed ({result['match_percentage']:.1f}%)"
-        )
+        logger.error(f"   {match_count}/{total_comparisons} comparisons passed ({result['match_percentage']:.1f}%)")
         for issue in issues[:10]:  # Show first 10
             logger.error(f"   {issue}")
         if len(issues) > 10:
@@ -466,14 +434,10 @@ if __name__ == "__main__":
     """Run as standalone script to generate expected results."""
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Calculate expected results from nise YAML"
-    )
+    parser = argparse.ArgumentParser(description="Calculate expected results from nise YAML")
     parser.add_argument("yaml_file", help="Path to nise static YAML file")
     parser.add_argument("--output", "-o", help="Output CSV file path")
-    parser.add_argument(
-        "--print", "-p", action="store_true", help="Print summary to console"
-    )
+    parser.add_argument("--print", "-p", action="store_true", help="Print summary to console")
 
     args = parser.parse_args()
 
