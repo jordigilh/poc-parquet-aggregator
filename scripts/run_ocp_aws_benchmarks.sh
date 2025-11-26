@@ -524,10 +524,10 @@ try:
     cur.execute('SELECT COUNT(*) FROM ${ORG_ID}.reporting_ocpawscostlineitem_project_daily_summary_p;')
     count = cur.fetchone()[0]
 
-    # Check for nulls in required columns
+    # Check for nulls in required columns (namespace only - OCP-on-AWS doesn't have pod column)
     cur.execute('''
         SELECT COUNT(*) FROM ${ORG_ID}.reporting_ocpawscostlineitem_project_daily_summary_p
-        WHERE namespace IS NULL OR pod IS NULL;
+        WHERE namespace IS NULL;
     ''')
     nulls = cur.fetchone()[0]
 
