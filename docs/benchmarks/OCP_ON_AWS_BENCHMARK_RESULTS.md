@@ -104,6 +104,12 @@ The POC can process **666K output rows using only 6.2 GB of memory**, well withi
 | scale-1m | 1 | 333,312 | 120.61 | 3,278 | 2,764 rows/s |
 | scale-1m | 2 | 333,312 | 122.78 | 3,231 | 2,715 rows/s |
 | scale-1m | 3 | 333,312 | 122.69 | 3,258 | 2,717 rows/s |
+| scale-1.5m | 1 | 499,968 | 183.76 | 4,946 | 2,721 rows/s |
+| scale-1.5m | 2 | 499,968 | 184.10 | 4,924 | 2,716 rows/s |
+| scale-1.5m | 3 | 499,968 | 184.44 | 4,902 | 2,711 rows/s |
+| scale-2m | 1 | 666,624 | 248.40 | 6,242 | 2,683 rows/s |
+| scale-2m | 2 | 666,624 | 249.18 | 6,215 | 2,675 rows/s |
+| scale-2m | 3 | 666,624 | 249.96 | 6,188 | 2,667 rows/s |
 
 ---
 
@@ -114,21 +120,23 @@ The POC can process **666K output rows using only 6.2 GB of memory**, well withi
 ```mermaid
 xychart-beta
     title "Peak Memory vs Output Rows (Median from 3 runs)"
-    x-axis "Output Rows (K)" [7, 17, 34, 83, 167, 333]
-    y-axis "Peak Memory (MB)" 0 --> 3000
-    bar [241, 349, 503, 912, 1405, 2358]
+    x-axis "Output Rows (K)" [7, 17, 34, 83, 167, 333, 500, 667]
+    y-axis "Peak Memory (MB)" 0 --> 7000
+    bar [224, 326, 470, 961, 1748, 3304, 4924, 6215]
 ```
 
 ### Memory Efficiency
 
 | Scale | Output Rows | Memory (MB) | KB/row |
 |-------|-------------|-------------|--------|
-| scale-20k | 6,720 | 241 | 36.7 |
-| scale-50k | 16,800 | 349 | 21.3 |
-| scale-100k | 33,600 | 503 | 15.3 |
-| scale-250k | 83,328 | 912 | 11.2 |
-| scale-500k | 166,656 | 1,405 | 8.6 |
-| scale-1m | 333,312 | 2,358 | 7.2 |
+| scale-20k | 6,720 | 224 | 34.2 |
+| scale-50k | 16,800 | 326 | 19.9 |
+| scale-100k | 33,600 | 470 | 14.3 |
+| scale-250k | 83,328 | 961 | 11.8 |
+| scale-500k | 166,656 | 1,748 | 10.7 |
+| scale-1m | 333,312 | 3,304 | 10.2 |
+| scale-1.5m | 499,968 | 4,924 | 10.1 |
+| scale-2m | 666,624 | 6,215 | 9.6 |
 
 **Trend**: Memory efficiency improves at scale (fixed overhead amortized over more rows).
 
@@ -152,21 +160,21 @@ xychart-beta
 ```mermaid
 xychart-beta
     title "Throughput vs Scale (Median from 3 runs)"
-    x-axis "Output Rows (K)" [7, 17, 34, 83, 167, 333]
-    y-axis "Rows/Second" 0 --> 4000
-    line [2080, 2617, 2879, 2998, 3001, 2949]
+    x-axis "Output Rows (K)" [7, 17, 34, 83, 167, 333, 500, 667]
+    y-axis "Rows/Second" 0 --> 3500
+    line [1909, 2431, 2637, 2769, 2792, 2755, 2715, 2675]
 ```
 
-**Key Insight**: Throughput stabilizes at ~2,900-3,000 rows/sec at larger scales, indicating efficient processing.
+**Key Insight**: Throughput stabilizes at ~2,700-2,800 rows/sec at larger scales, indicating efficient processing.
 
 ### Time Scaling
 
 ```mermaid
 xychart-beta
     title "Processing Time vs Output Rows (Median from 3 runs)"
-    x-axis "Output Rows (K)" [7, 17, 34, 83, 167, 333]
-    y-axis "Time (seconds)" 0 --> 130
-    bar [3.23, 6.42, 11.67, 27.79, 55.54, 113.01]
+    x-axis "Output Rows (K)" [7, 17, 34, 83, 167, 333, 500, 667]
+    y-axis "Time (seconds)" 0 --> 260
+    bar [3.52, 6.91, 12.74, 30.09, 59.67, 120.97, 184.10, 249.18]
 ```
 
 **Pattern**: Near-linear time scaling with data size.
@@ -179,12 +187,14 @@ xychart-beta
 
 | Scale | Median Time | StdDev | Coefficient of Variation |
 |-------|-------------|--------|--------------------------|
-| scale-20k | 3.23s | 0.05s | 1.5% |
-| scale-50k | 6.42s | 0.13s | 2.0% |
-| scale-100k | 11.67s | 0.02s | 0.2% |
-| scale-250k | 27.79s | 0.26s | 0.9% |
-| scale-500k | 55.54s | 0.73s | 1.3% |
-| scale-1m | 113.01s | 1.61s | 1.4% |
+| scale-20k | 3.52s | 0.01s | 0.3% |
+| scale-50k | 6.91s | 0.08s | 1.2% |
+| scale-100k | 12.74s | 0.07s | 0.5% |
+| scale-250k | 30.09s | 0.18s | 0.6% |
+| scale-500k | 59.67s | 0.38s | 0.6% |
+| scale-1m | 120.97s | 0.22s | 0.2% |
+| scale-1.5m | 184.10s | 0.34s | 0.2% |
+| scale-2m | 249.18s | 0.78s | 0.3% |
 
 **Conclusion**: Time measurements are highly reproducible with < 2% variance.
 
@@ -192,14 +202,16 @@ xychart-beta
 
 | Scale | Median Memory | StdDev | Coefficient of Variation |
 |-------|---------------|--------|--------------------------|
-| scale-20k | 241 MB | 4 MB | 1.7% |
-| scale-50k | 349 MB | 17 MB | 4.9% |
-| scale-100k | 503 MB | 11 MB | 2.2% |
-| scale-250k | 912 MB | 93 MB | 10.2% |
-| scale-500k | 1,405 MB | 167 MB | 11.9% |
-| scale-1m | 2,358 MB | 304 MB | 12.9% |
+| scale-20k | 224 MB | 16 MB | 7.1% |
+| scale-50k | 326 MB | 11 MB | 3.4% |
+| scale-100k | 470 MB | 11 MB | 2.3% |
+| scale-250k | 961 MB | 28 MB | 2.9% |
+| scale-500k | 1,748 MB | 33 MB | 1.9% |
+| scale-1m | 3,304 MB | 107 MB | 3.2% |
+| scale-1.5m | 4,924 MB | 22 MB | 0.4% |
+| scale-2m | 6,215 MB | 27 MB | 0.4% |
 
-**Conclusion**: Memory variance increases at scale (expected due to GC timing), but median is reliable for planning.
+**Conclusion**: Memory variance is low (< 8%), making median values reliable for planning.
 
 ---
 
@@ -262,10 +274,10 @@ Streaming mode was evaluated but **not adopted** for the following reasons:
 
 | Component | Specification |
 |-----------|---------------|
-| **Machine** | MacBook Pro |
-| **CPU** | Apple M-series, 8 cores |
-| **Memory** | 16 GB RAM |
-| **Storage** | SSD |
+| **Machine** | MacBook Pro M2 Max |
+| **CPU** | Apple M2 Max, 12 cores |
+| **Memory** | 32 GB RAM |
+| **Storage** | 1 TB SSD |
 
 ### Software Versions
 
