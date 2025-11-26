@@ -210,9 +210,9 @@ class OCPAWSAggregator:
             self.logger.info(
                 "✓ OCP-AWS aggregation complete (IN-MEMORY)",
                 output_rows=len(final_output),
-                total_unblended_cost=final_output["unblended_cost"].sum()
-                if "unblended_cost" in final_output.columns
-                else 0,
+                total_unblended_cost=(
+                    final_output["unblended_cost"].sum() if "unblended_cost" in final_output.columns else 0
+                ),
                 unique_namespaces=final_output["namespace"].nunique() if "namespace" in final_output.columns else 0,
                 unique_nodes=final_output["node"].nunique() if "node" in final_output.columns else 0,
             )
@@ -371,9 +371,9 @@ class OCPAWSAggregator:
             self.logger.info(
                 "✓ OCP-AWS aggregation complete (STREAMING)",
                 output_rows=len(final_output),
-                total_unblended_cost=final_output["unblended_cost"].sum()
-                if "unblended_cost" in final_output.columns
-                else 0,
+                total_unblended_cost=(
+                    final_output["unblended_cost"].sum() if "unblended_cost" in final_output.columns else 0
+                ),
                 unique_namespaces=final_output["namespace"].nunique() if "namespace" in final_output.columns else 0,
                 unique_nodes=final_output["node"].nunique() if "node" in final_output.columns else 0,
             )
@@ -552,9 +552,9 @@ class OCPAWSAggregator:
             self.logger.info(
                 "✓ Loaded AWS data",
                 rows=len(aws_data),
-                unique_resources=aws_data["lineitem_resourceid"].nunique()
-                if "lineitem_resourceid" in aws_data.columns
-                else 0,
+                unique_resources=(
+                    aws_data["lineitem_resourceid"].nunique() if "lineitem_resourceid" in aws_data.columns else 0
+                ),
             )
 
             return aws_data

@@ -137,18 +137,22 @@ class ArrowLabelProcessor:
             # Fast JSON serialization
             # Handle NaN, None, and empty values
             return [
-                json.dumps(labels, sort_keys=True)
-                if (labels and not (isinstance(labels, float) and pd.isna(labels)))
-                else "{}"
+                (
+                    json.dumps(labels, sort_keys=True)
+                    if (labels and not (isinstance(labels, float) and pd.isna(labels)))
+                    else "{}"
+                )
                 for labels in labels_list
             ]
         except Exception as e:
             self.logger.warning(f"Arrow JSON serialization failed, falling back: {e}")
             # Fallback - also handle NaN
             return [
-                "{}"
-                if (not labels or (isinstance(labels, float) and pd.isna(labels)))
-                else json.dumps(labels, sort_keys=True)
+                (
+                    "{}"
+                    if (not labels or (isinstance(labels, float) and pd.isna(labels)))
+                    else json.dumps(labels, sort_keys=True)
+                )
                 for labels in labels_list
             ]
 

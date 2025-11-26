@@ -815,9 +815,11 @@ class CostAttributor:
             # Trino: (persistentvolume != '' OR csi_volume_handle != '')
             # Use CSI handle if available, otherwise fall back to PV name
             ocp_storage_agg["resource_id"] = ocp_storage_agg.apply(
-                lambda row: row["csi_volume_handle"]
-                if (pd.notna(row["csi_volume_handle"]) and row["csi_volume_handle"] != "")
-                else row["persistentvolume"],
+                lambda row: (
+                    row["csi_volume_handle"]
+                    if (pd.notna(row["csi_volume_handle"]) and row["csi_volume_handle"] != "")
+                    else row["persistentvolume"]
+                ),
                 axis=1,
             )
 

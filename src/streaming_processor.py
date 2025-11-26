@@ -300,7 +300,7 @@ class StreamingProcessor:
 
 
 def make_chunk_processor(
-    process_single_row_fn: Callable[[pd.Series, Dict[str, Any]], Dict[str, Any]]
+    process_single_row_fn: Callable[[pd.Series, Dict[str, Any]], Dict[str, Any]],
 ) -> Callable[[pd.DataFrame, Dict[str, Any], int], pd.DataFrame]:
     """
     Factory function to create a chunk processor from a row processor.

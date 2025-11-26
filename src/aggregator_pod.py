@@ -663,9 +663,9 @@ class PodAggregator:
 
         # Aggregation functions
         agg_funcs = {
-            "resource_id": lambda x: x.iloc[0]
-            if len(x) > 0
-            else None,  # Take first value (safer than max for mixed types)
+            "resource_id": lambda x: (
+                x.iloc[0] if len(x) > 0 else None
+            ),  # Take first value (safer than max for mixed types)
             # CPU metrics (convert seconds to hours)
             "pod_usage_cpu_core_seconds": lambda x: convert_seconds_to_hours(x.sum()),
             "pod_request_cpu_core_seconds": lambda x: convert_seconds_to_hours(x.sum()),

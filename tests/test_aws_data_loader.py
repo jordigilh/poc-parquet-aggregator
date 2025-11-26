@@ -409,7 +409,7 @@ class TestAWSDataLoader:
                     "lineitem_resourceid": ["i-abc123"],
                     "lineitem_usagestartdate": pd.to_datetime(["2025-10-01"]),
                     "lineitem_unblendedcost": [1.0],
-                    "resourcetags": ["{}"]
+                    "resourcetags": ["{}"],
                     # Missing: lineitem_blendedcost, savingsplan_savingsplaneffectivecost, etc.
                 }
             )

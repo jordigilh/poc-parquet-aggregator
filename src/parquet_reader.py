@@ -434,7 +434,7 @@ class ParquetReader:
             "pod_limit_memory_byte_seconds",
             # 'pod_effective_usage_memory_byte_seconds',  # REMOVED: Computed at runtime, not in source
             "node_capacity_cpu_core_seconds",
-            "node_capacity_memory_byte_seconds"
+            "node_capacity_memory_byte_seconds",
             # 'source' is NOT in input data - it's added later in _format_output()
         ]
 
@@ -457,7 +457,7 @@ class ParquetReader:
             "persistentvolumeclaim_usage_byte_seconds",
             "persistentvolume_labels",
             "persistentvolumeclaim_labels",
-            "csi_volume_handle"
+            "csi_volume_handle",
             # 'source' is NOT in input data - it's added later
         ]
 

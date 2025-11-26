@@ -224,7 +224,7 @@ class TestNetworkCostHandler:
         incomplete_network = pd.DataFrame(
             {
                 "lineitem_resourceid": ["i-node1-suffix"],
-                "data_transfer_direction": ["IN"]
+                "data_transfer_direction": ["IN"],
                 # Missing cost columns
             }
         )
