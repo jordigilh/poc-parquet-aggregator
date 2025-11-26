@@ -1,9 +1,10 @@
 # OCP-Only Benchmark Plan
 
 **Date**: November 26, 2025
-**Status**: 🔄 **PENDING RE-RUN** (manifests updated to target input rows)
+**Status**: ✅ **EXECUTED** 
 **Purpose**: Measure processing time and memory for OCP-only aggregation at production scale
-**Note**: Scale names now refer to INPUT ROWS (hourly data from nise)
+**Results**: See [OCP_BENCHMARK_RESULTS.md](OCP_BENCHMARK_RESULTS.md)
+**Note**: Scale names refer to INPUT ROWS (hourly data from nise)
 
 ## Table of Contents
 

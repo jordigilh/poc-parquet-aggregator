@@ -17,18 +17,19 @@
 
 ## Summary
 
-| Scale | Output Rows | Time (s) | Memory (MB) | Throughput* |
-|-------|-------------|----------|-------------|-------------|
-| **20k** | 420 | 2.52 ± 0.06 | 253 ± 1 | 167 rows/s |
-| **50k** | 1,050 | 4.62 ± 0.00 | 369 ± 1 | 227 rows/s |
-| **100k** | 2,085 | 8.13 ± 0.07 | 502 ± 3 | 257 rows/s |
-| **250k** | 5,225 | 18.55 ± 0.22 | 1,086 ± 5 | 282 rows/s |
-| **500k** | 10,430 | 37.17 ± 0.03 | 1,969 ± 17 | 281 rows/s |
-| **1m** | 20,850 | 72.37 ± 0.19 | 3,729 ± 69 | 288 rows/s |
-| **1.5m** | 31,260 | 104.69 ± 0.10 | 4,982 ± 41 | 299 rows/s |
-| **2m** | 41,650 | 139.19 ± 0.77 | 7,184 ± 29 | 299 rows/s |
+| Scale | Input Rows | Output Rows | Time (s) | Memory (MB) | Throughput |
+|-------|------------|-------------|----------|-------------|------------|
+| **20k** | 20,406 | 830 | 4.35 ± 0.06 | 328 ± 4 | 191 rows/s |
+| **50k** | 50,886 | 2,080 | 8.49 ± 0.10 | 510 ± 3 | 245 rows/s |
+| **100k** | 101,766 | 4,160 | 15.60 ± 0.03 | 839 ± 8 | 267 rows/s |
+| **250k** | 254,408 | 10,400 | 37.01 ± 0.62 | 1,964 ± 22 | 281 rows/s |
+| **500k** | 508,810 | 20,800 | 72.04 ± 1.55 | 3,689 ± 32 | 289 rows/s |
+| **1m** | 1,017,615 | 41,600 | 139.67 ± 2.47 | 7,171 ± 493 | 298 rows/s |
+| **1.5m** | 1,526,420 | 62,400 | 208.55 ± 1.61 | 8,600 ± 302 | 299 rows/s |
+| **2m** | 2,035,225 | 83,200 | 282.76 ± 3.14 | 10,342 ± 292 | 294 rows/s |
 
-> **\*Throughput** = Output Rows / Time (calculated from median values)
+> **Note**: Scale names (20k, 50k, etc.) refer to **INPUT rows** (hourly data from nise).
+> **Throughput** = Output Rows / Time (calculated from median values)
 
 ---
 
@@ -38,19 +39,19 @@ What does each scale represent in a production environment?
 
 | Scale | Input Rows | Output Rows | Cluster Size | Use Case Example |
 |-------|------------|-------------|--------------|------------------|
-| **20k** | 10,080 | 420 | 5 nodes, ~420 pods | Single development cluster |
-| **50k** | 25,200 | 1,050 | 10 nodes, ~1,050 pods | Production workload, small org |
-| **100k** | 50,040 | 2,085 | 15 nodes, ~2,085 pods | Medium enterprise |
-| **250k** | 125,400 | 5,225 | 25 nodes, ~5,225 pods | Large enterprise |
-| **500k** | 250,320 | 10,430 | 35 nodes, ~10,430 pods | Multiple production clusters |
-| **1m** | 500,400 | 20,850 | 50 nodes, ~20,850 pods | Large-scale platform |
-| **1.5m** | 750,240 | 31,260 | 60 nodes, ~31,260 pods | Major enterprise |
-| **2m** | 999,600 | 41,650 | 70 nodes, ~41,650 pods | Cloud-scale operations |
+| **20k** | ~20,000 | 830 | 10 nodes, ~830 pods | Small production cluster |
+| **50k** | ~50,000 | 2,080 | 20 nodes, ~2,080 pods | Medium production environment |
+| **100k** | ~100,000 | 4,160 | 40 nodes, ~4,160 pods | Large enterprise deployment |
+| **250k** | ~250,000 | 10,400 | 100 nodes, ~10,400 pods | Multi-cluster enterprise |
+| **500k** | ~500,000 | 20,800 | 200 nodes, ~20,800 pods | Very large enterprise |
+| **1m** | ~1,000,000 | 41,600 | 400 nodes, ~41,600 pods | Hyperscale platform |
+| **1.5m** | ~1,500,000 | 62,400 | 600 nodes, ~62,400 pods | Major cloud provider scale |
+| **2m** | ~2,000,000 | 83,200 | 800 nodes, ~83,200 pods | Maximum tested scale |
 
-> **Note**: 
+> **Key**: 
 > - **Input Rows** = Pods × 24 hours (hourly data from nise)
-> - **Output Rows** = Daily aggregated summaries (Pod + Storage per namespace/node)
-> - Scale names (20k, 50k, etc.) refer to target scale, not exact row counts
+> - **Output Rows** = Daily aggregated summaries (one per pod/namespace/node)
+> - **Scale names now match input rows** (e.g., "20k" = ~20,000 input rows)
 
 ---
 
@@ -60,30 +61,30 @@ What does each scale represent in a production environment?
 
 | Scale | Run | Output Rows | Time (s) | Memory (MB) |
 |-------|-----|-------------|----------|-------------|
-| 20k | 1 | 420 | 2.53 | 254 |
-| 20k | 2 | 420 | 2.52 | 253 |
-| 20k | 3 | 420 | 2.43 | 253 |
-| 50k | 1 | 1,050 | 4.62 | 369 |
-| 50k | 2 | 1,050 | 4.62 | 367 |
-| 50k | 3 | 1,050 | 4.62 | 369 |
-| 100k | 1 | 2,085 | 8.15 | 505 |
-| 100k | 2 | 2,085 | 8.02 | 499 |
-| 100k | 3 | 2,085 | 8.13 | 502 |
-| 250k | 1 | 5,225 | 18.85 | 1,093 |
-| 250k | 2 | 5,225 | 18.55 | 1,084 |
-| 250k | 3 | 5,225 | 18.42 | 1,086 |
-| 500k | 1 | 10,430 | 37.22 | 1,985 |
-| 500k | 2 | 10,430 | 37.17 | 1,952 |
-| 500k | 3 | 10,430 | 37.16 | 1,969 |
-| 1m | 1 | 20,850 | 72.33 | 3,714 |
-| 1m | 2 | 20,850 | 72.67 | 3,729 |
-| 1m | 3 | 20,850 | 72.37 | 3,841 |
-| 1.5m | 1 | 31,260 | 104.66 | 4,981 |
-| 1.5m | 2 | 31,260 | 104.84 | 4,982 |
-| 1.5m | 3 | 31,260 | 104.69 | 5,053 |
-| 2m | 1 | 41,650 | 140.40 | 7,205 |
-| 2m | 2 | 41,650 | 139.19 | 7,148 |
-| 2m | 3 | 41,650 | 138.96 | 7,184 |
+| 20k | 1 | 830 | 4.31 | 328 |
+| 20k | 2 | 830 | 4.35 | 330 |
+| 20k | 3 | 830 | 4.42 | 322 |
+| 50k | 1 | 2,080 | 8.49 | 507 |
+| 50k | 2 | 2,080 | 8.59 | 510 |
+| 50k | 3 | 2,080 | 8.40 | 512 |
+| 100k | 1 | 4,160 | 15.62 | 844 |
+| 100k | 2 | 4,160 | 15.60 | 829 |
+| 100k | 3 | 4,160 | 15.57 | 839 |
+| 250k | 1 | 10,400 | 36.79 | 1,997 |
+| 250k | 2 | 10,400 | 37.95 | 1,955 |
+| 250k | 3 | 10,400 | 37.01 | 1,964 |
+| 500k | 1 | 20,800 | 72.04 | 3,689 |
+| 500k | 2 | 20,800 | 71.62 | 3,722 |
+| 500k | 3 | 20,800 | 74.49 | 3,659 |
+| 1m | 1 | 41,600 | 143.58 | 6,322 |
+| 1m | 2 | 41,600 | 139.67 | 7,180 |
+| 1m | 3 | 41,600 | 139.00 | 7,171 |
+| 1.5m | 1 | 62,400 | 211.29 | 8,097 |
+| 1.5m | 2 | 62,400 | 208.44 | 8,638 |
+| 1.5m | 3 | 62,400 | 208.55 | 8,600 |
+| 2m | 1 | 83,200 | 277.34 | 10,342 |
+| 2m | 2 | 83,200 | 282.81 | 10,374 |
+| 2m | 3 | 83,200 | 282.76 | 9,853 |
 
 ---
 
@@ -92,16 +93,16 @@ What does each scale represent in a production environment?
 ### Processing Time Scaling
 
 ```
-Time (s) vs Output Rows (linear scaling observed):
-- 420 rows:    2.52s   → ~6ms per row
-- 41,650 rows: 139.19s → ~3.3ms per row
+Time (s) vs Input Rows (linear scaling observed):
+- 20k input:  4.35s   → ~0.21ms per input row
+- 2m input:   282.76s → ~0.14ms per input row
 
 Observation: Efficiency improves at scale due to fixed overhead amortization.
 ```
 
 ### Throughput Consistency
 
-Throughput remains consistent across scales (~270-300 rows/sec), demonstrating:
+Throughput remains consistent across scales (~260-300 output rows/sec), demonstrating:
 - ✅ Linear scalability
 - ✅ No performance degradation at larger scales
 - ✅ Predictable resource requirements
@@ -112,27 +113,27 @@ Throughput remains consistent across scales (~270-300 rows/sec), demonstrating:
 
 ### Memory Scaling
 
-| Scale | Output Rows | Memory (MB) | MB per 1K Rows |
-|-------|-------------|-------------|----------------|
-| 20k | 420 | 253 | 602 |
-| 50k | 1,050 | 369 | 352 |
-| 100k | 2,085 | 502 | 241 |
-| 250k | 5,225 | 1,086 | 208 |
-| 500k | 10,430 | 1,969 | 189 |
-| 1m | 20,850 | 3,729 | 179 |
-| 1.5m | 31,260 | 4,982 | 159 |
-| 2m | 41,650 | 7,184 | 172 |
+| Scale | Input Rows | Output Rows | Memory (MB) | MB per 1K Input |
+|-------|------------|-------------|-------------|-----------------|
+| 20k | 20,406 | 830 | 328 | 16.1 |
+| 50k | 50,886 | 2,080 | 510 | 10.0 |
+| 100k | 101,766 | 4,160 | 839 | 8.2 |
+| 250k | 254,408 | 10,400 | 1,964 | 7.7 |
+| 500k | 508,810 | 20,800 | 3,689 | 7.2 |
+| 1m | 1,017,615 | 41,600 | 7,171 | 7.0 |
+| 1.5m | 1,526,420 | 62,400 | 8,600 | 5.6 |
+| 2m | 2,035,225 | 83,200 | 10,342 | 5.1 |
 
-**Key Insight**: Memory efficiency improves at scale (~160-180 MB per 1K rows at production scale).
+**Key Insight**: Memory efficiency improves at scale (~5-7 MB per 1K input rows at production scale).
 
 ### Memory Formula
 
 ```
-Estimated Memory (MB) ≈ 200 + (Output Rows × 0.17)
+Estimated Memory (MB) ≈ 200 + (Input Rows × 0.005)
 
 Examples:
-- 10,000 rows: 200 + 1,700 = ~1,900 MB ✓
-- 50,000 rows: 200 + 8,500 = ~8,700 MB
+- 500,000 input: 200 + 2,500 = ~2,700 MB
+- 2,000,000 input: 200 + 10,000 = ~10,200 MB ✓
 ```
 
 ---
@@ -141,21 +142,21 @@ Examples:
 
 ### Memory Requirements
 
-| Scenario | Output Rows | Est. Memory | Fits in 32GB? |
-|----------|-------------|-------------|---------------|
-| Small customer | 5,000 | ~1 GB | ✅ Yes (3%) |
-| Medium customer | 20,000 | ~4 GB | ✅ Yes (13%) |
-| Large customer | 50,000 | ~9 GB | ✅ Yes (28%) |
-| Very large | 100,000 | ~17 GB | ✅ Yes (53%) |
-| Production target | 150,000 | ~26 GB | ✅ Yes (81%) |
-| Maximum | 190,000 | ~32 GB | ✅ Yes (100%) |
+| Scenario | Input Rows | Est. Memory | Fits in 32GB? |
+|----------|------------|-------------|---------------|
+| Small customer | 100,000 | ~1 GB | ✅ Yes (3%) |
+| Medium customer | 500,000 | ~4 GB | ✅ Yes (13%) |
+| Large customer | 1,000,000 | ~7 GB | ✅ Yes (22%) |
+| Very large | 2,000,000 | ~10 GB | ✅ Yes (31%) |
+| Maximum tested | 2,000,000 | 10,342 MB | ✅ Yes (32%) |
+| Projected max | 6,000,000 | ~31 GB | ✅ Yes (97%) |
 
 ### Conclusions
 
-1. **Memory-efficient**: OCP-only aggregation uses ~170MB per 1K output rows
-2. **Scalable**: Linear time scaling with consistent throughput
-3. **Production-ready**: Comfortably handles enterprise workloads within 32GB
-4. **Simpler than OCP-on-AWS**: No JOIN overhead, lower memory requirements
+1. **Memory-efficient**: OCP-only aggregation uses ~5-7MB per 1K input rows at scale
+2. **Scalable**: Linear time scaling with consistent throughput (~280-300 output rows/sec)
+3. **Production-ready**: Comfortably handles 2M+ input rows within 32GB
+4. **Input Row Alignment**: Scale names now correctly reflect input row counts
 
 ---
 
@@ -163,11 +164,11 @@ Examples:
 
 | Metric | OCP-Only | OCP-on-AWS |
 |--------|----------|------------|
-| Throughput | ~280-300 rows/s | ~2,500-2,800 rows/s |
-| Memory per 1K rows | ~170 MB | ~10 MB |
+| Throughput | ~280-300 output rows/s | ~2,500-2,800 output rows/s |
+| Memory per 1K input | ~5-7 MB | ~3-4 MB |
 | Complexity | Simple aggregation | JOIN + matching |
 
-**Note**: OCP-on-AWS has higher throughput but also higher memory overhead due to JOIN operations.
+**Note**: OCP-on-AWS has higher throughput due to different output row calculation (daily aggregation vs hourly).
 
 ---
 
