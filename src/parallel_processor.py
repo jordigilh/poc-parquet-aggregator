@@ -6,8 +6,7 @@ CPU utilization and achieve 2-4x speedup for streaming mode.
 """
 
 import multiprocessing as mp
-from concurrent.futures import (ProcessPoolExecutor, ThreadPoolExecutor,
-                                as_completed)
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Iterator, List, Optional
 
 import pandas as pd

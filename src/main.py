@@ -554,8 +554,7 @@ def run_poc(args):
         if args.validate_expected:
             logger.info("Phase 8: Validating against expected results...")
 
-            from .expected_results import (ExpectedResultsCalculator,
-                                           compare_results)
+            from .expected_results import ExpectedResultsCalculator, compare_results
 
             calculator = ExpectedResultsCalculator(args.validate_expected)
             expected_df = calculator.calculate_expected_aggregations()

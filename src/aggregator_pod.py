@@ -7,10 +7,18 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-from .utils import (PerformanceTimer, coalesce, convert_bytes_to_gigabytes,
-                    convert_seconds_to_hours, filter_labels_by_enabled_keys,
-                    get_logger, labels_to_json_string, merge_label_dicts,
-                    parse_json_labels, safe_greatest)
+from .utils import (
+    PerformanceTimer,
+    coalesce,
+    convert_bytes_to_gigabytes,
+    convert_seconds_to_hours,
+    filter_labels_by_enabled_keys,
+    get_logger,
+    labels_to_json_string,
+    merge_label_dicts,
+    parse_json_labels,
+    safe_greatest,
+)
 
 # Try to import Arrow compute (optional high-performance dependency)
 try:
