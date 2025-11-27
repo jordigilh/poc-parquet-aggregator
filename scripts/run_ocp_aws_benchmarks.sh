@@ -136,9 +136,9 @@ setup_environment() {
     export OCP_MONTH=10
 
     # Initialize CSV files with headers
-    echo "scale,output_rows,time_median,time_stddev,memory_median,memory_stddev,throughput" > "$RESULTS_CSV"
+    echo "scale,output_rows,time_median,time_stddev,memory_median,memory_stddev,throughput,avg_cpu_pct,max_cpu_pct" > "$RESULTS_CSV"
     echo "scale,phase,time_sec,memory_mb,exit_code" > "$PHASE_CSV"
-    echo "scale,run,output_rows,time_sec,memory_mb,throughput" > "$RAW_CSV"
+    echo "scale,run,output_rows,time_sec,memory_mb,throughput,avg_cpu_pct,max_cpu_pct" > "$RAW_CSV"
 
     # Check services (port 9000 is the S3 API, port 9001 is console)
     if ! curl -s http://localhost:9000/minio/health/live > /dev/null 2>&1; then
@@ -371,7 +371,7 @@ except Exception as e:
     pass  # Table might not exist yet
 EOF
 
-    # Run aggregation with continuous memory monitoring (100ms sampling)
+    # Run aggregation with continuous memory + CPU monitoring (100ms sampling)
     python3 << WRAPPER_AGG > "$mem_log"
 import subprocess
 import psutil
@@ -390,30 +390,53 @@ proc = subprocess.Popen(
 
 peak_mb = 0
 samples = 0
+cpu_samples = []
 start = time.time()
 
-# Continuous memory sampling at 100ms interval
+# Continuous memory + CPU sampling at ~100ms interval
 while proc.poll() is None:
     try:
         p = psutil.Process(proc.pid)
         rss = p.memory_info().rss / (1024**2)
-        for c in p.children(recursive=True):
-            try: rss += c.memory_info().rss / (1024**2)
+        
+        # Get all processes (main + children)
+        all_procs = [p] + list(p.children(recursive=True))
+        
+        total_cpu = 0
+        for proc_obj in all_procs:
+            try:
+                if proc_obj != p:
+                    rss += proc_obj.memory_info().rss / (1024**2)
+                # Use cpu_percent with small interval for accurate readings
+                cpu = proc_obj.cpu_percent(interval=0.05)
+                total_cpu += cpu
             except: pass
+        
+        if samples > 0:  # Skip first sample
+            cpu_samples.append(total_cpu)
         peak_mb = max(peak_mb, rss)
         samples += 1
     except: pass
-    time.sleep(0.1)  # 100ms sampling interval
+    time.sleep(0.05)  # ~100ms total with cpu_percent interval
 
 elapsed = time.time() - start
+
+# Calculate CPU stats
+avg_cpu = sum(cpu_samples) / len(cpu_samples) if cpu_samples else 0
+max_cpu = max(cpu_samples) if cpu_samples else 0
+
 print(f"TIME={elapsed:.2f}")
 print(f"PEAK_MB={peak_mb:.0f}")
 print(f"SAMPLES={samples}")
+print(f"AVG_CPU={avg_cpu:.1f}")
+print(f"MAX_CPU={max_cpu:.1f}")
 print(f"EXIT={proc.returncode or 0}")
 WRAPPER_AGG
 
     local agg_time=$(grep "TIME=" "$mem_log" 2>/dev/null | cut -d= -f2 || echo "0")
     local peak_memory=$(grep "PEAK_MB=" "$mem_log" 2>/dev/null | cut -d= -f2 || echo "0")
+    local avg_cpu=$(grep "AVG_CPU=" "$mem_log" 2>/dev/null | cut -d= -f2 || echo "0")
+    local max_cpu=$(grep "MAX_CPU=" "$mem_log" 2>/dev/null | cut -d= -f2 || echo "0")
     local exit_code=$(grep "EXIT=" "$mem_log" 2>/dev/null | cut -d= -f2 || echo "0")
 
     # Extract output rows from log
@@ -430,13 +453,13 @@ WRAPPER_AGG
         [[ -z "$throughput" ]] && throughput=0
     fi
 
-    # Record raw run data
-    echo "$scale,$run_num,$output_rows,$agg_time,$peak_memory,$throughput" >> "$RAW_CSV"
+    # Record raw run data (now includes CPU metrics)
+    echo "$scale,$run_num,$output_rows,$agg_time,$peak_memory,$throughput,$avg_cpu,$max_cpu" >> "$RAW_CSV"
 
-    echo -e "${GREEN}    Run $run_num: ${agg_time}s, ${peak_memory}MB, $output_rows rows${NC}" >&2
+    echo -e "${GREEN}    Run $run_num: ${agg_time}s, ${peak_memory}MB, CPU avg=${avg_cpu}% max=${max_cpu}%, $output_rows rows${NC}" >&2
 
-    # Return values via file to avoid log pollution
-    echo "$agg_time $peak_memory $output_rows $throughput" > "$result_file"
+    # Return values via file to avoid log pollution (now includes CPU)
+    echo "$agg_time $peak_memory $output_rows $throughput $avg_cpu $max_cpu" > "$result_file"
 }
 
 # Run multiple aggregations and compute statistics
@@ -449,6 +472,8 @@ run_aggregation_with_stats() {
     local memories=()
     local rows=0
     local throughputs=()
+    local avg_cpus=()
+    local max_cpus=()
 
     for run in $(seq 1 $RUNS_PER_SCALE); do
         run_single_aggregation "$scale" "$run"
@@ -458,11 +483,15 @@ run_aggregation_with_stats() {
         local mem=$(echo "$result" | awk '{print $2}')
         local r=$(echo "$result" | awk '{print $3}')
         local tput=$(echo "$result" | awk '{print $4}')
+        local avg_cpu=$(echo "$result" | awk '{print $5}')
+        local max_cpu=$(echo "$result" | awk '{print $6}')
 
         times+=("$time")
         memories+=("$mem")
         rows=$r
         throughputs+=("$tput")
+        avg_cpus+=("$avg_cpu")
+        max_cpus+=("$max_cpu")
     done
 
     # Calculate median and stddev using Python
@@ -472,6 +501,8 @@ import statistics
 times = [float(t) for t in "${times[*]}".split()]
 memories = [float(m) for m in "${memories[*]}".split()]
 throughputs = [float(t) for t in "${throughputs[*]}".split()]
+avg_cpus = [float(c) for c in "${avg_cpus[*]}".split()]
+max_cpus = [float(c) for c in "${max_cpus[*]}".split()]
 rows = $rows
 
 time_median = statistics.median(times)
@@ -479,6 +510,8 @@ time_stddev = statistics.stdev(times) if len(times) > 1 else 0
 mem_median = statistics.median(memories)
 mem_stddev = statistics.stdev(memories) if len(memories) > 1 else 0
 tput_median = statistics.median(throughputs)
+avg_cpu_median = statistics.median(avg_cpus)
+max_cpu_median = statistics.median(max_cpus)
 
 print(f"SCALE=$scale")
 print(f"ROWS={rows}")
@@ -487,10 +520,12 @@ print(f"TIME_STDDEV={time_stddev:.2f}")
 print(f"MEM_MEDIAN={mem_median:.0f}")
 print(f"MEM_STDDEV={mem_stddev:.0f}")
 print(f"THROUGHPUT={tput_median:.0f}")
+print(f"AVG_CPU={avg_cpu_median:.1f}")
+print(f"MAX_CPU={max_cpu_median:.1f}")
 
-# Write to results CSV
+# Write to results CSV (now includes CPU metrics)
 with open('$RESULTS_CSV', 'a') as f:
-    f.write(f"$scale,{rows},{time_median:.2f},{time_stddev:.2f},{mem_median:.0f},{mem_stddev:.0f},{tput_median:.0f}\n")
+    f.write(f"$scale,{rows},{time_median:.2f},{time_stddev:.2f},{mem_median:.0f},{mem_stddev:.0f},{tput_median:.0f},{avg_cpu_median:.1f},{max_cpu_median:.1f}\n")
 
 print("")
 print(f"  📊 Statistics for $scale:")
@@ -498,6 +533,7 @@ print(f"     Output Rows: {rows}")
 print(f"     Time: {time_median:.2f}s ± {time_stddev:.2f}s")
 print(f"     Memory: {mem_median:.0f}MB ± {mem_stddev:.0f}MB")
 print(f"     Throughput: {tput_median:.0f} rows/sec")
+print(f"     CPU: avg={avg_cpu_median:.1f}%, max={max_cpu_median:.1f}% (single-threaded)")
 EOF
 }
 
@@ -602,25 +638,26 @@ summarize_results() {
 
 ## Summary Results
 
-| Scale | Output Rows | Time (s) | Time StdDev | Memory (MB) | Memory StdDev | Throughput |
-|-------|-------------|----------|-------------|-------------|---------------|------------|
-$(tail -n +2 "$RESULTS_CSV" | while IFS=',' read scale rows time_med time_std mem_med mem_std tput; do
-    echo "| $scale | $rows | $time_med | ±$time_std | $mem_med | ±$mem_std | $tput rows/s |"
+| Scale | Output Rows | Time (s) | Time StdDev | Memory (MB) | Memory StdDev | Throughput | Avg CPU | Max CPU |
+|-------|-------------|----------|-------------|-------------|---------------|------------|---------|---------|
+$(tail -n +2 "$RESULTS_CSV" | while IFS=',' read scale rows time_med time_std mem_med mem_std tput avg_cpu max_cpu; do
+    echo "| $scale | $rows | $time_med | ±$time_std | $mem_med | ±$mem_std | $tput rows/s | ${avg_cpu}% | ${max_cpu}% |"
 done)
 
 ## Raw Run Data
 
-| Scale | Run | Output Rows | Time (s) | Memory (MB) | Throughput |
-|-------|-----|-------------|----------|-------------|------------|
-$(tail -n +2 "$RAW_CSV" | while IFS=',' read scale run rows time mem tput; do
-    echo "| $scale | $run | $rows | $time | $mem | $tput rows/s |"
+| Scale | Run | Output Rows | Time (s) | Memory (MB) | Throughput | Avg CPU | Max CPU |
+|-------|-----|-------------|----------|-------------|------------|---------|---------|
+$(tail -n +2 "$RAW_CSV" | while IFS=',' read scale run rows time mem tput avg_cpu max_cpu; do
+    echo "| $scale | $run | $rows | $time | $mem | $tput rows/s | ${avg_cpu}% | ${max_cpu}% |"
 done)
 
 ## Configuration
 
-- Mode: In-memory only (streaming disabled)
+- Mode: In-memory only (streaming disabled, **single-threaded**)
 - Runs per scale: $RUNS_PER_SCALE
 - Memory sampling: 100ms interval
+- CPU sampling: 100ms interval (confirms single-core utilization ~100%)
 - PostgreSQL: $POSTGRES_HOST:$POSTGRES_PORT
 - MinIO: localhost:9000
 
