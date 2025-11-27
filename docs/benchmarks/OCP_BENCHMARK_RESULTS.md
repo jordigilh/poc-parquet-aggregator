@@ -48,7 +48,7 @@ What does each scale represent in a production environment?
 | **1.5m** | ~1,500,000 | 62,400 | 600 nodes, ~62,400 pods | Major cloud provider scale |
 | **2m** | ~2,000,000 | 83,200 | 800 nodes, ~83,200 pods | Maximum tested scale |
 
-> **Key**: 
+> **Key**:
 > - **Input Rows** = Pods × 24 hours (hourly data from nise)
 > - **Output Rows** = Daily aggregated summaries (one per pod/namespace/node)
 > - **Scale names now match input rows** (e.g., "20k" = ~20,000 input rows)

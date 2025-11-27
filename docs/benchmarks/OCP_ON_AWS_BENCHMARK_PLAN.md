@@ -1,9 +1,10 @@
 # OCP-on-AWS Benchmark Plan
 
 **Date**: November 26, 2025
-**Status**: 🔄 **PENDING RE-RUN** (manifests updated to target input rows)
+**Status**: ✅ **EXECUTED**
 **Purpose**: Measure processing time and memory for OCP-on-AWS aggregation at production scale
-**Note**: Scale names now refer to INPUT ROWS (combined OCP + AWS hourly data)
+**Results**: See [OCP_ON_AWS_BENCHMARK_RESULTS.md](OCP_ON_AWS_BENCHMARK_RESULTS.md)
+**Note**: Scale names refer to INPUT ROWS (OCP hourly data)
 
 ## Table of Contents
 
