@@ -1,7 +1,7 @@
 # {SCENARIO_NAME} Benchmark Results
 
-**Date**: {DATE}  
-**Environment**: {MACHINE_SPECS}  
+**Date**: {DATE}
+**Environment**: {MACHINE_SPECS}
 **Methodology**: 3 runs per scale, median ± stddev, continuous 100ms memory sampling
 
 ## Table of Contents
@@ -30,7 +30,7 @@
 | **1.5m** | ... | ... | ... | ... | ... |
 | **2m** | ... | ... | ... | ... | ... |
 
-> **Scale names** refer to input rows (hourly data). E.g., "20k" = ~20,000 input rows.  
+> **Scale names** refer to input rows (hourly data). E.g., "20k" = ~20,000 input rows.
 > **Throughput** = Output Rows / Time (calculated from median values)
 
 ---
@@ -48,7 +48,7 @@
 | **1.5m** | ~1,500,000 | ... | ... | ... |
 | **2m** | ~2,000,000 | ... | ... | ... |
 
-> **Input Rows** = {INPUT_FORMULA}  
+> **Input Rows** = {INPUT_FORMULA}
 > **Output Rows** = {OUTPUT_FORMULA}
 
 ---

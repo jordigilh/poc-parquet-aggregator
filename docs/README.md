@@ -15,7 +15,9 @@ docs/
 ├── architecture/       # System architecture
 │   └── ARCHITECTURE.md
 ├── benchmarks/         # Performance benchmarks
+│   ├── BENCHMARK_RESULTS_TEMPLATE.md
 │   ├── OCP_BENCHMARK_PLAN.md
+│   ├── OCP_BENCHMARK_RESULTS.md
 │   ├── OCP_ON_AWS_BENCHMARK_PLAN.md
 │   └── OCP_ON_AWS_BENCHMARK_RESULTS.md
 └── guides/             # How-to guides
@@ -29,10 +31,10 @@ docs/
 
 ### By Scenario
 
-| Scenario | Overview | Matching Labels | Benchmark Plan |
-|----------|----------|-----------------|----------------|
-| **OCP-only** | [README](ocp-only/README.md) | [MATCHING_LABELS](ocp-only/MATCHING_LABELS.md) | [Plan](benchmarks/OCP_BENCHMARK_PLAN.md) |
-| **OCP-on-AWS** | [README](ocp-on-aws/README.md) | [MATCHING_LABELS](ocp-on-aws/MATCHING_LABELS.md) | [Plan](benchmarks/OCP_ON_AWS_BENCHMARK_PLAN.md) |
+| Scenario | Overview | Matching Labels | Benchmark Plan | Results |
+|----------|----------|-----------------|----------------|---------|
+| **OCP-only** | [README](ocp-only/README.md) | [MATCHING_LABELS](ocp-only/MATCHING_LABELS.md) | [Plan](benchmarks/OCP_BENCHMARK_PLAN.md) | [Results](benchmarks/OCP_BENCHMARK_RESULTS.md) |
+| **OCP-on-AWS** | [README](ocp-on-aws/README.md) | [MATCHING_LABELS](ocp-on-aws/MATCHING_LABELS.md) | [Plan](benchmarks/OCP_ON_AWS_BENCHMARK_PLAN.md) | [Results](benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md) |
 
 ### Essential Reading
 
@@ -46,6 +48,7 @@ docs/
 
 | Document | Description |
 |----------|-------------|
+| [OCP_BENCHMARK_RESULTS.md](benchmarks/OCP_BENCHMARK_RESULTS.md) | OCP-only performance results |
 | [OCP_ON_AWS_BENCHMARK_RESULTS.md](benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md) | OCP-on-AWS performance results |
 
 ---
@@ -57,10 +60,11 @@ docs/
 | How does the POC work? | [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) |
 | OCP-only Trino parity? | [ocp-only/MATCHING_LABELS.md](ocp-only/MATCHING_LABELS.md) |
 | OCP-on-AWS Trino parity? | [ocp-on-aws/MATCHING_LABELS.md](ocp-on-aws/MATCHING_LABELS.md) |
-| How fast is it? | [benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md](benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md) |
+| OCP-only performance? | [benchmarks/OCP_BENCHMARK_RESULTS.md](benchmarks/OCP_BENCHMARK_RESULTS.md) |
+| OCP-on-AWS performance? | [benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md](benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md) |
 | How do I run benchmarks? | [guides/BENCHMARK_HOWTO.md](guides/BENCHMARK_HOWTO.md) |
 | How do I set up locally? | [guides/DEVELOPER_QUICKSTART.md](guides/DEVELOPER_QUICKSTART.md) |
 
 ---
 
-*Last Updated: November 26, 2025*
+*Last Updated: November 27, 2025*

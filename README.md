@@ -4,9 +4,8 @@
 
 [![CI](https://github.com/insights-onprem/poc-parquet-aggregator/actions/workflows/ci.yml/badge.svg)](https://github.com/insights-onprem/poc-parquet-aggregator/actions/workflows/ci.yml)
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)](docs/architecture/ARCHITECTURE.md)
-[![Tests](https://img.shields.io/badge/Tests-23%2F23%20Passing-brightgreen)](docs/MATCHING_LABELS.md)
-[![OCP](https://img.shields.io/badge/OCP-✓%20Supported-blue)](docs/benchmarks/OCP_BENCHMARK_RESULTS.md)
-[![OCP--on--AWS](https://img.shields.io/badge/OCP--on--AWS-✓%20Supported-blue)](docs/benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md)
+[![OCP](https://img.shields.io/badge/OCP-20%2F20%20Passing-brightgreen)](docs/ocp-only/MATCHING_LABELS.md)
+[![OCP--on--AWS](https://img.shields.io/badge/OCP--on--AWS-23%2F23%20Passing-brightgreen)](docs/ocp-on-aws/MATCHING_LABELS.md)
 
 ---
 
@@ -17,7 +16,7 @@ This POC demonstrates replacing **Trino + Hive** with a custom Python aggregatio
 - ✅ Reads Parquet files directly from S3/MinIO using PyArrow
 - ✅ Performs all aggregation logic in Python/Pandas
 - ✅ Writes results directly to PostgreSQL
-- ✅ Achieves **100% Trino parity** (23/23 E2E test scenarios passing)
+- ✅ Achieves **100% Trino parity** (43 E2E test scenarios passing: 20 OCP + 23 OCP-on-AWS)
 
 ### Supported Modes
 
@@ -114,11 +113,13 @@ python -m src.main
 | Document | Description |
 |----------|-------------|
 | **[Architecture](docs/architecture/ARCHITECTURE.md)** | Technical architecture overview |
-| **[Matching Labels](docs/MATCHING_LABELS.md)** | Trino vs POC feature parity reference |
+| **[OCP-only Matching Labels](docs/ocp-only/MATCHING_LABELS.md)** | OCP-only Trino vs POC feature parity |
+| **[OCP-on-AWS Matching Labels](docs/ocp-on-aws/MATCHING_LABELS.md)** | OCP-on-AWS Trino vs POC feature parity |
 | **[Benchmark Guide](docs/guides/BENCHMARK_HOWTO.md)** | How to run benchmarks |
 | **[OCP Benchmark Plan](docs/benchmarks/OCP_BENCHMARK_PLAN.md)** | OCP-only benchmark methodology |
 | **[OCP-on-AWS Benchmark Plan](docs/benchmarks/OCP_ON_AWS_BENCHMARK_PLAN.md)** | OCP-on-AWS benchmark methodology |
-| **[OCP-on-AWS Benchmark Results](docs/benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md)** | Performance results |
+| **[OCP Benchmark Results](docs/benchmarks/OCP_BENCHMARK_RESULTS.md)** | OCP-only performance results |
+| **[OCP-on-AWS Benchmark Results](docs/benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md)** | OCP-on-AWS performance results |
 | **[Developer Quickstart](docs/guides/DEVELOPER_QUICKSTART.md)** | Getting started guide |
 
 ### Additional Resources
@@ -127,62 +128,55 @@ python -m src.main
 docs/
 ├── architecture/       # System architecture
 ├── benchmarks/         # Performance benchmarks
-├── analysis/           # Technical analysis docs
 ├── guides/             # How-to guides
-└── ocp_on_aws/        # OCP-on-AWS specific docs
+├── ocp-only/           # OCP-only specific docs
+└── ocp-on-aws/         # OCP-on-AWS specific docs
 ```
 
 ---
 
 ## Benchmark Results
 
-### OCP-on-AWS Performance (In-Memory, Industry Standard)
+### OCP-on-AWS Performance
 
 Results from 3 runs per scale, reporting median ± stddev:
 
-| Output Rows | Time (s) | Memory (MB) | Throughput |
-|-------------|----------|-------------|------------|
-| 6,720 | 3.52 ±0.01 | 224 ±16 | 1,909 rows/s |
-| 33,600 | 12.74 ±0.07 | 470 ±11 | 2,637 rows/s |
-| 166,656 | 59.67 ±0.38 | 1,748 ±33 | 2,792 rows/s |
-| 333,312 | 120.97 ±0.22 | 3,304 ±107 | 2,755 rows/s |
-| 499,968 | 184.10 ±0.34 | 4,924 ±22 | 2,715 rows/s |
-| 666,624 | 249.18 ±0.78 | 6,215 ±27 | 2,675 rows/s |
+| Scale | Input Rows | Output Rows | Time (s) | Memory (MB) | Throughput |
+|-------|------------|-------------|----------|-------------|------------|
+| 20k | ~20,000 | 19,920 | 7.99 ± 0.03 | 381 ± 13 | 2,493 rows/s |
+| 100k | ~100,000 | 99,840 | 34.10 ± 0.06 | 1,108 ± 38 | 2,927 rows/s |
+| 500k | ~500,000 | 499,200 | 166.84 ± 1.27 | 4,188 ± 440 | 2,992 rows/s |
+| 1m | ~1,000,000 | 998,400 | 334.29 ± 2.22 | 6,862 ± 379 | 2,986 rows/s |
+| 2m | ~2,000,000 | 1,996,800 | 640.26 ± 11.54 | 7,326 ± 122 | 3,118 rows/s |
 
-> **Methodology**: 3 runs per scale, continuous 100ms memory sampling.
+**Memory Scaling**: ~4-7 MB per 1K input rows at production scale
 
-**Memory Scaling**: ~9 MB per 1K output rows (linear)
+### OCP-Only Performance
 
-### OCP-Only Performance (In-Memory)
+| Scale | Input Rows | Output Rows | Time (s) | Memory (MB) | Throughput |
+|-------|------------|-------------|----------|-------------|------------|
+| 20k | ~20,000 | 830 | 4.35 ± 0.06 | 328 ± 4 | 191 rows/s |
+| 100k | ~100,000 | 4,160 | 15.60 ± 0.03 | 839 ± 8 | 267 rows/s |
+| 500k | ~500,000 | 20,800 | 72.04 ± 1.55 | 3,689 ± 32 | 289 rows/s |
+| 1m | ~1,000,000 | 41,600 | 139.67 ± 2.47 | 7,171 ± 493 | 298 rows/s |
+| 2m | ~2,000,000 | 83,200 | 282.76 ± 3.14 | 10,342 ± 292 | 294 rows/s |
 
-| Output Rows | Time (s) | Memory (MB) | Throughput |
-|-------------|----------|-------------|------------|
-| 420 | 2.52 ±0.06 | 253 ±1 | 167 rows/s |
-| 2,085 | 8.13 ±0.07 | 502 ±3 | 257 rows/s |
-| 10,430 | 37.17 ±0.03 | 1,969 ±17 | 281 rows/s |
-| 20,850 | 72.37 ±0.19 | 3,729 ±69 | 288 rows/s |
-| 41,650 | 139.19 ±0.77 | 7,184 ±29 | 299 rows/s |
+**Memory Scaling**: ~5-7 MB per 1K input rows at production scale
 
-**Memory Scaling**: ~170 MB per 1K output rows (linear)
-
-See [OCP_ON_AWS_BENCHMARK_RESULTS.md](docs/benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md) and [OCP_BENCHMARK_RESULTS.md](docs/benchmarks/OCP_BENCHMARK_RESULTS.md) for details.
+See [OCP_ON_AWS_BENCHMARK_RESULTS.md](docs/benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md) and [OCP_BENCHMARK_RESULTS.md](docs/benchmarks/OCP_BENCHMARK_RESULTS.md) for full details.
 
 ---
 
 ## Test Coverage
 
-### E2E Test Scenarios: 23/23 Passing ✅
+### E2E Test Scenarios: 43 Passing ✅
 
-| Category | Scenarios | Status |
-|----------|-----------|--------|
-| Basic Attribution | 1-4 | ✅ Pass |
-| Multi-Cluster | 5-8 | ✅ Pass |
-| Tag Matching | 9-12 | ✅ Pass |
-| Network Costs | 13-15 | ✅ Pass |
-| Storage Attribution | 16-22 | ✅ Pass |
-| Edge Cases | 23 | ✅ Pass |
+| Mode | Scenarios | Status |
+|------|-----------|--------|
+| **OCP-only** | 20/20 | ✅ Pass |
+| **OCP-on-AWS** | 23/23 | ✅ Pass |
 
-See [MATCHING_LABELS.md](docs/MATCHING_LABELS.md) for detailed test mapping.
+See [OCP-only MATCHING_LABELS](docs/ocp-only/MATCHING_LABELS.md) and [OCP-on-AWS MATCHING_LABELS](docs/ocp-on-aws/MATCHING_LABELS.md) for detailed test mapping.
 
 ---
 
@@ -196,7 +190,7 @@ cost:
 
 performance:
   max_workers: 4
-  use_streaming: false  # Enable for large OCP-only datasets
+  use_streaming: false  # Not recommended (see benchmark plans)
   use_bulk_copy: true   # Faster PostgreSQL writes
 ```
 

@@ -1,7 +1,7 @@
 # OCP-Only Benchmark Results
 
-**Date**: November 26, 2025  
-**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)  
+**Date**: November 26, 2025
+**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)
 **Methodology**: 3 runs per scale, median ± stddev, continuous 100ms memory sampling
 
 ## Table of Contents
@@ -30,7 +30,7 @@
 | **1.5m** | 1,526,420 | 62,400 | 208.55 ± 1.61 | 8,600 ± 302 | 299 rows/s |
 | **2m** | 2,035,225 | 83,200 | 282.76 ± 3.14 | 10,342 ± 292 | 294 rows/s |
 
-> **Scale names** refer to input rows (hourly data from nise). E.g., "20k" = ~20,000 input rows.  
+> **Scale names** refer to input rows (hourly data from nise). E.g., "20k" = ~20,000 input rows.
 > **Throughput** = Output Rows / Time (calculated from median values)
 
 ---
@@ -48,7 +48,7 @@
 | **1.5m** | ~1,500,000 | 62,400 | 600 nodes, ~62,400 pods | Major cloud scale |
 | **2m** | ~2,000,000 | 83,200 | 800 nodes, ~83,200 pods | Maximum tested |
 
-> **Input Rows** = Pods × 24 hours (hourly usage data)  
+> **Input Rows** = Pods × 24 hours (hourly usage data)
 > **Output Rows** = Daily aggregated summaries (one per pod/namespace/node combination)
 
 ---

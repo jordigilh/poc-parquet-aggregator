@@ -1,7 +1,7 @@
 # OCP-on-AWS Benchmark Results
 
-**Date**: November 26, 2025  
-**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)  
+**Date**: November 26, 2025
+**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)
 **Methodology**: 3 runs per scale, median ± stddev, continuous 100ms memory sampling
 
 ## Table of Contents
@@ -30,7 +30,7 @@
 | **1.5m** | 1,526,420 + 14,401 | 1,497,600 | 495.70 ± 1.09 | 6,924 ± 80 | 3,021 rows/s |
 | **2m** | 2,035,225 + 19,201 | 1,996,800 | 640.26 ± 11.54 | 7,326 ± 122 | 3,118 rows/s |
 
-> **Scale names** refer to OCP input rows. E.g., "20k" = ~20,000 OCP input rows.  
+> **Scale names** refer to OCP input rows. E.g., "20k" = ~20,000 OCP input rows.
 > **Throughput** = Output Rows / Time (calculated from median values)
 
 ---
@@ -48,8 +48,8 @@
 | **1.5m** | ~1,500,000 | ~14,400 | 1,497,600 | 600 nodes, ~62,400 pods | Major cloud scale |
 | **2m** | ~2,000,000 | ~19,200 | 1,996,800 | 800 nodes, ~83,200 pods | Maximum tested |
 
-> **OCP Input** = Pods × 24 hours (hourly usage data)  
-> **AWS Input** = EC2/EBS resources × 24 hours  
+> **OCP Input** = Pods × 24 hours (hourly usage data)
+> **AWS Input** = EC2/EBS resources × 24 hours
 > **Output Rows** = Matched OCP-AWS records (hourly granularity)
 
 ---
