@@ -185,14 +185,16 @@ echo ""
 echo "6. Duplicate Aggregation Check"
 echo "------------------------------"
 echo "Note: Pod rows grouped by (usage_start, namespace, node)"
-echo "      Storage rows grouped by (usage_start, namespace, node, pvc, pv, storageclass)"
+echo "      Storage rows grouped by (usage_start, namespace, node, pvc, pv, storageclass, csi_volume_handle)"
+echo "      (Trino SQL groups by csi_volume_handle - different handles = different rows)"
 
 # Check for Pod duplicates (grouped by usage_start, namespace, node)
 POD_DUPLICATES=$(run_psql "SELECT COUNT(*) FROM (SELECT usage_start, namespace, node, COUNT(*) as cnt FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='$CLUSTER_ID' AND data_source='Pod' GROUP BY usage_start, namespace, node HAVING COUNT(*) > 1) as dupes;")
 echo "Pod duplicate aggregations: $POD_DUPLICATES"
 
-# Check for Storage duplicates (grouped by usage_start, namespace, node, pvc, pv, storageclass)
-STORAGE_DUPLICATES=$(run_psql "SELECT COUNT(*) FROM (SELECT usage_start, namespace, node, persistentvolumeclaim, persistentvolume, storageclass, COUNT(*) as cnt FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='$CLUSTER_ID' AND data_source='Storage' GROUP BY usage_start, namespace, node, persistentvolumeclaim, persistentvolume, storageclass HAVING COUNT(*) > 1) as dupes;")
+# Check for Storage duplicates (grouped by usage_start, namespace, node, pvc, pv, storageclass, csi_volume_handle)
+# NOTE: Trino SQL (line 441) groups by csi_volume_handle, so different CSI handles are expected to produce different rows
+STORAGE_DUPLICATES=$(run_psql "SELECT COUNT(*) FROM (SELECT usage_start, namespace, node, persistentvolumeclaim, persistentvolume, storageclass, COALESCE(csi_volume_handle, '') as csi, COUNT(*) as cnt FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='$CLUSTER_ID' AND data_source='Storage' GROUP BY usage_start, namespace, node, persistentvolumeclaim, persistentvolume, storageclass, COALESCE(csi_volume_handle, '') HAVING COUNT(*) > 1) as dupes;")
 echo "Storage duplicate aggregations: $STORAGE_DUPLICATES"
 
 TOTAL_DUPLICATES=$((POD_DUPLICATES + STORAGE_DUPLICATES))
@@ -205,7 +207,7 @@ if [ "$TOTAL_DUPLICATES" -gt 0 ]; then
     fi
     if [ "$STORAGE_DUPLICATES" -gt 0 ]; then
         echo "Storage duplicates:"
-        run_psql_display "SELECT usage_start, namespace, node, persistentvolumeclaim, persistentvolume, storageclass, COUNT(*) as cnt FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='$CLUSTER_ID' AND data_source='Storage' GROUP BY usage_start, namespace, node, persistentvolumeclaim, persistentvolume, storageclass HAVING COUNT(*) > 1 LIMIT 5;"
+        run_psql_display "SELECT usage_start, namespace, node, persistentvolumeclaim, persistentvolume, storageclass, COALESCE(csi_volume_handle, '') as csi, COUNT(*) as cnt FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='$CLUSTER_ID' AND data_source='Storage' GROUP BY usage_start, namespace, node, persistentvolumeclaim, persistentvolume, storageclass, COALESCE(csi_volume_handle, '') HAVING COUNT(*) > 1 LIMIT 5;"
     fi
     VALIDATION_FAILURES=$((VALIDATION_FAILURES + 1))
 else

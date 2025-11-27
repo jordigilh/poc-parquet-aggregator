@@ -127,8 +127,8 @@ cat > "$SUMMARY_FILE" <<EOF
 
 ## Test Results
 
-| # | Scenario | Status | Output Rows | CPU Hours | Memory GB-Hours | Duration |
-|---|----------|--------|-------------|-----------|-----------------|----------|
+| # | Scenario | Status | Expected CPU | Actual CPU | Expected Mem | Actual Mem | Expected Storage | Actual Storage | Rows | Duration |
+|---|----------|--------|--------------|------------|--------------|------------|------------------|----------------|------|----------|
 EOF
 
 TOTAL_TESTS=0
@@ -223,8 +223,20 @@ for SCENARIO in "${SCENARIOS[@]}"; do
         echo "  ✓ OCP data: $CSV_DIR ($CSV_COUNT CSV files)"
     fi
 
-    # Step 2: Convert to Parquet and upload to MinIO
-    echo "  📦 Converting to Parquet and uploading to MinIO..."
+    # Step 2: Clear MinIO and upload new Parquet data
+    echo "  📦 Clearing MinIO and uploading Parquet..."
+    
+    # Clear existing data in MinIO for this source
+    python3 -c "
+from minio import Minio
+client = Minio('localhost:9000', access_key='minioadmin', secret_key='minioadmin', secure=False)
+prefix = 'data/org1234567/OCP/source=00000000-0000-0000-0000-000000000001/'
+objects = list(client.list_objects('koku', prefix=prefix, recursive=True))
+for obj in objects:
+    client.remove_object('koku', obj.object_name)
+if objects:
+    print(f'  ✓ Cleared {len(objects)} objects from MinIO')
+" 2>/dev/null || true
 
     # Use the existing csv_to_parquet_minio.py script which handles path structure correctly
     if [ -d "$CSV_DIR" ]; then
@@ -268,66 +280,108 @@ cur = conn.cursor()
 cur.execute('''
     SELECT
         COALESCE(ROUND(SUM(pod_usage_cpu_core_hours)::numeric, 2), 0) as cpu_hours,
-        COALESCE(ROUND(SUM(pod_usage_memory_gigabyte_hours)::numeric, 2), 0) as mem_hours
+        COALESCE(ROUND(SUM(pod_usage_memory_gigabyte_hours)::numeric, 2), 0) as mem_hours,
+        COALESCE(ROUND(SUM(persistentvolumeclaim_usage_gigabyte_months)::numeric, 4), 0) as storage_months
     FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary
 ''')
 row = cur.fetchone()
-print(f'{row[0]}|{row[1]}')
+print(f'{row[0]}|{row[1]}|{row[2]}')
 conn.close()
-" 2>/dev/null || echo "0|0")
-        CPU_HOURS=$(echo "$METRICS" | cut -d'|' -f1)
-        MEM_HOURS=$(echo "$METRICS" | cut -d'|' -f2)
+" 2>/dev/null || echo "0|0|0")
+        ACTUAL_CPU=$(echo "$METRICS" | cut -d'|' -f1)
+        ACTUAL_MEM=$(echo "$METRICS" | cut -d'|' -f2)
+        ACTUAL_STORAGE=$(echo "$METRICS" | cut -d'|' -f3)
+        
+        # Get expected values from manifest
+        EXPECTED_VALUES=$(python3 -c "
+import yaml
+with open('$MANIFEST_FILE') as f:
+    m = yaml.safe_load(f)
+    expected = m.get('expected_outcome', {})
+    cpu = expected.get('cpu_core_hours', 'N/A')
+    mem = expected.get('memory_gigabyte_hours', 'N/A')
+    storage = expected.get('storage_gigabyte_months', 'N/A')
+    print(f'{cpu}|{mem}|{storage}')
+" 2>/dev/null || echo "N/A|N/A|N/A")
+        EXPECTED_CPU=$(echo "$EXPECTED_VALUES" | cut -d'|' -f1)
+        EXPECTED_MEM=$(echo "$EXPECTED_VALUES" | cut -d'|' -f2)
+        EXPECTED_STORAGE=$(echo "$EXPECTED_VALUES" | cut -d'|' -f3)
 
         if [ "$OUTPUT_ROWS" -gt 0 ]; then
-            # Step 5: Run strict validation
+            # Step 5: Run strict validation (data integrity)
             echo "  🔍 Running strict validation..."
             VALIDATION_LOG="$SCENARIO_DIR/validation.log"
-
+            
             if "$SCRIPT_DIR/validate_e2e_results.sh" "$OCP_CLUSTER_ID" > "$VALIDATION_LOG" 2>&1; then
-                STATUS="✅ PASS"
-                PASSED_TESTS=$((PASSED_TESTS + 1))
-                echo -e "${GREEN}  ✓ Validation passed: $OUTPUT_ROWS rows${NC}"
-                echo -e "${BLUE}    CPU Hours: $CPU_HOURS${NC}"
-                echo -e "${BLUE}    Memory GB-Hours: $MEM_HOURS${NC}"
+                # Step 6: Run value validation (expected vs actual)
+                echo "  📊 Validating expected vs actual values..."
+                VALUE_VALIDATION_LOG="$SCENARIO_DIR/value_validation.log"
+                
+                if python3 "$SCRIPT_DIR/validate_ocp_totals.py" "$MANIFEST_FILE" "$OCP_CLUSTER_ID" > "$VALUE_VALIDATION_LOG" 2>&1; then
+                    STATUS="✅ PASS"
+                    PASSED_TESTS=$((PASSED_TESTS + 1))
+                    echo -e "${GREEN}✅ Scenario passed:${NC}"
+                    echo -e "${BLUE}   CPU Hours:     Expected $EXPECTED_CPU, Got $ACTUAL_CPU${NC}"
+                    echo -e "${BLUE}   Memory GB-Hrs: Expected $EXPECTED_MEM, Got $ACTUAL_MEM${NC}"
+                    if [ "$ACTUAL_STORAGE" != "0" ] && [ "$ACTUAL_STORAGE" != "0.0000" ]; then
+                        echo -e "${BLUE}   Storage GB-Mo: Expected $EXPECTED_STORAGE, Got $ACTUAL_STORAGE${NC}"
+                    fi
+                else
+                    # Check if it's just missing expected_outcome (warning, not failure)
+                    if grep -q "No expected_outcome defined" "$VALUE_VALIDATION_LOG"; then
+                        STATUS="✅ PASS"
+                        PASSED_TESTS=$((PASSED_TESTS + 1))
+                        echo -e "${GREEN}✅ Scenario passed (no expected values defined):${NC}"
+                        echo -e "${BLUE}   CPU Hours:     $ACTUAL_CPU${NC}"
+                        echo -e "${BLUE}   Memory GB-Hrs: $ACTUAL_MEM${NC}"
+                        if [ "$ACTUAL_STORAGE" != "0" ] && [ "$ACTUAL_STORAGE" != "0.0000" ]; then
+                            echo -e "${BLUE}   Storage GB-Mo: $ACTUAL_STORAGE${NC}"
+                        fi
+                    else
+                        STATUS="❌ FAIL"
+                        FAILED_TESTS=$((FAILED_TESTS + 1))
+                        echo -e "${RED}❌ Scenario failed:${NC}"
+                        echo -e "${RED}   CPU Hours:     Expected $EXPECTED_CPU, Got $ACTUAL_CPU${NC}"
+                        echo -e "${RED}   Memory GB-Hrs: Expected $EXPECTED_MEM, Got $ACTUAL_MEM${NC}"
+                        if [ "$ACTUAL_STORAGE" != "0" ] && [ "$ACTUAL_STORAGE" != "0.0000" ]; then
+                            echo -e "${RED}   Storage GB-Mo: Expected $EXPECTED_STORAGE, Got $ACTUAL_STORAGE${NC}"
+                        fi
+                        grep -E "❌|mismatch" "$VALUE_VALIDATION_LOG" 2>/dev/null || true
+                    fi
+                fi
             else
-                STATUS="❌ VALIDATION FAILED"
+                STATUS="❌ FAIL"
                 FAILED_TESTS=$((FAILED_TESTS + 1))
-                echo -e "${RED}  ❌ Validation failed - see $VALIDATION_LOG${NC}"
+                echo -e "${RED}❌ Data validation failed - see $VALIDATION_LOG${NC}"
                 # Show validation failures
                 grep -E "❌ FAIL|Validation failures:" "$VALIDATION_LOG" 2>/dev/null || true
             fi
         else
             STATUS="⚠️ NO DATA"
-            CPU_HOURS="0"
-            MEM_HOURS="0"
+            ACTUAL_CPU="0"
+            ACTUAL_MEM="0"
+            EXPECTED_CPU="N/A"
+            EXPECTED_MEM="N/A"
             FAILED_TESTS=$((FAILED_TESTS + 1))
-            echo -e "${YELLOW}  ⚠ POC ran but produced no output rows${NC}"
+            echo -e "${YELLOW}⚠ POC ran but produced no output rows${NC}"
         fi
     else
-        STATUS="❌ FAILED"
-        CPU_HOURS="0"
-        MEM_HOURS="0"
+        STATUS="❌ FAIL"
+        ACTUAL_CPU="0"
+        ACTUAL_MEM="0"
+        EXPECTED_CPU="N/A"
+        EXPECTED_MEM="N/A"
         FAILED_TESTS=$((FAILED_TESTS + 1))
-        echo -e "${RED}  ❌ POC failed - see $SCENARIO_DIR/poc.log${NC}"
+        echo -e "${RED}❌ POC failed - see $SCENARIO_DIR/poc.log${NC}"
     fi
 
     END_TIME=$(date +%s)
     DURATION=$((END_TIME - START_TIME))
 
-    # Extract peak memory from POC log (format: peak_rss_mb='177.11 MB')
-    PEAK_MEMORY=$(grep "peak_rss_mb" "$SCENARIO_DIR/poc.log" | tail -1 | sed 's/\x1b\[[0-9;]*m//g' | sed -n "s/.*peak_rss_mb='\([0-9.]*\).*/\1/p" || echo "0")
-    PEAK_MEMORY="${PEAK_MEMORY:-0}"
-    if [ "$PEAK_MEMORY" != "0" ]; then
-        PEAK_MEMORY_DISPLAY="${PEAK_MEMORY}MB"
-    else
-        PEAK_MEMORY_DISPLAY="N/A"
-    fi
-
-    echo -e "  ${STATUS} (${PEAK_MEMORY_DISPLAY})"
     echo ""
 
-    # Add to summary with actual metrics
-    echo "| $TOTAL_TESTS | $SCENARIO | $STATUS | $OUTPUT_ROWS | $CPU_HOURS | $MEM_HOURS | ${DURATION}s |" >> "$SUMMARY_FILE"
+    # Add to summary with expected vs actual
+    echo "| $TOTAL_TESTS | $SCENARIO | $STATUS | $EXPECTED_CPU | $ACTUAL_CPU | $EXPECTED_MEM | $ACTUAL_MEM | $OUTPUT_ROWS | ${DURATION}s |" >> "$SUMMARY_FILE"
 done
 
 # Final summary

@@ -49,14 +49,28 @@ This POC replaces **Trino + Hive** with a custom Python aggregation layer that:
 │                     Current Architecture (Trino)                        │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│   S3 ◄──► Trino ◄──► Hive Metastore ◄──► Metastore DB (PostgreSQL)     │
-│              │                                                          │
-│              ▼                                                          │
-│   OCP-only:    Trino → Hive/S3 (summary) → MASU → PostgreSQL           │
-│   OCP-on-AWS:  Trino → PostgreSQL (direct via postgres connector)      │
+│   S3 (Parquet) ◄──► Trino ◄──► Hive Metastore ◄──► Metastore DB        │
+│                        │                                                │
+│                        ▼                                                │
+│   OCP-only:    Trino reads S3 → aggregates → Hive/S3 (intermediate)    │
+│                                            → postgres connector → PG   │
+│                                                                         │
+│   OCP-on-AWS:  Trino reads S3 → JOINs OCP+AWS → postgres connector → PG│
+│                                                                         │
+│   Note: Both paths use Trino's postgres connector to INSERT directly   │
+│         into PostgreSQL. MASU orchestrates the Trino SQL execution.    │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+**Key Trino SQL Evidence** (from `koku/masu/database/trino_sql/`):
+
+1. **OCP-only** (`reporting_ocpusagelineitem_daily_summary.sql`):
+   - Creates intermediate Hive table in S3: `hive.{schema}.reporting_ocpusagelineitem_daily_summary`
+   - Then INSERTs into PostgreSQL: `INSERT INTO postgres.{schema}.reporting_ocpusagelineitem_daily_summary`
+
+2. **OCP-on-AWS** (`aws/openshift/reporting_ocpawscostlineitem_project_daily_summary_p.sql`):
+   - Directly INSERTs into PostgreSQL: `INSERT INTO postgres.{schema}.reporting_ocpawscostlineitem_project_daily_summary_p`
 
 ### After: POC Aggregator
 

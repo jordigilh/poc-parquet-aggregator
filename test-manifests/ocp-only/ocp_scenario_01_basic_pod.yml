@@ -40,3 +40,10 @@ generators:
 # - node: worker-node-1
 # - pod_request_cpu_core_hours: ~12.0 (0.5 cores * 24 hours)
 # - pod_usage_cpu_core_hours: ~7.2 (0.3 cores * 24 hours)
+
+expected_outcome:
+  cpu_core_hours: 172.80
+  memory_gigabyte_hours: 460.80
+  storage_gigabyte_months: 0.0
+  min_rows: 1
+  namespaces: 1
