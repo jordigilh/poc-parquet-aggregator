@@ -15,7 +15,7 @@
 
 ## Prerequisites
 
-- **Python 3.9+** (check with `python3 --version`)
+- **Python 3.12+** (check with `python3 --version`)
 - **Git** (for cloning)
 - **Access to**:
   - MinIO instance (S3-compatible storage)
@@ -38,7 +38,7 @@ cd poc-parquet-aggregator
 ```
 
 **This will**:
-- ✅ Check Python version (3.9+ required)
+- ✅ Check Python version (3.12+ required)
 - ✅ Create virtual environment (`./venv`)
 - ✅ Install all dependencies
 - ✅ Validate everything works
@@ -289,7 +289,7 @@ Provider UUID: fab13fc0-942e-429f-9a9e-e4d4f0eed848
 
 ## Getting Help
 
-1. **Check documentation**: Read `README.md` and `SCHEMA_FIX_COMPLETE.md`
+1. **Check documentation**: Read the main `README.md`
 2. **Validate environment**: Run `python3 scripts/validate_environment.py`
 3. **Check logs**: Look for detailed error messages in terminal output
 4. **Ask the team**: Reach out with specific error messages
@@ -329,7 +329,4 @@ The POC writes directly to PostgreSQL, while Trino writes to Hive then copies to
 
 ---
 
-**Questions?** Check `VALIDATION_READY.md` for detailed Trino validation steps.
-
 **Happy testing!** 🚀
-

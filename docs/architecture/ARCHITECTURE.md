@@ -29,7 +29,7 @@ This POC replaces **Trino + Hive** with a custom Python aggregation layer that:
 - ✅ Performs all aggregation logic in Python/Pandas
 - ✅ Writes results directly to PostgreSQL
 - ✅ Supports both **OCP-only** and **OCP-on-AWS** workloads
-- ✅ Achieves **100% Trino parity** (23/23 test scenarios passing)
+- ✅ Achieves **100% Trino parity** (43 test scenarios passing: 20 OCP + 23 OCP-on-AWS)
 
 ### Key Benefits
 
@@ -197,33 +197,31 @@ Matches OCP resources to AWS costs and attributes cloud spending.
 
 ### OCP-on-AWS Benchmarks (In-Memory)
 
-Results from 3 runs per scale (median values). See [full results](../benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md).
+Results from 3 runs per scale (median values). See [benchmark results](../benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md) for full details.
 
-| Output Rows | Memory | Time | Throughput |
-|-------------|--------|------|------------|
-| 6,720 | 224 MB | 3.52s | 1,909 r/s |
-| 33,600 | 470 MB | 12.74s | 2,637 r/s |
-| 166,656 | 1,748 MB | 59.67s | 2,792 r/s |
-| 333,312 | 3,304 MB | 120.97s | 2,755 r/s |
-| 499,968 | 4,924 MB | 184.10s | 2,715 r/s |
-| 666,624 | 6,215 MB | 249.18s | 2,675 r/s |
+| Scale | Input Rows | Output Rows | Time | Memory | Throughput |
+|-------|------------|-------------|------|--------|------------|
+| 20k | ~20,000 | 19,920 | 7.99s | 381 MB | 2,493 r/s |
+| 100k | ~100,000 | 99,840 | 34.10s | 1,108 MB | 2,927 r/s |
+| 500k | ~500,000 | 499,200 | 166.84s | 4,188 MB | 2,992 r/s |
+| 1m | ~1,000,000 | 998,400 | 334.29s | 6,862 MB | 2,986 r/s |
+| 2m | ~2,000,000 | 1,996,800 | 640.26s | 7,326 MB | 3,118 r/s |
 
-**Memory Scaling**: ~9 MB per 1K output rows (linear)
+**Memory Scaling**: ~4-7 MB per 1K input rows at production scale
 
 ### OCP-Only Benchmarks (In-Memory)
 
-OCP-only is simpler (no JOIN) and uses less memory. See [full results](../benchmarks/OCP_BENCHMARK_RESULTS.md).
+OCP-only is simpler (no JOIN) and uses less memory. See [benchmark results](../benchmarks/OCP_BENCHMARK_RESULTS.md) for full details.
 
-| Output Rows | Memory | Time | Throughput |
-|-------------|--------|------|------------|
-| 420 | 253 MB | 2.52s | 167 r/s |
-| 2,085 | 502 MB | 8.13s | 257 r/s |
-| 10,430 | 1,969 MB | 37.17s | 281 r/s |
-| 20,850 | 3,729 MB | 72.37s | 288 r/s |
-| 31,260 | 4,982 MB | 104.69s | 299 r/s |
-| 41,650 | 7,184 MB | 139.19s | 299 r/s |
+| Scale | Input Rows | Output Rows | Time | Memory | Throughput |
+|-------|------------|-------------|------|--------|------------|
+| 20k | ~20,000 | 830 | 4.35s | 328 MB | 191 r/s |
+| 100k | ~100,000 | 4,160 | 15.60s | 839 MB | 267 r/s |
+| 500k | ~500,000 | 20,800 | 72.04s | 3,689 MB | 289 r/s |
+| 1m | ~1,000,000 | 41,600 | 139.67s | 7,171 MB | 298 r/s |
+| 2m | ~2,000,000 | 83,200 | 282.76s | 10,342 MB | 294 r/s |
 
-**Memory Scaling**: ~170 MB per 1K output rows (linear)
+**Memory Scaling**: ~5-7 MB per 1K input rows at production scale
 
 ---
 
@@ -364,14 +362,13 @@ else:
 
 | Document | Purpose |
 |----------|---------|
-| [MATCHING_LABELS.md](../MATCHING_LABELS.md) | Resource/tag matching reference |
-| [OCP_ON_AWS_BENCHMARK_RESULTS.md](../benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md) | Benchmark results |
-| [OCP_ON_AWS_BENCHMARK_DETAILS.md](../benchmarks/OCP_ON_AWS_BENCHMARK_DETAILS.md) | Detailed benchmark breakdown |
+| [OCP-only MATCHING_LABELS](../ocp-only/MATCHING_LABELS.md) | OCP-only resource/tag matching reference |
+| [OCP-on-AWS MATCHING_LABELS](../ocp-on-aws/MATCHING_LABELS.md) | OCP-on-AWS resource/tag matching reference |
+| [OCP Benchmark Results](../benchmarks/OCP_BENCHMARK_RESULTS.md) | OCP-only performance results |
+| [OCP-on-AWS Benchmark Results](../benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md) | OCP-on-AWS performance results |
 
 ---
 
 *Document Version: 2.0*
-*Last Updated: November 25, 2025*
+*Last Updated: November 27, 2025*
 *POC Status: Production-Ready*
-
-

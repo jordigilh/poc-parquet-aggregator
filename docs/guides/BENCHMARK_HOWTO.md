@@ -101,13 +101,13 @@ Open http://localhost:9001 in browser:
 
 ### Full Benchmark Suite
 
-Runs all scales (20K to 1.5M output rows):
+Runs all scales (20K to 2M input rows):
 
 ```bash
 ./scripts/run_ocp_aws_benchmarks.sh --all
 ```
 
-**Duration**: ~20-30 minutes
+**Duration**: ~30-45 minutes
 **Output**: `benchmark_results/ocp_aws_YYYYMMDD_HHMMSS/`
 
 ### Single Scale
@@ -115,7 +115,7 @@ Runs all scales (20K to 1.5M output rows):
 Run a specific scale:
 
 ```bash
-# Options: scale-20k, scale-50k, scale-100k, scale-250k, scale-500k, scale-1m, scale-1.5m
+# Options: scale-20k, scale-50k, scale-100k, scale-250k, scale-500k, scale-1m, scale-1.5m, scale-2m
 ./scripts/run_ocp_aws_benchmarks.sh --scale scale-250k
 ```
 
@@ -187,9 +187,9 @@ benchmark_results/ocp_aws_YYYYMMDD_HHMMSS/
 
 ```
 scale       mode      output_rows  total_time_sec  peak_memory_mb  throughput
-scale-100k  inmemory  33600        13.22           514             2542
-scale-250k  inmemory  83328        31.67           938             2631
-scale-500k  inmemory  166656       61.79           1693            2697
+scale-100k  inmemory  99840        34.10           1108            2927
+scale-250k  inmemory  249600       83.67           2411            2983
+scale-500k  inmemory  499200       166.84          4188            2992
 ```
 
 ---
@@ -329,12 +329,10 @@ This is expected - benchmarks clear and regenerate data each run.
 
 | Document | Purpose |
 |----------|---------|
-| [OCP_ON_AWS_BENCHMARK_RESULTS.md](../benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md) | Benchmark results and analysis |
-| [OCP_ON_AWS_BENCHMARK_DETAILS.md](../benchmarks/OCP_ON_AWS_BENCHMARK_DETAILS.md) | Detailed phase breakdown |
+| [OCP Benchmark Results](../benchmarks/OCP_BENCHMARK_RESULTS.md) | OCP-only performance results |
+| [OCP-on-AWS Benchmark Results](../benchmarks/OCP_ON_AWS_BENCHMARK_RESULTS.md) | OCP-on-AWS performance results |
 | [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) | System architecture |
 
 ---
 
-*Last Updated: November 25, 2025*
-
-
+*Last Updated: November 27, 2025*

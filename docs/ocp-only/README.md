@@ -62,6 +62,7 @@ python -m src.main
 |----------|-------------|
 | **[MATCHING_LABELS.md](MATCHING_LABELS.md)** | Trino parity reference (36/36 features) |
 | [Benchmark Plan](../benchmarks/OCP_BENCHMARK_PLAN.md) | Performance methodology |
+| [Benchmark Results](../benchmarks/OCP_BENCHMARK_RESULTS.md) | Latest performance results |
 | [Test Scenarios](../../test-manifests/ocp-only/README.md) | E2E test cases (20 scenarios) |
 
 ## Scripts
@@ -73,4 +74,3 @@ python -m src.main
 # Run benchmarks
 ./scripts/run_ocp_full_benchmarks.sh
 ```
-
