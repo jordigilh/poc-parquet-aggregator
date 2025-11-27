@@ -616,4 +616,3 @@ class TestUnallocatedCapacityAggregator:
         worker_0 = result[result["node"] == "worker-0"].iloc[0]
         # capacity - usage = 96 - 100 = -4
         assert worker_0["pod_usage_cpu_core_hours"] == pytest.approx(-4.0, rel=0.01)
-
