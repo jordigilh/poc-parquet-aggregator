@@ -279,11 +279,23 @@ conn.close()
         MEM_HOURS=$(echo "$METRICS" | cut -d'|' -f2)
 
         if [ "$OUTPUT_ROWS" -gt 0 ]; then
-            STATUS="✅ $OUTPUT_ROWS rows"
-            PASSED_TESTS=$((PASSED_TESTS + 1))
-            echo -e "${GREEN}  ✓ Output: $OUTPUT_ROWS rows${NC}"
-            echo -e "${BLUE}    CPU Hours: $CPU_HOURS${NC}"
-            echo -e "${BLUE}    Memory GB-Hours: $MEM_HOURS${NC}"
+            # Step 5: Run strict validation
+            echo "  🔍 Running strict validation..."
+            VALIDATION_LOG="$SCENARIO_DIR/validation.log"
+            
+            if "$SCRIPT_DIR/validate_e2e_results.sh" "$OCP_CLUSTER_ID" > "$VALIDATION_LOG" 2>&1; then
+                STATUS="✅ PASS"
+                PASSED_TESTS=$((PASSED_TESTS + 1))
+                echo -e "${GREEN}  ✓ Validation passed: $OUTPUT_ROWS rows${NC}"
+                echo -e "${BLUE}    CPU Hours: $CPU_HOURS${NC}"
+                echo -e "${BLUE}    Memory GB-Hours: $MEM_HOURS${NC}"
+            else
+                STATUS="❌ VALIDATION FAILED"
+                FAILED_TESTS=$((FAILED_TESTS + 1))
+                echo -e "${RED}  ❌ Validation failed - see $VALIDATION_LOG${NC}"
+                # Show validation failures
+                grep -E "❌ FAIL|Validation failures:" "$VALIDATION_LOG" 2>/dev/null || true
+            fi
         else
             STATUS="⚠️ NO DATA"
             CPU_HOURS="0"
