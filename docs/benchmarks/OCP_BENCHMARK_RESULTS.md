@@ -189,14 +189,6 @@ xychart-beta
 | 1.5m | ~1,500,000 | 8,600 MB | 27% |
 | 2m | ~2,000,000 | 10,342 MB | 32% |
 
-### Projected Memory (beyond tested scales)
-
-| Scale | Input Rows | Memory (Estimated) | % of 32GB |
-|-------|------------|-------------------|-----------|
-| 3m | ~3,000,000 | ~15 GB | 47% |
-| 4m | ~4,000,000 | ~20 GB | 63% |
-| 6m | ~6,000,000 | ~31 GB | 97% |
-
 ### Conclusions
 
 1. **Memory-efficient**: ~5-7 MB per 1K input rows at production scale
