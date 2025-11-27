@@ -1,7 +1,7 @@
 # OCP-Only Benchmark Results
 
-**Date**: November 26, 2025
-**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)
+**Date**: November 26, 2025  
+**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)  
 **Methodology**: 3 runs per scale, median ± stddev, continuous 100ms memory sampling
 
 ## Table of Contents
@@ -28,30 +28,26 @@
 | **1.5m** | 1,526,420 | 62,400 | 208.55 ± 1.61 | 8,600 ± 302 | 299 rows/s |
 | **2m** | 2,035,225 | 83,200 | 282.76 ± 3.14 | 10,342 ± 292 | 294 rows/s |
 
-> **Note**: Scale names (20k, 50k, etc.) refer to **INPUT rows** (hourly data from nise).
+> **Scale names** refer to input rows (hourly data from nise). E.g., "20k" = ~20,000 input rows.  
 > **Throughput** = Output Rows / Time (calculated from median values)
 
 ---
 
 ## Scale Interpretation
 
-What does each scale represent in a production environment?
-
-| Scale | Input Rows | Output Rows | Cluster Size | Use Case Example |
-|-------|------------|-------------|--------------|------------------|
+| Scale | Input Rows | Output Rows | Cluster Size | Use Case |
+|-------|------------|-------------|--------------|----------|
 | **20k** | ~20,000 | 830 | 10 nodes, ~830 pods | Small production cluster |
-| **50k** | ~50,000 | 2,080 | 20 nodes, ~2,080 pods | Medium production environment |
-| **100k** | ~100,000 | 4,160 | 40 nodes, ~4,160 pods | Large enterprise deployment |
+| **50k** | ~50,000 | 2,080 | 20 nodes, ~2,080 pods | Medium production |
+| **100k** | ~100,000 | 4,160 | 40 nodes, ~4,160 pods | Large enterprise |
 | **250k** | ~250,000 | 10,400 | 100 nodes, ~10,400 pods | Multi-cluster enterprise |
 | **500k** | ~500,000 | 20,800 | 200 nodes, ~20,800 pods | Very large enterprise |
 | **1m** | ~1,000,000 | 41,600 | 400 nodes, ~41,600 pods | Hyperscale platform |
-| **1.5m** | ~1,500,000 | 62,400 | 600 nodes, ~62,400 pods | Major cloud provider scale |
-| **2m** | ~2,000,000 | 83,200 | 800 nodes, ~83,200 pods | Maximum tested scale |
+| **1.5m** | ~1,500,000 | 62,400 | 600 nodes, ~62,400 pods | Major cloud scale |
+| **2m** | ~2,000,000 | 83,200 | 800 nodes, ~83,200 pods | Maximum tested |
 
-> **Key**:
-> - **Input Rows** = Pods × 24 hours (hourly data from nise)
-> - **Output Rows** = Daily aggregated summaries (one per pod/namespace/node)
-> - **Scale names now match input rows** (e.g., "20k" = ~20,000 input rows)
+> **Input Rows** = Pods × 24 hours (hourly usage data)  
+> **Output Rows** = Daily aggregated summaries (one per pod/namespace/node combination)
 
 ---
 
@@ -92,20 +88,18 @@ What does each scale represent in a production environment?
 
 ### Processing Time Scaling
 
-```
-Time (s) vs Input Rows:
-- 20k input:  4.35s   → ~0.21ms per input row
-- 2m input:   282.76s → ~0.14ms per input row
+| Scale | Time per Input Row |
+|-------|-------------------|
+| 20k | 0.21 ms |
+| 2m | 0.14 ms |
 
-Observation: Sub-linear scaling - efficiency improves at scale due to 
-fixed overhead amortization (connection setup, schema loading, etc.).
-The ~33% improvement in per-row time indicates good scalability.
-```
+**Observation**: Sub-linear scaling — efficiency improves at larger scales due to fixed overhead amortization (connection setup, schema loading, etc.). The ~33% improvement in per-row processing time demonstrates excellent scalability.
 
 ### Throughput Consistency
 
-Throughput remains consistent across scales (~260-300 output rows/sec), demonstrating:
-- ✅ Linear scalability
+Throughput remains consistent across scales (~260-300 output rows/sec):
+
+- ✅ Sub-linear scalability (efficiency improves at scale)
 - ✅ No performance degradation at larger scales
 - ✅ Predictable resource requirements
 
@@ -115,16 +109,16 @@ Throughput remains consistent across scales (~260-300 output rows/sec), demonstr
 
 ### Memory Scaling
 
-| Scale | Input Rows | Output Rows | Memory (MB) | MB per 1K Input |
-|-------|------------|-------------|-------------|-----------------|
-| 20k | 20,406 | 830 | 328 | 16.1 |
-| 50k | 50,886 | 2,080 | 510 | 10.0 |
-| 100k | 101,766 | 4,160 | 839 | 8.2 |
-| 250k | 254,408 | 10,400 | 1,964 | 7.7 |
-| 500k | 508,810 | 20,800 | 3,689 | 7.2 |
-| 1m | 1,017,615 | 41,600 | 7,171 | 7.0 |
-| 1.5m | 1,526,420 | 62,400 | 8,600 | 5.6 |
-| 2m | 2,035,225 | 83,200 | 10,342 | 5.1 |
+| Scale | Input Rows | Memory (MB) | MB per 1K Input |
+|-------|------------|-------------|-----------------|
+| 20k | 20,406 | 328 | 16.1 |
+| 50k | 50,886 | 510 | 10.0 |
+| 100k | 101,766 | 839 | 8.2 |
+| 250k | 254,408 | 1,964 | 7.7 |
+| 500k | 508,810 | 3,689 | 7.2 |
+| 1m | 1,017,615 | 7,171 | 7.0 |
+| 1.5m | 1,526,420 | 8,600 | 5.6 |
+| 2m | 2,035,225 | 10,342 | 5.1 |
 
 **Key Insight**: Memory efficiency improves at scale (~5-7 MB per 1K input rows at production scale).
 
@@ -134,7 +128,7 @@ Throughput remains consistent across scales (~260-300 output rows/sec), demonstr
 Estimated Memory (MB) ≈ 200 + (Input Rows × 0.005)
 
 Examples:
-- 500,000 input: 200 + 2,500 = ~2,700 MB
+- 500,000 input:   200 + 2,500  = ~2,700 MB
 - 2,000,000 input: 200 + 10,000 = ~10,200 MB ✓
 ```
 
@@ -155,10 +149,9 @@ Examples:
 
 ### Conclusions
 
-1. **Memory-efficient**: OCP-only aggregation uses ~5-7MB per 1K input rows at scale
-2. **Scalable**: Linear time scaling with consistent throughput (~280-300 output rows/sec)
-3. **Production-ready**: Comfortably handles 2M+ input rows within 32GB
-4. **Input Row Alignment**: Scale names now correctly reflect input row counts
+1. **Memory-efficient**: ~5-7 MB per 1K input rows at production scale
+2. **Scalable**: Sub-linear time scaling with consistent throughput (~280-300 output rows/sec)
+3. **Production-ready**: Handles 2M+ input rows within 32GB with headroom to spare
 
 ---
 
@@ -166,12 +159,13 @@ Examples:
 
 | Metric | OCP-Only | OCP-on-AWS |
 |--------|----------|------------|
-| Throughput | ~280-300 output rows/s | ~2,500-2,800 output rows/s |
+| Throughput | ~280-300 rows/s | ~2,900-3,100 rows/s |
 | Memory per 1K input | ~5-7 MB | ~3-4 MB |
-| Complexity | Simple aggregation | JOIN + matching |
+| Complexity | Simple aggregation | JOIN + AWS matching |
+| Output type | Daily summary per pod | Hourly matched records |
 
-**Note**: OCP-on-AWS has higher throughput due to different output row calculation (daily aggregation vs hourly).
+> OCP-on-AWS has higher throughput because it produces hourly matched records rather than daily aggregated summaries.
 
 ---
 
-*Generated by automated benchmark suite on November 26, 2025*
+*Generated by automated benchmark suite*

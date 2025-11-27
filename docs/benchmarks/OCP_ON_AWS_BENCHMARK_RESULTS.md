@@ -1,7 +1,7 @@
 # OCP-on-AWS Benchmark Results
 
-**Date**: November 26, 2025
-**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)
+**Date**: November 26, 2025  
+**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)  
 **Methodology**: 3 runs per scale, median ± stddev, continuous 100ms memory sampling
 
 ## Table of Contents
@@ -29,14 +29,12 @@
 | **1.5m** | 1,526,420 + 14,401 | 1,497,600 | 495.70 ± 1.09 | 6,924 ± 80 | 3,021 rows/s |
 | **2m** | 2,035,225 + 19,201 | 1,996,800 | 640.26 ± 11.54 | 7,326 ± 122 | 3,118 rows/s |
 
-> **Note**: Scale names refer to **INPUT rows** (OCP hourly data). Output rows match input (daily summary per hour).
+> **Scale names** refer to OCP input rows. E.g., "20k" = ~20,000 OCP input rows.  
 > **Throughput** = Output Rows / Time (calculated from median values)
 
 ---
 
 ## Scale Interpretation
-
-What does each scale represent in a production environment?
 
 | Scale | OCP Input | AWS Input | Output Rows | Cluster Size | Use Case |
 |-------|-----------|-----------|-------------|--------------|----------|
@@ -49,7 +47,9 @@ What does each scale represent in a production environment?
 | **1.5m** | ~1,500,000 | ~14,400 | 1,497,600 | 600 nodes, ~62,400 pods | Major cloud scale |
 | **2m** | ~2,000,000 | ~19,200 | 1,996,800 | 800 nodes, ~83,200 pods | Maximum tested |
 
-> **Key**: Scale names now correctly match OCP input rows (e.g., "20k" = ~20,000 OCP input rows)
+> **OCP Input** = Pods × 24 hours (hourly usage data)  
+> **AWS Input** = EC2/EBS resources × 24 hours  
+> **Output Rows** = Matched OCP-AWS records (hourly granularity)
 
 ---
 
@@ -59,30 +59,30 @@ What does each scale represent in a production environment?
 
 | Scale | Run | Output Rows | Time (s) | Memory (MB) | Throughput |
 |-------|-----|-------------|----------|-------------|------------|
-| scale-20k | 1 | 19,920 | 8.04 | 381 | 2,477 |
-| scale-20k | 2 | 19,920 | 7.98 | 400 | 2,496 |
-| scale-20k | 3 | 19,920 | 7.99 | 374 | 2,493 |
-| scale-50k | 1 | 49,920 | 17.84 | 646 | 2,798 |
-| scale-50k | 2 | 49,920 | 17.83 | 635 | 2,799 |
-| scale-50k | 3 | 49,920 | 17.79 | 634 | 2,806 |
-| scale-100k | 1 | 99,840 | 34.08 | 1,140 | 2,929 |
-| scale-100k | 2 | 99,840 | 34.10 | 1,108 | 2,927 |
-| scale-100k | 3 | 99,840 | 34.20 | 1,065 | 2,919 |
-| scale-250k | 1 | 249,600 | 83.39 | 2,459 | 2,993 |
-| scale-250k | 2 | 249,600 | 83.90 | 2,411 | 2,974 |
-| scale-250k | 3 | 249,600 | 83.67 | 2,408 | 2,983 |
-| scale-500k | 1 | 499,200 | 165.57 | 4,465 | 3,015 |
-| scale-500k | 2 | 499,200 | 168.10 | 4,188 | 2,969 |
-| scale-500k | 3 | 499,200 | 166.84 | 3,603 | 2,992 |
-| scale-1m | 1 | 998,400 | 334.29 | 6,297 | 2,986 |
-| scale-1m | 2 | 998,400 | 334.70 | 6,862 | 2,982 |
-| scale-1m | 3 | 998,400 | 330.67 | 7,016 | 3,019 |
-| scale-1.5m | 1 | 1,497,600 | 495.15 | 6,956 | 3,024 |
-| scale-1.5m | 2 | 1,497,600 | 497.26 | 6,805 | 3,011 |
-| scale-1.5m | 3 | 1,497,600 | 495.70 | 6,924 | 3,021 |
-| scale-2m | 1 | 1,996,800 | 656.14 | 7,512 | 3,043 |
-| scale-2m | 2 | 1,996,800 | 640.26 | 7,281 | 3,118 |
-| scale-2m | 3 | 1,996,800 | 633.69 | 7,326 | 3,151 |
+| 20k | 1 | 19,920 | 8.04 | 381 | 2,477 |
+| 20k | 2 | 19,920 | 7.98 | 400 | 2,496 |
+| 20k | 3 | 19,920 | 7.99 | 374 | 2,493 |
+| 50k | 1 | 49,920 | 17.84 | 646 | 2,798 |
+| 50k | 2 | 49,920 | 17.83 | 635 | 2,799 |
+| 50k | 3 | 49,920 | 17.79 | 634 | 2,806 |
+| 100k | 1 | 99,840 | 34.08 | 1,140 | 2,929 |
+| 100k | 2 | 99,840 | 34.10 | 1,108 | 2,927 |
+| 100k | 3 | 99,840 | 34.20 | 1,065 | 2,919 |
+| 250k | 1 | 249,600 | 83.39 | 2,459 | 2,993 |
+| 250k | 2 | 249,600 | 83.90 | 2,411 | 2,974 |
+| 250k | 3 | 249,600 | 83.67 | 2,408 | 2,983 |
+| 500k | 1 | 499,200 | 165.57 | 4,465 | 3,015 |
+| 500k | 2 | 499,200 | 168.10 | 4,188 | 2,969 |
+| 500k | 3 | 499,200 | 166.84 | 3,603 | 2,992 |
+| 1m | 1 | 998,400 | 334.29 | 6,297 | 2,986 |
+| 1m | 2 | 998,400 | 334.70 | 6,862 | 2,982 |
+| 1m | 3 | 998,400 | 330.67 | 7,016 | 3,019 |
+| 1.5m | 1 | 1,497,600 | 495.15 | 6,956 | 3,024 |
+| 1.5m | 2 | 1,497,600 | 497.26 | 6,805 | 3,011 |
+| 1.5m | 3 | 1,497,600 | 495.70 | 6,924 | 3,021 |
+| 2m | 1 | 1,996,800 | 656.14 | 7,512 | 3,043 |
+| 2m | 2 | 1,996,800 | 640.26 | 7,281 | 3,118 |
+| 2m | 3 | 1,996,800 | 633.69 | 7,326 | 3,151 |
 
 ---
 
@@ -90,15 +90,12 @@ What does each scale represent in a production environment?
 
 ### Processing Time Scaling
 
-```
-Time (s) vs Input Rows:
-- 20k input:  7.99s   → ~0.40ms per input row
-- 2m input:   640.26s → ~0.32ms per input row
+| Scale | Time per Input Row |
+|-------|-------------------|
+| 20k | 0.40 ms |
+| 2m | 0.32 ms |
 
-Observation: Sub-linear scaling - efficiency improves at scale due to 
-fixed overhead amortization. The ~20% improvement in per-row time 
-indicates good scalability. Consistent throughput ~3,000 output rows/sec.
-```
+**Observation**: Sub-linear scaling — efficiency improves at larger scales due to fixed overhead amortization. The ~20% improvement in per-row processing time demonstrates excellent scalability.
 
 ### Throughput Consistency
 
@@ -140,7 +137,7 @@ indicates good scalability. Consistent throughput ~3,000 output rows/sec.
 Estimated Memory (MB) ≈ 300 + (Output Rows × 0.0035)
 
 Examples:
-- 500,000 output: 300 + 1,750 = ~2,050 MB
+- 500,000 output:   300 + 1,750 = ~2,050 MB
 - 2,000,000 output: 300 + 7,000 = ~7,300 MB ✓
 ```
 
@@ -161,16 +158,15 @@ Examples:
 
 ### Conclusions
 
-1. **Memory-efficient**: OCP-on-AWS aggregation uses ~4-7MB per 1K output rows at scale
-2. **Scalable**: Linear time scaling with consistent throughput (~3,000 rows/sec)
-3. **Production-ready**: Comfortably handles 2M+ output rows within 32GB
-4. **Input Row Alignment**: Scale names now correctly reflect input row counts
+1. **Memory-efficient**: ~4-7 MB per 1K output rows at production scale
+2. **Scalable**: Sub-linear time scaling with consistent throughput (~3,000 rows/sec)
+3. **Production-ready**: Handles 2M+ output rows within 32GB with headroom to spare
 
 ---
 
 ## Data Validation
 
-### Validation Results (Post-Benchmark)
+### Validation Results
 
 | Check | Result | Status |
 |-------|--------|--------|
@@ -201,14 +197,14 @@ SELECT SUM(unblended_cost) FROM org1234567.reporting_ocpawscostlineitem_project_
 
 | Metric | OCP-Only | OCP-on-AWS |
 |--------|----------|------------|
-| Throughput | ~280-300 output rows/s | ~2,900-3,100 output rows/s |
+| Throughput | ~280-300 rows/s | ~2,900-3,100 rows/s |
 | Memory per 1K output | ~125 MB | ~4-7 MB |
-| Output rows per input | ~24:1 reduction | ~1:1 (hourly summary) |
-| Complexity | Simple aggregation | JOIN + matching |
+| Output type | Daily summary per pod | Hourly matched records |
+| Complexity | Simple aggregation | JOIN + AWS matching |
 
-**Note**: OCP-on-AWS has higher throughput because output is per-hour, not daily aggregated.
+> OCP-on-AWS has higher throughput because it produces hourly matched records rather than daily aggregated summaries.
 
 ---
 
-*Generated by automated benchmark suite on November 26, 2025*
-*Validated against PostgreSQL database post-benchmark*
+*Generated by automated benchmark suite*  
+*Validated against PostgreSQL database*
