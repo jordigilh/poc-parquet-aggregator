@@ -127,8 +127,8 @@ cat > "$SUMMARY_FILE" <<EOF
 
 ## Test Results
 
-| # | Scenario | Status | Rows | Duration | Memory | Details |
-|---|----------|--------|------|----------|--------|---------|
+| # | Scenario | Status | Output Rows | CPU Hours | Memory GB-Hours | Duration |
+|---|----------|--------|-------------|-----------|-----------------|----------|
 EOF
 
 TOTAL_TESTS=0
@@ -260,17 +260,41 @@ print(cur.fetchone()[0])
 conn.close()
 " 2>/dev/null || echo "0")
 
+        # Get aggregated metrics from database
+        METRICS=$(python3 -c "
+import psycopg2
+conn = psycopg2.connect(host='$POSTGRES_HOST', port=$POSTGRES_PORT, user='$POSTGRES_USER', password='$POSTGRES_PASSWORD', dbname='$POSTGRES_DB')
+cur = conn.cursor()
+cur.execute('''
+    SELECT
+        COALESCE(ROUND(SUM(pod_usage_cpu_core_hours)::numeric, 2), 0) as cpu_hours,
+        COALESCE(ROUND(SUM(pod_usage_memory_gigabyte_hours)::numeric, 2), 0) as mem_hours
+    FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary
+''')
+row = cur.fetchone()
+print(f'{row[0]}|{row[1]}')
+conn.close()
+" 2>/dev/null || echo "0|0")
+        CPU_HOURS=$(echo "$METRICS" | cut -d'|' -f1)
+        MEM_HOURS=$(echo "$METRICS" | cut -d'|' -f2)
+
         if [ "$OUTPUT_ROWS" -gt 0 ]; then
-            STATUS="✅ PASSED"
+            STATUS="✅ $OUTPUT_ROWS rows"
             PASSED_TESTS=$((PASSED_TESTS + 1))
-            echo "  ✓ Output: $OUTPUT_ROWS rows"
+            echo -e "${GREEN}  ✓ Output: $OUTPUT_ROWS rows${NC}"
+            echo -e "${BLUE}    CPU Hours: $CPU_HOURS${NC}"
+            echo -e "${BLUE}    Memory GB-Hours: $MEM_HOURS${NC}"
         else
             STATUS="⚠️ NO DATA"
+            CPU_HOURS="0"
+            MEM_HOURS="0"
             FAILED_TESTS=$((FAILED_TESTS + 1))
             echo -e "${YELLOW}  ⚠ POC ran but produced no output rows${NC}"
         fi
     else
         STATUS="❌ FAILED"
+        CPU_HOURS="0"
+        MEM_HOURS="0"
         FAILED_TESTS=$((FAILED_TESTS + 1))
         echo -e "${RED}  ❌ POC failed - see $SCENARIO_DIR/poc.log${NC}"
     fi
@@ -290,8 +314,8 @@ conn.close()
     echo -e "  ${STATUS} (${PEAK_MEMORY_DISPLAY})"
     echo ""
 
-    # Add to summary
-    echo "| $TOTAL_TESTS | $SCENARIO | $STATUS | $OUTPUT_ROWS | ${DURATION}s | $PEAK_MEMORY_DISPLAY | - |" >> "$SUMMARY_FILE"
+    # Add to summary with actual metrics
+    echo "| $TOTAL_TESTS | $SCENARIO | $STATUS | $OUTPUT_ROWS | $CPU_HOURS | $MEM_HOURS | ${DURATION}s |" >> "$SUMMARY_FILE"
 done
 
 # Final summary
@@ -305,6 +329,49 @@ cat >> "$SUMMARY_FILE" <<EOF
 | Passed | $PASSED_TESTS |
 | Failed | $FAILED_TESTS |
 | Pass Rate | $(echo "scale=1; $PASSED_TESTS * 100 / $TOTAL_TESTS" | bc)% |
+
+---
+
+## How to Verify Results
+
+### Quick Verification Query
+
+Connect to PostgreSQL and run:
+
+\`\`\`sql
+-- Connect: podman exec -it postgres-poc psql -U koku -d koku
+
+-- Total summary
+SELECT
+    COUNT(*) as output_rows,
+    ROUND(SUM(pod_usage_cpu_core_hours)::numeric, 2) as total_cpu_hours,
+    ROUND(SUM(pod_usage_memory_gigabyte_hours)::numeric, 2) as total_mem_gb_hours,
+    COUNT(DISTINCT namespace) as namespaces,
+    COUNT(DISTINCT node) as nodes
+FROM org1234567.reporting_ocpusagelineitem_daily_summary;
+
+-- Usage by namespace
+SELECT
+    namespace,
+    COUNT(*) as rows,
+    ROUND(SUM(pod_usage_cpu_core_hours)::numeric, 2) as cpu_hours,
+    ROUND(SUM(pod_usage_memory_gigabyte_hours)::numeric, 2) as mem_gb_hours
+FROM org1234567.reporting_ocpusagelineitem_daily_summary
+GROUP BY namespace
+ORDER BY cpu_hours DESC;
+
+-- Sample rows
+SELECT
+    usage_start,
+    namespace,
+    node,
+    pod,
+    ROUND(pod_usage_cpu_core_hours::numeric, 4) as cpu_hours,
+    ROUND(pod_usage_memory_gigabyte_hours::numeric, 4) as mem_gb_hours
+FROM org1234567.reporting_ocpusagelineitem_daily_summary
+ORDER BY usage_start, namespace
+LIMIT 20;
+\`\`\`
 
 EOF
 

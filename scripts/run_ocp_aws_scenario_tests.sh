@@ -117,8 +117,8 @@ cat > "$SUMMARY_FILE" <<EOF
 
 ## Test Results
 
-| # | Scenario | Status | OCP Rows | AWS Rows | Output Rows | Duration | Memory | Details |
-|---|----------|--------|----------|----------|-------------|----------|--------|---------|
+| # | Scenario | Status | Expected Cost | Actual Cost | Output Rows | Duration |
+|---|----------|--------|---------------|-------------|-------------|----------|
 EOF
 
 TOTAL_TESTS=0
@@ -538,8 +538,26 @@ EOFC
         # Ensure OUTPUT_ROWS is numeric
         OUTPUT_ROWS=${OUTPUT_ROWS:-0}
 
+        # Extract expected cost from manifest
+        EXPECTED_COST=$(python3 -c "
+import yaml
+with open('$MANIFEST_FILE') as f:
+    m = yaml.safe_load(f)
+    expected = m.get('expected_outcome', {})
+    cost = expected.get('total_cost') or expected.get('attributed_cost') or expected.get('total_amortized_cost') or 0
+    print(f'{float(cost):.2f}')
+" 2>/dev/null || echo "N/A")
+
+        # Get actual cost from DB
+        ACTUAL_COST=$(podman exec postgres-poc psql -U koku -d koku -t -c "
+            SELECT COALESCE(ROUND(SUM(unblended_cost)::numeric, 2), 0)
+            FROM org1234567.reporting_ocpawscostlineitem_project_daily_summary_p;
+        " 2>/dev/null | tr -d ' ' || echo "0.00")
+
         if [ "$OUTPUT_ROWS" -gt 0 ] 2>/dev/null; then
             echo -e "${GREEN}✅ POC generated $OUTPUT_ROWS output rows${NC}"
+            echo -e "${BLUE}   Expected cost: \$$EXPECTED_COST${NC}"
+            echo -e "${BLUE}   Actual cost:   \$$ACTUAL_COST${NC}"
 
             # Validate results (Core-style: check totals match expected)
             echo -e "${YELLOW}→ Validating results (Core-style: totals)...${NC}"
@@ -548,31 +566,62 @@ EOFC
 
             if python3 scripts/validate_totals_iqe_style.py "$MANIFEST_FILE" \
                 > "$TEST_RESULTS_DIR/${SCENARIO}_validation.txt" 2>&1; then
-                STATUS="✅ PASSED"
+                STATUS="✅ PASS"
                 PASSED_TESTS=$((PASSED_TESTS + 1))
-                echo -e "${GREEN}✅ Scenario passed: Totals match expected${NC}"
+                echo -e "${GREEN}✅ Scenario passed: Expected \$$EXPECTED_COST, Got \$$ACTUAL_COST${NC}"
 
                 # Show validation summary
                 cat "$TEST_RESULTS_DIR/${SCENARIO}_validation.txt"
             else
-                STATUS="❌ FAILED"
-                ERROR_MSG="Validation failed - totals don't match"
+                STATUS="❌ FAIL"
                 FAILED_TESTS=$((FAILED_TESTS + 1))
-                echo -e "${RED}❌ Scenario failed: Validation errors found${NC}"
+                echo -e "${RED}❌ Scenario failed: Expected \$$EXPECTED_COST, Got \$$ACTUAL_COST${NC}"
 
                 # Show validation errors
                 cat "$TEST_RESULTS_DIR/${SCENARIO}_validation.txt"
-
-                # FAIL FAST: Disabled - continue with remaining tests
-                # echo ""
-                # echo -e "${RED}================================${NC}"
-                # echo -e "${RED}FAIL FAST: Stopping test suite${NC}"
-                # echo -e "${RED}Fix the issue before continuing${NC}"
-                # echo -e "${RED}================================${NC}"
-                # exit 1
             fi
 
-            # Save detailed results
+            # Save detailed results with validation query
+            cat > "$TEST_RESULTS_DIR/${SCENARIO}_results.txt" <<VALIDATION_EOF
+================================================================================
+VALIDATION QUERY - Run this to verify results yourself:
+================================================================================
+
+-- Total cost and row count
+SELECT 
+    COUNT(*) as output_rows,
+    ROUND(SUM(unblended_cost)::numeric, 2) as total_cost,
+    COUNT(DISTINCT namespace) as namespaces,
+    COUNT(DISTINCT cluster_id) as clusters
+FROM org1234567.reporting_ocpawscostlineitem_project_daily_summary_p;
+
+-- Cost breakdown by namespace
+SELECT 
+    namespace,
+    COUNT(*) as rows,
+    ROUND(SUM(unblended_cost)::numeric, 2) as cost
+FROM org1234567.reporting_ocpawscostlineitem_project_daily_summary_p
+GROUP BY namespace
+ORDER BY cost DESC;
+
+-- Sample rows with all key columns
+SELECT
+    usage_start,
+    cluster_id,
+    namespace,
+    resource_id_matched,
+    tag_matched,
+    ROUND(unblended_cost::numeric, 2) as cost,
+    ROUND(pod_usage_cpu_core_hours::numeric, 2) as cpu_hours,
+    ROUND(pod_usage_memory_gigabyte_hours::numeric, 2) as memory_gb_hours
+FROM org1234567.reporting_ocpawscostlineitem_project_daily_summary_p
+ORDER BY usage_start, namespace
+LIMIT 20;
+
+================================================================================
+ACTUAL QUERY RESULTS:
+================================================================================
+VALIDATION_EOF
             podman exec postgres-poc psql -U koku -d koku -c "
                 SELECT
                     usage_start,
@@ -586,19 +635,20 @@ EOFC
                 FROM org1234567.reporting_ocpawscostlineitem_project_daily_summary_p
                 ORDER BY usage_start, namespace
                 LIMIT 20;
-            " > "$TEST_RESULTS_DIR/${SCENARIO}_results.txt" 2>&1 || true
+            " >> "$TEST_RESULTS_DIR/${SCENARIO}_results.txt" 2>&1 || true
         else
-            STATUS="❌ FAILED"
-            ERROR_MSG="No output rows generated"
+            STATUS="❌ FAIL"
+            EXPECTED_COST="${EXPECTED_COST:-N/A}"
+            ACTUAL_COST="0.00"
             FAILED_TESTS=$((FAILED_TESTS + 1))
-            echo -e "${RED}❌ Scenario failed: No output rows${NC}"
+            echo -e "${RED}❌ Scenario failed: No output rows (expected \$$EXPECTED_COST)${NC}"
         fi
 
     END_TIME=$(date +%s)
     DURATION=$((END_TIME - START_TIME))
 
-    # Write to summary
-    echo "| $TOTAL_TESTS | $SCENARIO | $STATUS | $OCP_ROWS | $AWS_ROWS | $OUTPUT_ROWS | ${DURATION}s | $PEAK_MEMORY_DISPLAY | $ERROR_MSG |" >> "$SUMMARY_FILE"
+    # Write to summary with expected vs actual costs
+    echo "| $TOTAL_TESTS | $SCENARIO | $STATUS | \$$EXPECTED_COST | \$$ACTUAL_COST | $OUTPUT_ROWS | ${DURATION}s |" >> "$SUMMARY_FILE"
 
     echo ""
 done
@@ -631,6 +681,40 @@ The POC successfully passed all OCP-on-AWS validation scenarios:
 - Multi-cluster support
 
 **Status**: Production-ready for OCP-on-AWS aggregation
+
+---
+
+## How to Verify Results
+
+### Quick Verification Query
+
+Connect to PostgreSQL and run:
+
+\`\`\`sql
+-- Connect: podman exec -it postgres-poc psql -U koku -d koku
+
+-- Total cost summary
+SELECT 
+    COUNT(*) as output_rows,
+    ROUND(SUM(unblended_cost)::numeric, 2) as total_cost,
+    COUNT(DISTINCT namespace) as namespaces
+FROM org1234567.reporting_ocpawscostlineitem_project_daily_summary_p;
+
+-- Cost by namespace
+SELECT 
+    namespace,
+    ROUND(SUM(unblended_cost)::numeric, 2) as cost
+FROM org1234567.reporting_ocpawscostlineitem_project_daily_summary_p
+GROUP BY namespace
+ORDER BY cost DESC;
+\`\`\`
+
+### Detailed Validation
+
+Each scenario has a \`*_results.txt\` file in \`scenario-test-results/\` with:
+- The exact SQL queries used for validation
+- Sample output rows
+- Expected vs actual cost comparison
 EOF
     echo -e "${GREEN}"
     echo "=============================================="
