@@ -1,7 +1,7 @@
 # OCP-on-AWS Benchmark Results
 
-**Date**: November 26, 2025  
-**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)  
+**Date**: November 26, 2025
+**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)
 **Methodology**: 3 runs per scale, median ± stddev, continuous 100ms memory sampling
 
 ## Table of Contents
@@ -12,7 +12,7 @@
 4. [Performance Analysis](#performance-analysis)
 5. [Memory Analysis](#memory-analysis)
 6. [Production Fit Analysis](#production-fit-analysis)
-7. [Data Validation](#data-validation)
+7. [Comparison with OCP-Only](#comparison-with-ocp-only)
 
 ---
 
@@ -29,7 +29,7 @@
 | **1.5m** | 1,526,420 + 14,401 | 1,497,600 | 495.70 ± 1.09 | 6,924 ± 80 | 3,021 rows/s |
 | **2m** | 2,035,225 + 19,201 | 1,996,800 | 640.26 ± 11.54 | 7,326 ± 122 | 3,118 rows/s |
 
-> **Scale names** refer to OCP input rows. E.g., "20k" = ~20,000 OCP input rows.  
+> **Scale names** refer to OCP input rows. E.g., "20k" = ~20,000 OCP input rows.
 > **Throughput** = Output Rows / Time (calculated from median values)
 
 ---
@@ -47,8 +47,8 @@
 | **1.5m** | ~1,500,000 | ~14,400 | 1,497,600 | 600 nodes, ~62,400 pods | Major cloud scale |
 | **2m** | ~2,000,000 | ~19,200 | 1,996,800 | 800 nodes, ~83,200 pods | Maximum tested |
 
-> **OCP Input** = Pods × 24 hours (hourly usage data)  
-> **AWS Input** = EC2/EBS resources × 24 hours  
+> **OCP Input** = Pods × 24 hours (hourly usage data)
+> **AWS Input** = EC2/EBS resources × 24 hours
 > **Output Rows** = Matched OCP-AWS records (hourly granularity)
 
 ---
@@ -57,32 +57,32 @@
 
 ### Raw Run Data
 
-| Scale | Run | Output Rows | Time (s) | Memory (MB) | Throughput |
-|-------|-----|-------------|----------|-------------|------------|
-| 20k | 1 | 19,920 | 8.04 | 381 | 2,477 |
-| 20k | 2 | 19,920 | 7.98 | 400 | 2,496 |
-| 20k | 3 | 19,920 | 7.99 | 374 | 2,493 |
-| 50k | 1 | 49,920 | 17.84 | 646 | 2,798 |
-| 50k | 2 | 49,920 | 17.83 | 635 | 2,799 |
-| 50k | 3 | 49,920 | 17.79 | 634 | 2,806 |
-| 100k | 1 | 99,840 | 34.08 | 1,140 | 2,929 |
-| 100k | 2 | 99,840 | 34.10 | 1,108 | 2,927 |
-| 100k | 3 | 99,840 | 34.20 | 1,065 | 2,919 |
-| 250k | 1 | 249,600 | 83.39 | 2,459 | 2,993 |
-| 250k | 2 | 249,600 | 83.90 | 2,411 | 2,974 |
-| 250k | 3 | 249,600 | 83.67 | 2,408 | 2,983 |
-| 500k | 1 | 499,200 | 165.57 | 4,465 | 3,015 |
-| 500k | 2 | 499,200 | 168.10 | 4,188 | 2,969 |
-| 500k | 3 | 499,200 | 166.84 | 3,603 | 2,992 |
-| 1m | 1 | 998,400 | 334.29 | 6,297 | 2,986 |
-| 1m | 2 | 998,400 | 334.70 | 6,862 | 2,982 |
-| 1m | 3 | 998,400 | 330.67 | 7,016 | 3,019 |
-| 1.5m | 1 | 1,497,600 | 495.15 | 6,956 | 3,024 |
-| 1.5m | 2 | 1,497,600 | 497.26 | 6,805 | 3,011 |
-| 1.5m | 3 | 1,497,600 | 495.70 | 6,924 | 3,021 |
-| 2m | 1 | 1,996,800 | 656.14 | 7,512 | 3,043 |
-| 2m | 2 | 1,996,800 | 640.26 | 7,281 | 3,118 |
-| 2m | 3 | 1,996,800 | 633.69 | 7,326 | 3,151 |
+| Scale | Run | Output Rows | Time (s) | Memory (MB) |
+|-------|-----|-------------|----------|-------------|
+| 20k | 1 | 19,920 | 8.04 | 381 |
+| 20k | 2 | 19,920 | 7.98 | 400 |
+| 20k | 3 | 19,920 | 7.99 | 374 |
+| 50k | 1 | 49,920 | 17.84 | 646 |
+| 50k | 2 | 49,920 | 17.83 | 635 |
+| 50k | 3 | 49,920 | 17.79 | 634 |
+| 100k | 1 | 99,840 | 34.08 | 1,140 |
+| 100k | 2 | 99,840 | 34.10 | 1,108 |
+| 100k | 3 | 99,840 | 34.20 | 1,065 |
+| 250k | 1 | 249,600 | 83.39 | 2,459 |
+| 250k | 2 | 249,600 | 83.90 | 2,411 |
+| 250k | 3 | 249,600 | 83.67 | 2,408 |
+| 500k | 1 | 499,200 | 165.57 | 4,465 |
+| 500k | 2 | 499,200 | 168.10 | 4,188 |
+| 500k | 3 | 499,200 | 166.84 | 3,603 |
+| 1m | 1 | 998,400 | 334.29 | 6,297 |
+| 1m | 2 | 998,400 | 334.70 | 6,862 |
+| 1m | 3 | 998,400 | 330.67 | 7,016 |
+| 1.5m | 1 | 1,497,600 | 495.15 | 6,956 |
+| 1.5m | 2 | 1,497,600 | 497.26 | 6,805 |
+| 1.5m | 3 | 1,497,600 | 495.70 | 6,924 |
+| 2m | 1 | 1,996,800 | 656.14 | 7,512 |
+| 2m | 2 | 1,996,800 | 640.26 | 7,281 |
+| 2m | 3 | 1,996,800 | 633.69 | 7,326 |
 
 ---
 
@@ -118,27 +118,27 @@
 
 ### Memory Scaling
 
-| Scale | Input Rows | Output Rows | Memory (MB) | MB per 1K Output |
-|-------|------------|-------------|-------------|------------------|
-| 20k | ~20,000 | 19,920 | 381 | 19.1 |
-| 50k | ~50,000 | 49,920 | 635 | 12.7 |
-| 100k | ~100,000 | 99,840 | 1,108 | 11.1 |
-| 250k | ~250,000 | 249,600 | 2,411 | 9.7 |
-| 500k | ~500,000 | 499,200 | 4,188 | 8.4 |
-| 1m | ~1,000,000 | 998,400 | 6,862 | 6.9 |
-| 1.5m | ~1,500,000 | 1,497,600 | 6,924 | 4.6 |
-| 2m | ~2,000,000 | 1,996,800 | 7,326 | 3.7 |
+| Scale | Input Rows | Memory (MB) | MB per 1K Input |
+|-------|------------|-------------|-----------------|
+| 20k | ~20,000 | 381 | 19.1 |
+| 50k | ~50,000 | 635 | 12.7 |
+| 100k | ~100,000 | 1,108 | 11.1 |
+| 250k | ~250,000 | 2,411 | 9.7 |
+| 500k | ~500,000 | 4,188 | 8.4 |
+| 1m | ~1,000,000 | 6,862 | 6.9 |
+| 1.5m | ~1,500,000 | 6,924 | 4.6 |
+| 2m | ~2,000,000 | 7,326 | 3.7 |
 
-**Key Insight**: Memory efficiency improves at scale (~4-7 MB per 1K output rows at production scale).
+**Key Insight**: Memory efficiency improves at scale (~4-7 MB per 1K input rows at production scale).
 
 ### Memory Formula
 
 ```
-Estimated Memory (MB) ≈ 300 + (Output Rows × 0.0035)
+Estimated Memory (MB) ≈ 300 + (Input Rows × 0.0035)
 
 Examples:
-- 500,000 output:   300 + 1,750 = ~2,050 MB
-- 2,000,000 output: 300 + 7,000 = ~7,300 MB ✓
+- 500,000 input:   300 + 1,750 = ~2,050 MB
+- 2,000,000 input: 300 + 7,000 = ~7,300 MB ✓
 ```
 
 ---
@@ -147,10 +147,10 @@ Examples:
 
 ### Memory Requirements
 
-| Scenario | Output Rows | Est. Memory | Fits in 32GB? |
-|----------|-------------|-------------|---------------|
-| Small customer | 50,000 | ~0.5 GB | ✅ Yes (2%) |
-| Medium customer | 250,000 | ~1.2 GB | ✅ Yes (4%) |
+| Scenario | Input Rows | Est. Memory | Fits in 32GB? |
+|----------|------------|-------------|---------------|
+| Small customer | 100,000 | ~0.7 GB | ✅ Yes (2%) |
+| Medium customer | 500,000 | ~2 GB | ✅ Yes (6%) |
 | Large customer | 1,000,000 | ~4 GB | ✅ Yes (13%) |
 | Very large | 2,000,000 | ~7.5 GB | ✅ Yes (23%) |
 | Maximum tested | 2,000,000 | 7,326 MB | ✅ Yes (23%) |
@@ -158,53 +158,23 @@ Examples:
 
 ### Conclusions
 
-1. **Memory-efficient**: ~4-7 MB per 1K output rows at production scale
+1. **Memory-efficient**: ~4-7 MB per 1K input rows at production scale
 2. **Scalable**: Sub-linear time scaling with consistent throughput (~3,000 rows/sec)
-3. **Production-ready**: Handles 2M+ output rows within 32GB with headroom to spare
-
----
-
-## Data Validation
-
-### Validation Results
-
-| Check | Result | Status |
-|-------|--------|--------|
-| Row count | 1,996,800 | ✅ Matches scale-2m target |
-| NULL namespaces | 0 | ✅ No NULL values |
-| Total unblended_cost | $3,686.40 | ✅ AWS costs present |
-
-### Validation Queries
-
-```sql
--- Row count
-SELECT COUNT(*) FROM org1234567.reporting_ocpawscostlineitem_project_daily_summary_p;
--- Result: 1,996,800
-
--- NULL check
-SELECT COUNT(*) FROM org1234567.reporting_ocpawscostlineitem_project_daily_summary_p
-WHERE namespace IS NULL;
--- Result: 0
-
--- Cost verification
-SELECT SUM(unblended_cost) FROM org1234567.reporting_ocpawscostlineitem_project_daily_summary_p;
--- Result: $3,686.40
-```
+3. **Production-ready**: Handles 2M+ input rows within 32GB with headroom to spare
 
 ---
 
 ## Comparison with OCP-Only
 
-| Metric | OCP-Only | OCP-on-AWS |
-|--------|----------|------------|
-| Throughput | ~280-300 rows/s | ~2,900-3,100 rows/s |
-| Memory per 1K output | ~125 MB | ~4-7 MB |
-| Output type | Daily summary per pod | Hourly matched records |
-| Complexity | Simple aggregation | JOIN + AWS matching |
+| Metric | OCP-on-AWS | OCP-Only |
+|--------|------------|----------|
+| Throughput | ~2,900-3,100 rows/s | ~280-300 rows/s |
+| Memory per 1K input | ~4-7 MB | ~5-7 MB |
+| Output type | Hourly matched records | Daily summary per pod |
+| Complexity | JOIN + AWS matching | Simple aggregation |
 
 > OCP-on-AWS has higher throughput because it produces hourly matched records rather than daily aggregated summaries.
 
 ---
 
-*Generated by automated benchmark suite*  
-*Validated against PostgreSQL database*
+*Generated by automated benchmark suite*
