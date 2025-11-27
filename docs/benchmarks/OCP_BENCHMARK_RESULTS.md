@@ -1,7 +1,7 @@
 # OCP-Only Benchmark Results
 
-**Date**: November 26, 2025
-**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)
+**Date**: November 26, 2025  
+**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)  
 **Methodology**: 3 runs per scale, median ± stddev, continuous 100ms memory sampling
 
 ## Table of Contents
@@ -11,7 +11,9 @@
 3. [Detailed Results](#detailed-results)
 4. [Performance Analysis](#performance-analysis)
 5. [Memory Analysis](#memory-analysis)
-6. [Production Fit Analysis](#production-fit-analysis)
+6. [Visualizations](#visualizations)
+7. [Production Fit Analysis](#production-fit-analysis)
+8. [Comparison with OCP-on-AWS](#comparison-with-ocp-on-aws)
 
 ---
 
@@ -28,7 +30,7 @@
 | **1.5m** | 1,526,420 | 62,400 | 208.55 ± 1.61 | 8,600 ± 302 | 299 rows/s |
 | **2m** | 2,035,225 | 83,200 | 282.76 ± 3.14 | 10,342 ± 292 | 294 rows/s |
 
-> **Scale names** refer to input rows (hourly data from nise). E.g., "20k" = ~20,000 input rows.
+> **Scale names** refer to input rows (hourly data from nise). E.g., "20k" = ~20,000 input rows.  
 > **Throughput** = Output Rows / Time (calculated from median values)
 
 ---
@@ -46,7 +48,7 @@
 | **1.5m** | ~1,500,000 | 62,400 | 600 nodes, ~62,400 pods | Major cloud scale |
 | **2m** | ~2,000,000 | 83,200 | 800 nodes, ~83,200 pods | Maximum tested |
 
-> **Input Rows** = Pods × 24 hours (hourly usage data)
+> **Input Rows** = Pods × 24 hours (hourly usage data)  
 > **Output Rows** = Daily aggregated summaries (one per pod/namespace/node combination)
 
 ---
@@ -97,11 +99,18 @@
 
 ### Throughput Consistency
 
-Throughput remains consistent across scales (~260-300 output rows/sec):
+| Scale | Throughput (rows/s) |
+|-------|---------------------|
+| 20k | 191 |
+| 50k | 245 |
+| 100k | 267 |
+| 250k | 281 |
+| 500k | 289 |
+| 1m | 298 |
+| 1.5m | 299 |
+| 2m | 294 |
 
-- ✅ Sub-linear scalability (efficiency improves at scale)
-- ✅ No performance degradation at larger scales
-- ✅ Predictable resource requirements
+**Average throughput**: ~280 output rows/second
 
 ---
 
@@ -134,6 +143,40 @@ Examples:
 
 ---
 
+## Visualizations
+
+### Processing Time vs Input Rows
+
+```mermaid
+xychart-beta
+    title "Processing Time vs Input Rows"
+    x-axis "Input Rows" [20K, 50K, 100K, 250K, 500K, 1M, 1.5M, 2M]
+    y-axis "Time (seconds)" 0 --> 300
+    bar "Time" [4, 8, 16, 37, 72, 140, 209, 283]
+```
+
+### Memory Usage vs Input Rows
+
+```mermaid
+xychart-beta
+    title "Peak Memory Usage vs Input Rows"
+    x-axis "Input Rows" [20K, 50K, 100K, 250K, 500K, 1M, 1.5M, 2M]
+    y-axis "Memory (MB)" 0 --> 12000
+    bar "Memory" [328, 510, 839, 1964, 3689, 7171, 8600, 10342]
+```
+
+### Throughput vs Scale
+
+```mermaid
+xychart-beta
+    title "Throughput (rows/sec) vs Scale"
+    x-axis "Input Rows" [20K, 50K, 100K, 250K, 500K, 1M, 1.5M, 2M]
+    y-axis "Rows/Second" 0 --> 350
+    line "Throughput" [191, 245, 267, 281, 289, 298, 299, 294]
+```
+
+---
+
 ## Production Fit Analysis
 
 ### Memory Requirements
@@ -160,9 +203,9 @@ Examples:
 | Metric | OCP-Only | OCP-on-AWS |
 |--------|----------|------------|
 | Throughput | ~280-300 rows/s | ~2,900-3,100 rows/s |
-| Memory per 1K input | ~5-7 MB | ~3-4 MB |
-| Complexity | Simple aggregation | JOIN + AWS matching |
+| Memory per 1K input | ~5-7 MB | ~4-7 MB |
 | Output type | Daily summary per pod | Hourly matched records |
+| Complexity | Simple aggregation | JOIN + AWS matching |
 
 > OCP-on-AWS has higher throughput because it produces hourly matched records rather than daily aggregated summaries.
 

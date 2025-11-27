@@ -1,7 +1,7 @@
 # OCP-on-AWS Benchmark Results
 
-**Date**: November 26, 2025
-**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)
+**Date**: November 26, 2025  
+**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)  
 **Methodology**: 3 runs per scale, median ± stddev, continuous 100ms memory sampling
 
 ## Table of Contents
@@ -11,8 +11,9 @@
 3. [Detailed Results](#detailed-results)
 4. [Performance Analysis](#performance-analysis)
 5. [Memory Analysis](#memory-analysis)
-6. [Production Fit Analysis](#production-fit-analysis)
-7. [Comparison with OCP-Only](#comparison-with-ocp-only)
+6. [Visualizations](#visualizations)
+7. [Production Fit Analysis](#production-fit-analysis)
+8. [Comparison with OCP-Only](#comparison-with-ocp-only)
 
 ---
 
@@ -29,7 +30,7 @@
 | **1.5m** | 1,526,420 + 14,401 | 1,497,600 | 495.70 ± 1.09 | 6,924 ± 80 | 3,021 rows/s |
 | **2m** | 2,035,225 + 19,201 | 1,996,800 | 640.26 ± 11.54 | 7,326 ± 122 | 3,118 rows/s |
 
-> **Scale names** refer to OCP input rows. E.g., "20k" = ~20,000 OCP input rows.
+> **Scale names** refer to OCP input rows. E.g., "20k" = ~20,000 OCP input rows.  
 > **Throughput** = Output Rows / Time (calculated from median values)
 
 ---
@@ -47,8 +48,8 @@
 | **1.5m** | ~1,500,000 | ~14,400 | 1,497,600 | 600 nodes, ~62,400 pods | Major cloud scale |
 | **2m** | ~2,000,000 | ~19,200 | 1,996,800 | 800 nodes, ~83,200 pods | Maximum tested |
 
-> **OCP Input** = Pods × 24 hours (hourly usage data)
-> **AWS Input** = EC2/EBS resources × 24 hours
+> **OCP Input** = Pods × 24 hours (hourly usage data)  
+> **AWS Input** = EC2/EBS resources × 24 hours  
 > **Output Rows** = Matched OCP-AWS records (hourly granularity)
 
 ---
@@ -139,6 +140,40 @@ Estimated Memory (MB) ≈ 300 + (Input Rows × 0.0035)
 Examples:
 - 500,000 input:   300 + 1,750 = ~2,050 MB
 - 2,000,000 input: 300 + 7,000 = ~7,300 MB ✓
+```
+
+---
+
+## Visualizations
+
+### Processing Time vs Input Rows
+
+```mermaid
+xychart-beta
+    title "Processing Time vs Input Rows"
+    x-axis "Input Rows" [20K, 50K, 100K, 250K, 500K, 1M, 1.5M, 2M]
+    y-axis "Time (seconds)" 0 --> 700
+    bar "Time" [8, 18, 34, 84, 167, 334, 496, 640]
+```
+
+### Memory Usage vs Input Rows
+
+```mermaid
+xychart-beta
+    title "Peak Memory Usage vs Input Rows"
+    x-axis "Input Rows" [20K, 50K, 100K, 250K, 500K, 1M, 1.5M, 2M]
+    y-axis "Memory (MB)" 0 --> 8000
+    bar "Memory" [381, 635, 1108, 2411, 4188, 6862, 6924, 7326]
+```
+
+### Throughput vs Scale
+
+```mermaid
+xychart-beta
+    title "Throughput (rows/sec) vs Scale"
+    x-axis "Input Rows" [20K, 50K, 100K, 250K, 500K, 1M, 1.5M, 2M]
+    y-axis "Rows/Second" 0 --> 3500
+    line "Throughput" [2493, 2799, 2927, 2983, 2992, 2986, 3021, 3118]
 ```
 
 ---
