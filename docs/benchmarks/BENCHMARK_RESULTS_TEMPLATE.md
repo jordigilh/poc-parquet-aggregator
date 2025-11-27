@@ -159,22 +159,28 @@ xychart-beta
 
 ## Production Fit Analysis
 
-### Memory Requirements
+### Measured Memory (from benchmarks)
 
-| Scenario | Input Rows | Est. Memory | Fits in 32GB? |
-|----------|------------|-------------|---------------|
-| Small customer | 100,000 | ~{EST} GB | ✅ Yes ({PCT}%) |
-| Medium customer | 500,000 | ~{EST} GB | ✅ Yes ({PCT}%) |
-| Large customer | 1,000,000 | ~{EST} GB | ✅ Yes ({PCT}%) |
-| Very large | 2,000,000 | ~{EST} GB | ✅ Yes ({PCT}%) |
-| Maximum tested | 2,000,000 | {ACTUAL} MB | ✅ Yes ({PCT}%) |
-| Projected max | {MAX_ROWS} | ~{EST} GB | ✅ Yes ({PCT}%) |
+| Scale | Input Rows | Memory (Measured) | % of 32GB |
+|-------|------------|-------------------|-----------|
+| 100k | ~100,000 | {MEASURED_100K} MB | {PCT}% |
+| 500k | ~500,000 | {MEASURED_500K} MB | {PCT}% |
+| 1m | ~1,000,000 | {MEASURED_1M} MB | {PCT}% |
+| 2m | ~2,000,000 | {MEASURED_2M} MB | {PCT}% |
+
+### Projected Memory (beyond tested scales)
+
+| Scale | Input Rows | Memory (Estimated) | % of 32GB |
+|-------|------------|-------------------|-----------|
+| {PROJ_SCALE_1} | ~{PROJ_ROWS_1} | ~{PROJ_MEM_1} GB | {PCT}% |
+| {PROJ_SCALE_2} | ~{PROJ_ROWS_2} | ~{PROJ_MEM_2} GB | {PCT}% |
+| {PROJ_SCALE_3} | ~{PROJ_ROWS_3} | ~{PROJ_MEM_3} GB | {PCT}% |
 
 ### Conclusions
 
 1. **Memory-efficient**: ~{MB_PER_1K} MB per 1K input rows at production scale
 2. **Scalable**: {SCALING_TYPE} time scaling with consistent throughput (~{THROUGHPUT} rows/sec)
-3. **Production-ready**: Handles {MAX_TESTED} input rows within 32GB with headroom to spare
+3. **Production-ready**: Handles 2M input rows using only {MAX_PCT}% of 32GB capacity
 
 ---
 

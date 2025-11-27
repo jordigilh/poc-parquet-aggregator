@@ -180,22 +180,29 @@ xychart-beta
 
 ## Production Fit Analysis
 
-### Memory Requirements
+### Measured Memory (from benchmarks)
 
-| Scenario | Input Rows | Est. Memory | Fits in 32GB? |
-|----------|------------|-------------|---------------|
-| Small customer | 100,000 | ~0.7 GB | ✅ Yes (2%) |
-| Medium customer | 500,000 | ~2 GB | ✅ Yes (6%) |
-| Large customer | 1,000,000 | ~4 GB | ✅ Yes (13%) |
-| Very large | 2,000,000 | ~7.5 GB | ✅ Yes (23%) |
-| Maximum tested | 2,000,000 | 7,326 MB | ✅ Yes (23%) |
-| Projected max | 8,000,000 | ~28 GB | ✅ Yes (88%) |
+| Scale | Input Rows | Memory (Measured) | % of 32GB |
+|-------|------------|-------------------|-----------|
+| 100k | ~100,000 | 1,108 MB | 3% |
+| 500k | ~500,000 | 4,188 MB | 13% |
+| 1m | ~1,000,000 | 6,862 MB | 21% |
+| 1.5m | ~1,500,000 | 6,924 MB | 22% |
+| 2m | ~2,000,000 | 7,326 MB | 23% |
+
+### Projected Memory (beyond tested scales)
+
+| Scale | Input Rows | Memory (Estimated) | % of 32GB |
+|-------|------------|-------------------|-----------|
+| 4m | ~4,000,000 | ~14 GB | 44% |
+| 6m | ~6,000,000 | ~21 GB | 66% |
+| 8m | ~8,000,000 | ~28 GB | 88% |
 
 ### Conclusions
 
 1. **Memory-efficient**: ~4-7 MB per 1K input rows at production scale
 2. **Scalable**: Sub-linear time scaling with consistent throughput (~3,000 rows/sec)
-3. **Production-ready**: Handles 2M+ input rows within 32GB with headroom to spare
+3. **Production-ready**: Handles 2M input rows using only 23% of 32GB capacity
 
 ---
 
