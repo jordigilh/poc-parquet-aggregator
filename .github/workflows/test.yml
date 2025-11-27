@@ -307,8 +307,8 @@ jobs:
           START_DATE=$(date -d "last month" +%Y-%m-01)
           END_DATE=$(date -d "$(date +%Y-%m-01) -1 day" +%Y-%m-%d)
 
-          # Use an existing working test manifest and update dates
-          cp test-manifests/ocp-only/ocp_scenario_01_basic_pod.yml e2e_test_data/nise_config.yml
+          # Use comprehensive E2E manifest (includes pods + storage + multiple namespaces)
+          cp test-manifests/ci-e2e/ci_e2e_manifest.yml e2e_test_data/nise_config.yml
 
           # Update dates in the config
           sed -i "s/start_date: .*/start_date: $START_DATE/" e2e_test_data/nise_config.yml

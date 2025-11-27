@@ -1,0 +1,83 @@
+# CI E2E Test Manifest
+# Purpose: Comprehensive E2E test for GitHub Actions CI pipeline
+# Includes: Pods + Storage + Multiple namespaces
+
+start_date: 2025-10-01
+end_date: 2025-10-02
+
+generators:
+  - OCPGenerator:
+      start_date: 2025-10-01
+      end_date: 2025-10-02
+      nodes:
+        - node: null
+          node_name: worker-node-1
+          cpu_cores: 8
+          memory_gig: 32
+          resource_id: i-worker001
+          namespaces:
+            frontend:
+              pods:
+                - pod: null
+                  pod_name: web-1
+                  cpu_request: 0.5
+                  cpu_limit: 1.0
+                  mem_request_gig: 1
+                  mem_limit_gig: 2
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.3
+                  mem_usage_gig:
+                    full_period: 0.8
+                  labels: app:frontend|tier:web|environment:production
+
+              volumes:
+                - volume:
+                  volume_name: web-pvc
+                  storage_class: gp2
+                  volume_request_gig: 50
+                  labels: storage:web|app:frontend|environment:production
+                  volume_claims:
+                    - volume_claim:
+                      volume_claim_name: web-pvc-claim
+                      pod_name: web-1
+                      capacity_gig: 50
+                      volume_claim_usage_gig:
+                        full_period: 25
+
+            backend:
+              pods:
+                - pod: null
+                  pod_name: api-1
+                  cpu_request: 1.0
+                  cpu_limit: 2.0
+                  mem_request_gig: 2
+                  mem_limit_gig: 4
+                  pod_seconds: 86400
+                  cpu_usage:
+                    full_period: 0.6
+                  mem_usage_gig:
+                    full_period: 1.5
+                  labels: app:backend|tier:api|environment:production
+
+              volumes:
+                - volume:
+                  volume_name: api-pvc
+                  storage_class: io1
+                  volume_request_gig: 100
+                  labels: storage:api|app:backend|environment:production
+                  volume_claims:
+                    - volume_claim:
+                      volume_claim_name: api-pvc-claim
+                      pod_name: api-1
+                      capacity_gig: 100
+                      volume_claim_usage_gig:
+                        full_period: 40
+
+# Expected output:
+# - 2 namespaces: frontend, backend
+# - 2 pods: web-1, api-1
+# - 2 PVCs: web-pvc-claim, api-pvc-claim
+# - 2 storage classes: gp2, io1
+# - data_source: Pod (2 rows per day) + Storage (2 rows per day)
+
