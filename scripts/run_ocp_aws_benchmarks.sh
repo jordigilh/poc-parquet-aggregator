@@ -531,8 +531,8 @@ try:
     ''')
     nulls = cur.fetchone()[0]
 
-    # Check costs
-    cur.execute('SELECT SUM(infrastructure_cost) FROM ${ORG_ID}.reporting_ocpawscostlineitem_project_daily_summary_p;')
+    # Check costs (use unblended_cost - the actual cost column in the table)
+    cur.execute('SELECT SUM(unblended_cost) FROM ${ORG_ID}.reporting_ocpawscostlineitem_project_daily_summary_p;')
     total_cost = cur.fetchone()[0] or 0
 
     conn.close()
