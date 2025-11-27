@@ -238,8 +238,8 @@ for SCENARIO in "${SCENARIOS[@]}"; do
 
     # Step 3: Clear PostgreSQL summary table
     echo "  🗄 Clearing PostgreSQL..."
-    PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB \
-        -c "TRUNCATE TABLE koku.reporting_ocpusagelineitem_daily_summary;" 2>/dev/null || true
+    podman exec postgres-poc psql -U $POSTGRES_USER -d $POSTGRES_DB \
+        -c "TRUNCATE TABLE ${ORG_ID}.reporting_ocpusagelineitem_daily_summary;" 2>/dev/null || true
 
     # Step 4: Run POC aggregation
     echo "  🚀 Running POC aggregation..."
@@ -282,7 +282,7 @@ conn.close()
             # Step 5: Run strict validation
             echo "  🔍 Running strict validation..."
             VALIDATION_LOG="$SCENARIO_DIR/validation.log"
-            
+
             if "$SCRIPT_DIR/validate_e2e_results.sh" "$OCP_CLUSTER_ID" > "$VALIDATION_LOG" 2>&1; then
                 STATUS="✅ PASS"
                 PASSED_TESTS=$((PASSED_TESTS + 1))

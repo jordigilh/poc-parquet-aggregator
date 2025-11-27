@@ -40,13 +40,27 @@ else
 fi
 
 # Helper function to run psql
-run_psql() {
-    PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "$1" | xargs
-}
-
-run_psql_display() {
-    PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$1"
-}
+# Detects whether to use local psql or podman exec
+if command -v psql &> /dev/null; then
+    # psql is available (CI environment)
+    run_psql() {
+        PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "$1" | xargs
+    }
+    run_psql_display() {
+        PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$1"
+    }
+elif podman ps 2>/dev/null | grep -q postgres-poc; then
+    # Use podman exec (local development)
+    run_psql() {
+        podman exec postgres-poc psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "$1" | xargs
+    }
+    run_psql_display() {
+        podman exec postgres-poc psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$1"
+    }
+else
+    echo "ERROR: Neither psql nor postgres-poc container available"
+    exit 1
+fi
 
 echo "=========================================="
 echo "=== E2E Validation Results ==="
@@ -145,17 +159,17 @@ echo "-----------------------------"
 if [ "$STORAGE_ROWS" -gt 0 ]; then
     STORAGE_WITH_CAPACITY=$(run_psql "SELECT COUNT(*) FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='$CLUSTER_ID' AND data_source='Storage' AND persistentvolumeclaim_capacity_gigabyte_months IS NOT NULL AND persistentvolumeclaim_capacity_gigabyte_months > 0;")
     STORAGE_WITH_USAGE=$(run_psql "SELECT COUNT(*) FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='$CLUSTER_ID' AND data_source='Storage' AND persistentvolumeclaim_usage_gigabyte_months IS NOT NULL AND persistentvolumeclaim_usage_gigabyte_months > 0;")
-    
+
     echo "Storage rows with capacity: $STORAGE_WITH_CAPACITY / $STORAGE_ROWS"
     echo "Storage rows with usage: $STORAGE_WITH_USAGE / $STORAGE_ROWS"
-    
+
     if [ "$STORAGE_WITH_CAPACITY" -eq 0 ] || [ "$STORAGE_WITH_USAGE" -eq 0 ]; then
         echo -e "${RED}❌ FAIL: Storage rows missing storage metrics${NC}"
         VALIDATION_FAILURES=$((VALIDATION_FAILURES + 1))
     else
         echo -e "${GREEN}✅ PASS: Storage rows have storage metrics${NC}"
     fi
-    
+
     # Storage class distribution
     echo ""
     echo "Storage Class Distribution:"
@@ -252,7 +266,7 @@ echo "-----------------"
 if [ "$POD_ROWS" -gt 0 ]; then
     ROWS_WITH_CAPACITY=$(run_psql "SELECT COUNT(*) FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='$CLUSTER_ID' AND data_source='Pod' AND node_capacity_cpu_core_hours IS NOT NULL AND node_capacity_cpu_core_hours > 0;")
     echo "Pod rows with node capacity: $ROWS_WITH_CAPACITY / $POD_ROWS"
-    
+
     if [ "$ROWS_WITH_CAPACITY" -eq 0 ]; then
         echo -e "${YELLOW}⚠️  WARNING: No node capacity data found${NC}"
     else
@@ -266,11 +280,11 @@ fi
 echo ""
 echo "11. Aggregated Metrics Summary"
 echo "------------------------------"
-run_psql_display "SELECT 
+run_psql_display "SELECT
     ROUND(SUM(pod_usage_cpu_core_hours)::numeric, 2) as total_cpu_hours,
     ROUND(SUM(pod_usage_memory_gigabyte_hours)::numeric, 2) as total_mem_gb_hours,
     ROUND(SUM(persistentvolumeclaim_usage_gigabyte_months)::numeric, 4) as total_storage_gb_months
-FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary 
+FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary
 WHERE cluster_id='$CLUSTER_ID';"
 
 # =============================================================================
