@@ -190,6 +190,21 @@ xychart-beta
 | 1.5m | ~1,500,000 | 6,924 MB | 22% |
 | 2m | ~2,000,000 | 7,326 MB | 23% |
 
+### Prediction Confidence for Scales Beyond 2M
+
+| Metric | Confidence | Reasoning |
+|--------|------------|-----------|
+| **Time** | ✅ High | Sub-linear scaling is consistent (~0.31-0.33 ms/row at scale). Predicting 4M rows: ~1,280s (21 min) |
+| **Memory** | ⚠️ Low | Memory nearly plateaus from 1M→2M (only +464 MB). Cannot reliably extrapolate. |
+
+**Time prediction formula** (high confidence):
+```
+Time (s) ≈ Input Rows × 0.00032
+Example: 4,000,000 × 0.00032 = ~1,280 seconds
+```
+
+**Memory observation**: The near-plateau from 1M to 2M suggests memory may be dominated by fixed structures (AWS data, intermediate DataFrames) rather than scaling linearly with input. Testing at 4M+ would be needed to confirm.
+
 ### Conclusions
 
 1. **Memory-efficient**: ~4-7 MB per 1K input rows at production scale

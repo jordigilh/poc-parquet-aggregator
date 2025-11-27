@@ -189,6 +189,21 @@ xychart-beta
 | 1.5m | ~1,500,000 | 8,600 MB | 27% |
 | 2m | ~2,000,000 | 10,342 MB | 32% |
 
+### Prediction Confidence for Scales Beyond 2M
+
+| Metric | Confidence | Reasoning |
+|--------|------------|-----------|
+| **Time** | ✅ High | Sub-linear scaling is consistent (~0.14 ms/row at scale). Predicting 4M rows: ~560s (9 min) |
+| **Memory** | ⚠️ Medium | More linear than OCP-on-AWS but still sub-linear. Growth rate decreasing. |
+
+**Time prediction formula** (high confidence):
+```
+Time (s) ≈ Input Rows × 0.00014
+Example: 4,000,000 × 0.00014 = ~560 seconds
+```
+
+**Memory observation**: Growth rate is decreasing (5.1 MB/1K at 2M vs 16.1 MB/1K at 20k). Extrapolation is uncertain but memory efficiency improves at scale.
+
 ### Conclusions
 
 1. **Memory-efficient**: ~5-7 MB per 1K input rows at production scale
