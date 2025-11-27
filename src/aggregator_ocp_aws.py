@@ -750,7 +750,7 @@ class OCPAWSAggregator:
         Handles three types of costs:
         1. Compute costs (regular attribution to namespaces)
         2. Network costs (attributed to "Network unattributed" namespace)
-        3. Storage costs (TODO: Future implementation)
+        3. Storage costs (CSI-based, tag-matched non-CSI, and untagged)
 
         Args:
             ocp_data: Dictionary of OCP DataFrames
