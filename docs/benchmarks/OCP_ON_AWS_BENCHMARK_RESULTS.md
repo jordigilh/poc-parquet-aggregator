@@ -1,7 +1,7 @@
 # OCP-on-AWS Benchmark Results
 
-**Date**: November 26, 2025  
-**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)  
+**Date**: November 26, 2025
+**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)
 **Methodology**: 3 runs per scale, median ± stddev, continuous 100ms memory sampling
 
 ## Table of Contents
@@ -31,7 +31,7 @@
 | **1.5m** | 1,526,420 + 14,401 | 1,497,600 | 495.70 ± 1.09 | 6,924 ± 80 | 3,021 rows/s |
 | **2m** | 2,035,225 + 19,201 | 1,996,800 | 640.26 ± 11.54 | 7,326 ± 122 | 3,118 rows/s |
 
-> **Scale names** refer to OCP input rows. E.g., "20k" = ~20,000 OCP input rows.  
+> **Scale names** refer to OCP input rows. E.g., "20k" = ~20,000 OCP input rows.
 > **Throughput** = Output Rows / Time (calculated from median values)
 
 ---
@@ -49,8 +49,8 @@
 | **1.5m** | ~1,500,000 | ~14,400 | 1,497,600 | 600 nodes, ~62,400 pods | Major cloud scale |
 | **2m** | ~2,000,000 | ~19,200 | 1,996,800 | 800 nodes, ~83,200 pods | Maximum tested |
 
-> **OCP Input** = Pods × 24 hours (hourly usage data)  
-> **AWS Input** = EC2/EBS resources × 24 hours  
+> **OCP Input** = Pods × 24 hours (hourly usage data)
+> **AWS Input** = EC2/EBS resources × 24 hours
 > **Output Rows** = Matched OCP-AWS records (hourly granularity)
 
 ---
@@ -229,7 +229,27 @@ Memory standard deviation pattern:
 
 Memory behavior becomes **more predictable** at larger scales, possibly because the system reaches a steady-state memory allocation pattern.
 
-### 4. Prediction Confidence
+### 4. Near 1:1 Input-to-Output Ratio
+
+Unlike OCP-only which compresses 24 hourly records into 1 daily summary, OCP-on-AWS maintains **hourly granularity**:
+- 20k input → 19,920 output (1.02:1)
+- 2m input → 1,996,800 output (1.02:1)
+
+This near 1:1 ratio means output size is predictable and directly proportional to input. The slight reduction (~2%) comes from filtering unmatched records.
+
+### 5. Why Higher Throughput Than OCP-Only?
+
+OCP-on-AWS produces ~10x more rows/second than OCP-only:
+- OCP-on-AWS: ~3,000 rows/s
+- OCP-only: ~290 rows/s
+
+This is because **output types differ fundamentally**:
+- OCP-on-AWS: Hourly matched records (simpler JOIN + filter, no aggregation)
+- OCP-only: Daily aggregated summaries (complex groupby + sum operations)
+
+The JOIN operation is computationally cheaper than the aggregation step that collapses 24 hourly records into 1 daily summary.
+
+### 6. Prediction Confidence
 
 | Metric | Confidence | Reasoning |
 |--------|------------|-----------|
