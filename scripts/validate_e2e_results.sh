@@ -170,16 +170,29 @@ fi
 echo ""
 echo "6. Duplicate Aggregation Check"
 echo "------------------------------"
-echo "Note: Aggregator produces namespace-level summaries (grouped by usage_start, namespace, node, data_source)"
+echo "Note: Pod rows grouped by (usage_start, namespace, node)"
+echo "      Storage rows grouped by (usage_start, namespace, node, persistentvolumeclaim)"
 
-# Check for duplicates at the correct aggregation level
-DUPLICATE_ROWS=$(run_psql "SELECT COUNT(*) FROM (SELECT usage_start, namespace, node, data_source, COUNT(*) as cnt FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='$CLUSTER_ID' GROUP BY usage_start, namespace, node, data_source HAVING COUNT(*) > 1) as dupes;")
-echo "Duplicate aggregations: $DUPLICATE_ROWS"
+# Check for Pod duplicates (grouped by usage_start, namespace, node)
+POD_DUPLICATES=$(run_psql "SELECT COUNT(*) FROM (SELECT usage_start, namespace, node, COUNT(*) as cnt FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='$CLUSTER_ID' AND data_source='Pod' GROUP BY usage_start, namespace, node HAVING COUNT(*) > 1) as dupes;")
+echo "Pod duplicate aggregations: $POD_DUPLICATES"
 
-if [ "$DUPLICATE_ROWS" -gt 0 ]; then
+# Check for Storage duplicates (grouped by usage_start, namespace, node, pvc)
+STORAGE_DUPLICATES=$(run_psql "SELECT COUNT(*) FROM (SELECT usage_start, namespace, node, persistentvolumeclaim, COUNT(*) as cnt FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='$CLUSTER_ID' AND data_source='Storage' GROUP BY usage_start, namespace, node, persistentvolumeclaim HAVING COUNT(*) > 1) as dupes;")
+echo "Storage duplicate aggregations: $STORAGE_DUPLICATES"
+
+TOTAL_DUPLICATES=$((POD_DUPLICATES + STORAGE_DUPLICATES))
+
+if [ "$TOTAL_DUPLICATES" -gt 0 ]; then
     echo -e "${RED}❌ FAIL: Found duplicate aggregations${NC}"
-    echo "Showing duplicates:"
-    run_psql_display "SELECT usage_start, namespace, node, data_source, COUNT(*) as cnt FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='$CLUSTER_ID' GROUP BY usage_start, namespace, node, data_source HAVING COUNT(*) > 1 LIMIT 5;"
+    if [ "$POD_DUPLICATES" -gt 0 ]; then
+        echo "Pod duplicates:"
+        run_psql_display "SELECT usage_start, namespace, node, COUNT(*) as cnt FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='$CLUSTER_ID' AND data_source='Pod' GROUP BY usage_start, namespace, node HAVING COUNT(*) > 1 LIMIT 5;"
+    fi
+    if [ "$STORAGE_DUPLICATES" -gt 0 ]; then
+        echo "Storage duplicates:"
+        run_psql_display "SELECT usage_start, namespace, node, persistentvolumeclaim, COUNT(*) as cnt FROM ${ORG_ID}.reporting_ocpusagelineitem_daily_summary WHERE cluster_id='$CLUSTER_ID' AND data_source='Storage' GROUP BY usage_start, namespace, node, persistentvolumeclaim HAVING COUNT(*) > 1 LIMIT 5;"
+    fi
     VALIDATION_FAILURES=$((VALIDATION_FAILURES + 1))
 else
     echo -e "${GREEN}✅ PASS: No duplicate aggregations${NC}"
