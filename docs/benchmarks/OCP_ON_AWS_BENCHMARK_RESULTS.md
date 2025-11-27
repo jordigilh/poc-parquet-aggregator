@@ -1,7 +1,7 @@
 # OCP-on-AWS Benchmark Results
 
-**Date**: November 26, 2025
-**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)
+**Date**: November 26, 2025  
+**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)  
 **Methodology**: 3 runs per scale, median ± stddev, continuous 100ms memory sampling
 
 ## Table of Contents
@@ -13,7 +13,8 @@
 5. [Memory Analysis](#memory-analysis)
 6. [Visualizations](#visualizations)
 7. [Production Fit Analysis](#production-fit-analysis)
-8. [Comparison with OCP-Only](#comparison-with-ocp-only)
+8. [Key Insights](#key-insights)
+9. [Comparison with OCP-Only](#comparison-with-ocp-only)
 
 ---
 
@@ -30,7 +31,7 @@
 | **1.5m** | 1,526,420 + 14,401 | 1,497,600 | 495.70 ± 1.09 | 6,924 ± 80 | 3,021 rows/s |
 | **2m** | 2,035,225 + 19,201 | 1,996,800 | 640.26 ± 11.54 | 7,326 ± 122 | 3,118 rows/s |
 
-> **Scale names** refer to OCP input rows. E.g., "20k" = ~20,000 OCP input rows.
+> **Scale names** refer to OCP input rows. E.g., "20k" = ~20,000 OCP input rows.  
 > **Throughput** = Output Rows / Time (calculated from median values)
 
 ---
@@ -48,8 +49,8 @@
 | **1.5m** | ~1,500,000 | ~14,400 | 1,497,600 | 600 nodes, ~62,400 pods | Major cloud scale |
 | **2m** | ~2,000,000 | ~19,200 | 1,996,800 | 800 nodes, ~83,200 pods | Maximum tested |
 
-> **OCP Input** = Pods × 24 hours (hourly usage data)
-> **AWS Input** = EC2/EBS resources × 24 hours
+> **OCP Input** = Pods × 24 hours (hourly usage data)  
+> **AWS Input** = EC2/EBS resources × 24 hours  
 > **Output Rows** = Matched OCP-AWS records (hourly granularity)
 
 ---
@@ -190,26 +191,58 @@ xychart-beta
 | 1.5m | ~1,500,000 | 6,924 MB | 22% |
 | 2m | ~2,000,000 | 7,326 MB | 23% |
 
-### Prediction Confidence for Scales Beyond 2M
-
-| Metric | Confidence | Reasoning |
-|--------|------------|-----------|
-| **Time** | ✅ High | Sub-linear scaling is consistent (~0.31-0.33 ms/row at scale). Predicting 4M rows: ~1,280s (21 min) |
-| **Memory** | ⚠️ Low | Memory nearly plateaus from 1M→2M (only +464 MB). Cannot reliably extrapolate. |
-
-**Time prediction formula** (high confidence):
-```
-Time (s) ≈ Input Rows × 0.00032
-Example: 4,000,000 × 0.00032 = ~1,280 seconds
-```
-
-**Memory observation**: The near-plateau from 1M to 2M suggests memory may be dominated by fixed structures (AWS data, intermediate DataFrames) rather than scaling linearly with input. Testing at 4M+ would be needed to confirm.
-
 ### Conclusions
 
 1. **Memory-efficient**: ~4-7 MB per 1K input rows at production scale
 2. **Scalable**: Sub-linear time scaling with consistent throughput (~3,000 rows/sec)
 3. **Production-ready**: Handles 2M input rows using only 23% of 32GB capacity
+
+---
+
+## Key Insights
+
+### 1. Memory Plateau Phenomenon
+
+Memory nearly **plateaus** from 1M to 2M rows:
+- 1M → 1.5M: +62 MB (6,862 → 6,924)
+- 1.5M → 2M: +402 MB (6,924 → 7,326)
+- **Total increase for 1M additional rows: only 464 MB**
+
+This is almost within measurement noise (stddev was ±379 MB at 1M scale), suggesting memory is dominated by **fixed structures** (AWS data held in memory for JOINs, intermediate DataFrames) rather than scaling linearly with input size.
+
+### 2. Throughput Actually Increases at Scale
+
+Unusual but positive finding — throughput *increases* with data size:
+- 20k: 2,493 rows/s
+- 2m: 3,118 rows/s (+25%)
+
+This indicates significant **fixed overhead amortization**. Connection setup, schema loading, and initialization costs become negligible at larger scales.
+
+### 3. Variance Stabilizes at Large Scale
+
+Memory standard deviation pattern:
+
+| Scale Range | Memory StdDev | Interpretation |
+|-------------|---------------|----------------|
+| 500k - 1m | ±440, ±379 MB | High variance |
+| 1.5m - 2m | ±80, ±122 MB | Stable |
+
+Memory behavior becomes **more predictable** at larger scales, possibly because the system reaches a steady-state memory allocation pattern.
+
+### 4. Prediction Confidence
+
+| Metric | Confidence | Reasoning |
+|--------|------------|-----------|
+| **Time** | ✅ High | Sub-linear scaling is consistent (~0.31-0.33 ms/row at scale) |
+| **Memory** | ⚠️ Low | Plateau behavior makes extrapolation unreliable |
+
+**Time prediction formula** (high confidence):
+```
+Time (s) ≈ Input Rows × 0.00032
+Example: 4,000,000 × 0.00032 = ~1,280 seconds (21 min)
+```
+
+**Memory**: Cannot reliably predict beyond 2M without additional testing. The plateau suggests we may be approaching a memory ceiling dominated by AWS data structures.
 
 ---
 

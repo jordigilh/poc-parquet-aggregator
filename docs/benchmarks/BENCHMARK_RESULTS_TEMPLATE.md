@@ -1,7 +1,7 @@
 # {SCENARIO_NAME} Benchmark Results
 
-**Date**: {DATE}
-**Environment**: {MACHINE_SPECS}
+**Date**: {DATE}  
+**Environment**: {MACHINE_SPECS}  
 **Methodology**: 3 runs per scale, median ± stddev, continuous 100ms memory sampling
 
 ## Table of Contents
@@ -13,7 +13,8 @@
 5. [Memory Analysis](#memory-analysis)
 6. [Visualizations](#visualizations)
 7. [Production Fit Analysis](#production-fit-analysis)
-8. [Comparison with {OTHER_SCENARIO}](#comparison-with-{other_scenario_anchor})
+8. [Key Insights](#key-insights)
+9. [Comparison with {OTHER_SCENARIO}](#comparison-with-{other_scenario_anchor})
 
 ---
 
@@ -30,7 +31,7 @@
 | **1.5m** | ... | ... | ... | ... | ... |
 | **2m** | ... | ... | ... | ... | ... |
 
-> **Scale names** refer to input rows (hourly data). E.g., "20k" = ~20,000 input rows.
+> **Scale names** refer to input rows (hourly data). E.g., "20k" = ~20,000 input rows.  
 > **Throughput** = Output Rows / Time (calculated from median values)
 
 ---
@@ -48,7 +49,7 @@
 | **1.5m** | ~1,500,000 | ... | ... | ... |
 | **2m** | ~2,000,000 | ... | ... | ... |
 
-> **Input Rows** = {INPUT_FORMULA}
+> **Input Rows** = {INPUT_FORMULA}  
 > **Output Rows** = {OUTPUT_FORMULA}
 
 ---
@@ -173,6 +174,78 @@ xychart-beta
 1. **Memory-efficient**: ~{MB_PER_1K} MB per 1K input rows at production scale
 2. **Scalable**: {SCALING_TYPE} time scaling with consistent throughput (~{THROUGHPUT} rows/sec)
 3. **Production-ready**: Handles 2M input rows using only {MAX_PCT}% of 32GB capacity
+
+---
+
+## Key Insights
+
+> **IMPORTANT**: This section provides analytical observations about the benchmark data.
+> Every benchmark results document MUST include this section with scenario-specific analysis.
+
+### 1. Memory Scaling Behavior
+
+Analyze how memory scales with input size:
+
+| Scale Transition | Memory Change | Interpretation |
+|------------------|---------------|----------------|
+| 1M → 1.5M | +{DELTA} MB | {LINEAR/PLATEAU/SUBLINEAR} |
+| 1.5M → 2M | +{DELTA} MB | {INTERPRETATION} |
+
+**Questions to answer**:
+- Does memory scale linearly, sub-linearly, or plateau?
+- Are there fixed structures dominating memory (e.g., AWS data for JOINs)?
+- Is the growth rate predictable?
+
+### 2. Throughput Trends
+
+Analyze throughput behavior across scales:
+
+| Scale Range | Throughput Change | Interpretation |
+|-------------|-------------------|----------------|
+| Small (20k-100k) | {CHANGE}% | {INTERPRETATION} |
+| Medium (100k-500k) | {CHANGE}% | {INTERPRETATION} |
+| Large (500k-2m) | {CHANGE}% | {INTERPRETATION} |
+
+**Questions to answer**:
+- Does throughput increase, decrease, or plateau at scale?
+- What explains the trend (fixed overhead amortization, I/O limits, aggregation limits)?
+- Is throughput predictable for capacity planning?
+
+### 3. Variance Analysis
+
+Analyze measurement stability:
+
+| Scale | Time StdDev | Memory StdDev | Interpretation |
+|-------|-------------|---------------|----------------|
+| Small scales | {VALUE} | {VALUE} | {INTERPRETATION} |
+| Large scales | {VALUE} | {VALUE} | {INTERPRETATION} |
+
+**Questions to answer**:
+- Are measurements reproducible (low variance)?
+- Does variance change with scale?
+- Are there outliers that need explanation?
+
+### 4. Prediction Confidence
+
+Summarize confidence in extrapolating beyond tested scales:
+
+| Metric | Confidence | Reasoning |
+|--------|------------|-----------|
+| **Time** | {HIGH/MEDIUM/LOW} | {REASONING} |
+| **Memory** | {HIGH/MEDIUM/LOW} | {REASONING} |
+
+**Prediction formulas** (if applicable):
+```
+Time (s) ≈ {FORMULA}
+Memory (MB) ≈ {FORMULA}
+```
+
+### 5. Scenario-Specific Observations
+
+Include any observations unique to this scenario:
+- Why is throughput higher/lower than other scenarios?
+- What explains memory differences?
+- Are there architectural implications (e.g., JOINs, aggregations)?
 
 ---
 

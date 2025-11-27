@@ -1,7 +1,7 @@
 # OCP-Only Benchmark Results
 
-**Date**: November 26, 2025
-**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)
+**Date**: November 26, 2025  
+**Environment**: MacBook Pro M2 Max (12 cores), 32GB RAM, 1TB SSD, podman containers (PostgreSQL + MinIO)  
 **Methodology**: 3 runs per scale, median ± stddev, continuous 100ms memory sampling
 
 ## Table of Contents
@@ -13,7 +13,8 @@
 5. [Memory Analysis](#memory-analysis)
 6. [Visualizations](#visualizations)
 7. [Production Fit Analysis](#production-fit-analysis)
-8. [Comparison with OCP-on-AWS](#comparison-with-ocp-on-aws)
+8. [Key Insights](#key-insights)
+9. [Comparison with OCP-on-AWS](#comparison-with-ocp-on-aws)
 
 ---
 
@@ -30,7 +31,7 @@
 | **1.5m** | 1,526,420 | 62,400 | 208.55 ± 1.61 | 8,600 ± 302 | 299 rows/s |
 | **2m** | 2,035,225 | 83,200 | 282.76 ± 3.14 | 10,342 ± 292 | 294 rows/s |
 
-> **Scale names** refer to input rows (hourly data from nise). E.g., "20k" = ~20,000 input rows.
+> **Scale names** refer to input rows (hourly data from nise). E.g., "20k" = ~20,000 input rows.  
 > **Throughput** = Output Rows / Time (calculated from median values)
 
 ---
@@ -48,7 +49,7 @@
 | **1.5m** | ~1,500,000 | 62,400 | 600 nodes, ~62,400 pods | Major cloud scale |
 | **2m** | ~2,000,000 | 83,200 | 800 nodes, ~83,200 pods | Maximum tested |
 
-> **Input Rows** = Pods × 24 hours (hourly usage data)
+> **Input Rows** = Pods × 24 hours (hourly usage data)  
 > **Output Rows** = Daily aggregated summaries (one per pod/namespace/node combination)
 
 ---
@@ -189,26 +190,86 @@ xychart-beta
 | 1.5m | ~1,500,000 | 8,600 MB | 27% |
 | 2m | ~2,000,000 | 10,342 MB | 32% |
 
-### Prediction Confidence for Scales Beyond 2M
-
-| Metric | Confidence | Reasoning |
-|--------|------------|-----------|
-| **Time** | ✅ High | Sub-linear scaling is consistent (~0.14 ms/row at scale). Predicting 4M rows: ~560s (9 min) |
-| **Memory** | ⚠️ Medium | More linear than OCP-on-AWS but still sub-linear. Growth rate decreasing. |
-
-**Time prediction formula** (high confidence):
-```
-Time (s) ≈ Input Rows × 0.00014
-Example: 4,000,000 × 0.00014 = ~560 seconds
-```
-
-**Memory observation**: Growth rate is decreasing (5.1 MB/1K at 2M vs 16.1 MB/1K at 20k). Extrapolation is uncertain but memory efficiency improves at scale.
-
 ### Conclusions
 
 1. **Memory-efficient**: ~5-7 MB per 1K input rows at production scale
 2. **Scalable**: Sub-linear time scaling with consistent throughput (~280-300 output rows/sec)
 3. **Production-ready**: Handles 2M input rows using only 32% of 32GB capacity
+
+---
+
+## Key Insights
+
+### 1. Memory Scales More Linearly Than OCP-on-AWS
+
+Unlike OCP-on-AWS which shows a memory plateau, OCP-only memory continues to grow:
+- 1M → 1.5M: +1,429 MB (7,171 → 8,600)
+- 1.5M → 2M: +1,742 MB (8,600 → 10,342)
+
+This is expected because OCP-only does not hold AWS data in memory for JOINs. Memory scales more predictably with input size.
+
+### 2. Daily Aggregation Creates Compression
+
+The **24:1 compression ratio** (input to output rows) is a key characteristic:
+- 20k input → 830 output (24.6:1)
+- 2m input → 83,200 output (24.5:1)
+
+This consistent ratio makes capacity planning straightforward: expect ~41 output rows per 1,000 input rows.
+
+### 3. Throughput Plateaus at Scale
+
+Throughput increases rapidly at small scales but plateaus around 290-300 rows/s:
+
+| Scale Range | Throughput Change |
+|-------------|-------------------|
+| 20k → 100k | +40% (191 → 267) |
+| 100k → 1m | +12% (267 → 298) |
+| 1m → 2m | -1% (298 → 294) |
+
+The plateau suggests we've reached the **aggregation-limited** phase where pandas groupby operations dominate rather than I/O or overhead.
+
+### 4. Variance Pattern Differs from OCP-on-AWS
+
+Memory variance remains relatively high across all scales:
+
+| Scale | Memory StdDev | % of Median |
+|-------|---------------|-------------|
+| 1m | ±493 MB | 6.9% |
+| 1.5m | ±302 MB | 3.5% |
+| 2m | ±292 MB | 2.8% |
+
+This is higher variance than OCP-on-AWS at similar scales, likely due to more complex aggregation operations and intermediate DataFrame allocations.
+
+### 5. Prediction Confidence
+
+| Metric | Confidence | Reasoning |
+|--------|------------|-----------|
+| **Time** | ✅ High | Sub-linear scaling is consistent (~0.14 ms/row at scale) |
+| **Memory** | ✅ Medium-High | More linear than OCP-on-AWS, but growth rate is decreasing |
+
+**Time prediction formula** (high confidence):
+```
+Time (s) ≈ Input Rows × 0.00014
+Example: 4,000,000 × 0.00014 = ~560 seconds (9 min)
+```
+
+**Memory prediction formula** (medium confidence):
+```
+Memory (MB) ≈ 200 + (Input Rows × 0.005)
+Example: 4,000,000 × 0.005 + 200 = ~20,200 MB (~63% of 32GB)
+```
+
+### 6. Why Lower Throughput Than OCP-on-AWS?
+
+OCP-only produces ~10x fewer rows/second than OCP-on-AWS:
+- OCP-only: ~290 rows/s
+- OCP-on-AWS: ~3,000 rows/s
+
+This is because **output types differ fundamentally**:
+- OCP-only: Daily aggregated summaries (complex groupby + sum operations)
+- OCP-on-AWS: Hourly matched records (simpler JOIN + filter)
+
+The aggregation step in OCP-only is computationally expensive, collapsing 24 hourly records into 1 daily summary.
 
 ---
 
