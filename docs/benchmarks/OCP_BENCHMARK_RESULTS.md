@@ -93,11 +93,13 @@ What does each scale represent in a production environment?
 ### Processing Time Scaling
 
 ```
-Time (s) vs Input Rows (linear scaling observed):
+Time (s) vs Input Rows:
 - 20k input:  4.35s   → ~0.21ms per input row
 - 2m input:   282.76s → ~0.14ms per input row
 
-Observation: Efficiency improves at scale due to fixed overhead amortization.
+Observation: Sub-linear scaling - efficiency improves at scale due to 
+fixed overhead amortization (connection setup, schema loading, etc.).
+The ~33% improvement in per-row time indicates good scalability.
 ```
 
 ### Throughput Consistency
