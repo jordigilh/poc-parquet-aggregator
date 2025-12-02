@@ -7,7 +7,7 @@ SOLUTION: Post-process CSVs to replace random IDs with manifest-specified IDs
 
 Usage:
     python3 align_test_data.py \
-        --manifest test-manifests/ocp_aws_scenario_01.yml \
+        --manifest test-manifests/ocp-on-aws/01-resource-matching/manifest.yml \
         --ocp-dir /tmp/scenario/ocp \
         --aws-file /tmp/scenario/aws.csv
 """

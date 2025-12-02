@@ -26,42 +26,8 @@ NC='\033[0m'
 
 # Test scenarios
 SCENARIOS=(
-    "ocp_aws_scenario_06_multi_cluster"
-)    "ocp_aws_scenario_01_resource_matching"
-    "ocp_aws_scenario_02_tag_matching"
-    "ocp_aws_scenario_03_multi_namespace"
-    "ocp_aws_scenario_04_network_costs"
-    "ocp_aws_scenario_05_storage_ebs"
-    "ocp_aws_scenario_06_multi_cluster"
-
-    # Phase 1: Critical Edge Cases (4 scenarios) - 90% confidence
-    "ocp_aws_scenario_07_partial_matching"
-    "ocp_aws_scenario_08_zero_usage"
-    "ocp_aws_scenario_09_cost_types"
-    "ocp_aws_scenario_10_unmatched_storage"
-
-    # Phase 4: Resilience (2 scenarios) - 99% confidence
-    "ocp_aws_scenario_11_corrupted_data"
-    "ocp_aws_scenario_12_trino_precision"
-
-    # Trino Compliance: Network & SavingsPlan (2 scenarios)
-    "ocp_aws_scenario_13_network_data_transfer"
-    "ocp_aws_scenario_14_savingsplan_costs"
-
-    # Business Scenarios: AWS Services (3 scenarios)
-    "ocp_aws_scenario_15_rds_database_costs"
-    "ocp_aws_scenario_16_s3_storage_costs"
-    "ocp_aws_scenario_17_reserved_instances"
-
-    # Critical Core Gaps: Multi-cluster & Non-CSI Storage (2 scenarios)
-    "ocp_aws_scenario_18_multi_cluster_shared_csi_disk"
-    "ocp_aws_scenario_19_non_csi_storage"
-
-    # Trino Parity Gaps: Generic Tag Matching (4 scenarios)
-    "ocp_aws_scenario_20_cluster_alias_matching"
-    "ocp_aws_scenario_21_volume_labels_matching"
-    "ocp_aws_scenario_22_pv_name_suffix_matching"
-    "ocp_aws_scenario_23_generic_pod_labels_matching"
+    # Only run scenario 06 - multi-cluster
+    "06-multi-cluster"
 )
 
 echo -e "${BLUE}=============================================="
@@ -133,7 +99,7 @@ for SCENARIO in "${SCENARIOS[@]}"; do
     echo -e "${BLUE}Test $TOTAL_TESTS/${#SCENARIOS[@]}: $SCENARIO${NC}"
     echo -e "${BLUE}========================================${NC}"
 
-    MANIFEST_FILE="$TEST_MANIFESTS_DIR/${SCENARIO}.yml"
+    MANIFEST_FILE="$TEST_MANIFESTS_DIR/${SCENARIO}/manifest.yml"
 
     if [ ! -f "$MANIFEST_FILE" ]; then
         echo -e "${RED}❌ Manifest not found: $MANIFEST_FILE${NC}"

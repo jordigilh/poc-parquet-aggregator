@@ -356,7 +356,7 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: python validate_ocp_aws_results.py <manifest_path>")
         print("\nExample:")
-        print("  python validate_ocp_aws_results.py test-manifests/ocp_aws_scenario_01_resource_matching.yml")
+        print("  python validate_ocp_aws_results.py test-manifests/ocp-on-aws/01-resource-matching/manifest.yml")
         sys.exit(1)
 
     manifest_path = sys.argv[1]

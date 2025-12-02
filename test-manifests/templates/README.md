@@ -18,8 +18,9 @@ This directory contains template files and minimal examples for creating new tes
 
 **Usage**:
 ```bash
-# Copy for a new OCP-on-AWS scenario
-cp templates/ocp_aws_template.yml ocp-on-aws/ocp_aws_scenario_XX_my_test.yml
+# Create a new OCP-on-AWS scenario directory
+mkdir ../ocp-on-aws/XX-my-scenario
+cp ocp_aws_template.yml ../ocp-on-aws/XX-my-scenario/manifest.yml
 ```
 
 **Best for**:
@@ -42,8 +43,8 @@ cp templates/ocp_aws_template.yml ocp-on-aws/ocp_aws_scenario_XX_my_test.yml
 
 **Usage**:
 ```bash
-# Quick smoke test
-./scripts/run_ocp_aws_scenario_tests.sh test-manifests/templates/minimal_test.yml
+# Quick smoke test using minimal manifest
+python src/main.py --manifest test-manifests/templates/minimal_test.yml
 ```
 
 **Best for**:
@@ -64,19 +65,28 @@ cp templates/ocp_aws_template.yml ocp-on-aws/ocp_aws_scenario_XX_my_test.yml
 | Quick test | `minimal_test.yml` |
 | OCP only | `ocp_template.yml` |
 
-### Step 2: Copy to Appropriate Directory
+### Step 2: Create Scenario Directory
 
 ```bash
 # For OCP-on-AWS scenarios
-cp templates/ocp_aws_template.yml ocp-on-aws/ocp_aws_scenario_XX_description.yml
+mkdir test-manifests/ocp-on-aws/XX-my-scenario
+cp test-manifests/templates/ocp_aws_template.yml test-manifests/ocp-on-aws/XX-my-scenario/manifest.yml
 
 # For OCP-only scenarios
-cp templates/ocp_template.yml ocp-only/ocp_scenario_XX_description.yml
+mkdir test-manifests/ocp-only/XX-my-scenario
+cp test-manifests/templates/ocp_template.yml test-manifests/ocp-only/XX-my-scenario/manifest.yml
 ```
 
-### Step 3: Customize the Scenario
+### Step 3: Add a README
 
-Edit your new YAML file and update:
+Create a `README.md` in your scenario directory explaining:
+- What the scenario tests
+- Expected outcomes
+- How to run and validate
+
+### Step 4: Customize the Scenario
+
+Edit your `manifest.yml` and update:
 
 1. **Scenario metadata**
    ```yaml
@@ -100,11 +110,11 @@ Edit your new YAML file and update:
    - Expected attributed costs
    - Any specific validation criteria
 
-### Step 4: Test Your Scenario
+### Step 5: Test Your Scenario
 
 ```bash
-# Run your new scenario
-./scripts/run_ocp_aws_scenario_tests.sh test-manifests/ocp-on-aws/your_scenario.yml
+# Run the full scenario test suite
+./scripts/run_ocp_aws_scenario_tests.sh
 ```
 
 ---
@@ -169,10 +179,10 @@ expected_outcome:
 
 ## 💡 Best Practices
 
-1. **Use meaningful names**
-   - Scenario files: `ocp_aws_scenario_##_descriptive_name.yml`
-   - Cluster IDs: `test-cluster-###`
-   - Resource IDs: `i-test-resource-###`
+1. **Use meaningful directory names**
+   - Directories: `XX-descriptive-name/`
+   - Main manifest: `manifest.yml`
+   - Variations: `variation.yml`
 
 2. **Keep scenarios focused**
    - Test one concept per scenario
@@ -180,7 +190,7 @@ expected_outcome:
 
 3. **Document expected outcomes**
    - Always include `expected_outcome` section
-   - Explain why costs should match
+   - Add a README explaining validation criteria
 
 4. **Use realistic data**
    - Real AWS pricing (varied decimal precision)
@@ -188,18 +198,18 @@ expected_outcome:
    - Standard time ranges (24h, 7d, 30d)
 
 5. **Version variations**
-   - Original: `ocp_aws_scenario_05_storage_ebs.yml`
-   - Variation: `ocp_aws_scenario_05_variation.yml`
-   - Fixed: `ocp_aws_scenario_05_storage_ebs_fixed.yml`
+   - Main: `manifest.yml`
+   - Variation: `variation.yml`
+   - Fixed version: `manifest_fixed.yml`
 
 ---
 
 ## 🔗 Related Documentation
 
-- **Trino Migration Guide**: [`../../docs/methodology/TRINO_MIGRATION_METHODOLOGY.md`](../../docs/methodology/TRINO_MIGRATION_METHODOLOGY.md)
-- **E2E Testing Guide**: [`../../docs/testing/E2E_TESTING_GUIDE.md`](../../docs/testing/E2E_TESTING_GUIDE.md)
+- **OCP-on-AWS Scenarios**: [`../ocp-on-aws/README.md`](../ocp-on-aws/README.md)
+- **OCP-Only Scenarios**: [`../ocp-only/README.md`](../ocp-only/README.md)
 - **Nise Documentation**: [nise GitHub](https://github.com/project-koku/nise)
 
 ---
 
-**Last Updated**: November 25, 2025
+**Last Updated**: December 2, 2025

@@ -29,34 +29,34 @@ NC='\033[0m'
 # Test scenarios
 SCENARIOS=(
     # Core Aggregation (6 scenarios)
-    "ocp_scenario_01_basic_pod"
-    "ocp_scenario_02_storage_volume"
-    "ocp_scenario_03_multi_namespace"
-    "ocp_scenario_04_multi_node"
-    "ocp_scenario_05_cluster_capacity"
-    "ocp_scenario_06_cost_category"
+    "01-basic-pod"
+    "02-storage-volume"
+    "03-multi-namespace"
+    "04-multi-node"
+    "05-cluster-capacity"
+    "06-cost-category"
 
     # Unallocated & Roles (2 scenarios)
-    "ocp_scenario_07_unallocated_capacity"
-    "ocp_scenario_17_node_roles"
+    "07-unallocated-capacity"
+    "17-node-roles"
 
     # Gap Coverage (4 scenarios) - Critical for 100% Trino parity
-    "ocp_scenario_08_shared_pv_nodes"
-    "ocp_scenario_09_days_in_month"
-    "ocp_scenario_10_storage_cost_category"
-    "ocp_scenario_11_pvc_capacity_gb"
+    "08-shared-pv-nodes"
+    "09-days-in-month"
+    "10-storage-cost-category"
+    "11-pvc-capacity-gb"
 
     # Extended Coverage (5 scenarios)
-    "ocp_scenario_12_label_precedence"
-    "ocp_scenario_13_labels_special_chars"
-    "ocp_scenario_14_empty_labels"
-    "ocp_scenario_15_effective_usage"
-    "ocp_scenario_16_all_labels"
+    "12-label-precedence"
+    "13-labels-special-chars"
+    "14-empty-labels"
+    "15-effective-usage"
+    "16-all-labels"
 
     # Edge Cases (3 scenarios)
-    "ocp_scenario_18_zero_usage"
-    "ocp_scenario_19_vm_pods"
-    "ocp_scenario_20_storage_no_pod"
+    "18-zero-usage"
+    "19-vm-pods"
+    "20-storage-no-pod"
 )
 
 # Parse arguments
@@ -155,7 +155,7 @@ for SCENARIO in "${SCENARIOS[@]}"; do
     echo -e "${BLUE}Test $TOTAL_TESTS/${#SCENARIOS[@]}: $SCENARIO${NC}"
     echo -e "${BLUE}========================================${NC}"
 
-    MANIFEST_FILE="$TEST_MANIFESTS_DIR/${SCENARIO}.yml"
+    MANIFEST_FILE="$TEST_MANIFESTS_DIR/${SCENARIO}/manifest.yml"
 
     if [ ! -f "$MANIFEST_FILE" ]; then
         echo -e "${YELLOW}⚠ Manifest not found: $MANIFEST_FILE${NC}"

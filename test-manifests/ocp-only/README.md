@@ -1,193 +1,221 @@
 # OCP-Only Test Scenarios
 
-**Purpose**: Validate OCP-only aggregation against Trino SQL parity
-**Target**: 20 scenarios (12 core + 4 gap coverage + 4 edge cases)
-**Status**: ✅ **20/20 Scenarios PASSING** (100% Trino parity achieved)
+This directory contains test scenarios for validating the OCP-only cost aggregation pipeline. These scenarios test OpenShift pod and storage aggregation without AWS cost attribution.
 
----
-
-## 📋 Scenario Matrix
-
-### Core Aggregation Scenarios (6)
-
-| # | Scenario | Trino SQL Feature | Status |
-|---|----------|-------------------|--------|
-| 01 | Basic Pod CPU/Memory | Pod aggregation (lines 260-316) | ✅ |
-| 02 | Storage Volume Usage | Volume aggregation (lines 327-446) | ✅ |
-| 03 | Multi-Namespace | Namespace rollup (lines 261, 294-296) | ✅ |
-| 04 | Multi-Node | Node capacity (lines 143-164) | ✅ |
-| 05 | Cluster Capacity | Cluster-wide capacity (lines 165-171) | ✅ |
-| 06 | Cost Categories | Cost category assignment (lines 302-303) | ✅ |
-
-### Unallocated & Node Roles (2)
-
-| # | Scenario | Trino SQL Feature | Status |
-|---|----------|-------------------|--------|
-| 07 | Unallocated Capacity | Platform/Worker unallocated (lines 491-581) | ✅ |
-| 17 | Node Role Detection | Master/infra/worker (lines 507-511) | ✅ |
-
-### Gap Coverage Scenarios (4) - Critical for 100% Parity
-
-| # | Scenario | Gap Fixed | Trino SQL Lines | Status |
-|---|----------|-----------|-----------------|--------|
-| 08 | Shared PV Across Nodes | Gap 1 | 205-212, 410-411 | ✅ |
-| 09 | Days in Month Formula | Gap 2 | 358-363 | ✅ |
-| 10 | Storage Cost Category | Gap 3 | 406, 428-429 | ✅ |
-| 11 | PVC Capacity Gigabyte | Gap 4 | 356-357 | ✅ |
-
-### Extended Coverage (5)
-
-| # | Scenario | Feature | Status |
-|---|----------|---------|--------|
-| 12 | Label Precedence | Pod > Namespace > Node | ✅ |
-| 13 | Labels - Special Chars | Unicode, emoji handling | ✅ |
-| 14 | Empty/Null Labels | Graceful NULL handling | ✅ |
-| 15 | Effective Usage | coalesce/greatest logic | ✅ |
-| 16 | all_labels Column | Merged pod + volume labels | ✅ |
-
-### Edge Cases (3)
-
-| # | Scenario | Edge Case | Status |
-|---|----------|-----------|--------|
-| 18 | Zero CPU/Memory Usage | No division-by-zero | ✅ |
-| 19 | VM Pods (KubeVirt) | vm_kubevirt_io_name always enabled | ✅ |
-| 20 | Storage Without Pod | LEFT JOIN handling | ✅ |
-
----
-
-## 🎯 What These Scenarios Validate
-
-### Data Layer Validation
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ POC E2E Tests (Data Layer)                                      │
-├─────────────────────────────────────────────────────────────────┤
-│ • Pod aggregation logic (CPU, memory usage/request/limit)       │
-│ • Storage aggregation (volume usage/request/capacity)           │
-│ • Unallocated capacity calculation                              │
-│ • Label merging (pod_labels + volume_labels → all_labels)       │
-│ • Node capacity and cluster capacity                            │
-│ • Cost category assignment                                      │
-│ • Node role detection (master/infra/worker)                     │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Core-to-Trino SQL Mapping
-
-| Scenario Category | What We Test | Trino SQL Reference |
-|-------------------|--------------|---------------------|
-| Compute (01, 10) | CPU aggregation math | `cte_pod_usage` |
-| Memory (01) | Memory aggregation math | `cte_pod_usage` |
-| Storage (02, 09) | PVC/storage aggregation | `cte_storage_usage` |
-| Network (08) | Network data aggregation | `cte_network_usage` |
-| Bucketing (06, 07, 12) | Unallocated, cost categories | `cte_unallocated` |
-| Virtual Machines (11) | VM label matching | `vm_kubevirt_io_name` |
-
----
-
-## 📊 Trino SQL Coverage
-
-### `reporting_ocpusagelineitem_daily_summary.sql` Lines Covered
-
-| Line Range | Feature | Scenario(s) |
-|-----------|---------|-------------|
-| 1-50 | CTE definitions | All |
-| 51-100 | Pod usage aggregation | 01, 19, 20 |
-| 101-150 | Storage usage aggregation | 02, 09 |
-| 151-200 | Node labels join | 04, 18 |
-| 201-250 | Namespace labels join | 03, 13-15 |
-| 251-300 | Node capacity | 10 |
-| 301-350 | Cluster capacity | 05 |
-| 351-400 | Cost category join | 12 |
-| 401-450 | all_labels creation | 16, 17 |
-| 451-500 | Final SELECT | All |
-| 501-550 | Unallocated capacity | 07, 22 |
-| 551-600 | Node role detection | 18 |
-
----
-
-## 🚀 Running Scenarios
+## Quick Start
 
 ### Prerequisites
 
-```bash
-# Start services
-podman-compose up -d
+1. Start the required containers:
+   ```bash
+   cd /path/to/poc-parquet-aggregator
+   podman-compose up -d
+   ```
 
-# Verify MinIO and PostgreSQL
-mc alias set minio http://localhost:9000 minioadmin minioadmin123
-psql -h localhost -p 15432 -U koku -d koku -c "SELECT 1"
+2. Activate the virtual environment:
+   ```bash
+   source venv/bin/activate
+   ```
+
+### Running a Single Scenario
+
+```bash
+# Run scenario 01 (Basic Pod)
+python src/main.py --ocp-only --manifest test-manifests/ocp-only/01-basic-pod/manifest.yml
 ```
 
-### Run All Scenarios
+### Running All Scenarios
 
 ```bash
 ./scripts/run_ocp_scenario_tests.sh
 ```
 
-### Run Single Scenario
+---
+
+## Validation Methodology
+
+### How E2E Validation Works (Core-Style)
+
+The POC uses a **totals-based validation approach** similar to OCP-on-AWS:
+
+1. **Row Count** - Number of aggregated output rows
+2. **CPU/Memory Totals** - Sum of usage and request hours
+3. **Storage Totals** - PVC capacity and usage
+4. **Namespace Count** - Number of unique namespaces in output
+
+### Key Difference from OCP-on-AWS
+
+OCP-only aggregation produces **daily summaries** (24:1 compression ratio):
+- Input: Hourly pod usage data (24 rows per pod per day)
+- Output: Daily aggregated summaries (1 row per pod/namespace/node per day)
+
+### Validation Script
+
+The primary validation script is [`scripts/validate_ocp_totals.py`](../../scripts/validate_ocp_totals.py):
+
+```sql
+-- Core validation query for OCP-only
+SELECT
+    COUNT(*) as total_rows,
+    COUNT(DISTINCT namespace) as namespaces,
+    ROUND(SUM(pod_usage_cpu_core_hours)::numeric, 4) as cpu_hours,
+    ROUND(SUM(pod_usage_memory_gigabyte_hours)::numeric, 4) as memory_gb_hours
+FROM {schema}.reporting_ocpusagelineitem_daily_summary_p;
+```
+
+---
+
+## Scenario Overview
+
+### Phase 1: Core Functionality (5 scenarios)
+
+| # | Scenario | Description |
+|---|----------|-------------|
+| 01 | [Basic Pod](./01-basic-pod/) | Single pod aggregation |
+| 02 | [Storage Volume](./02-storage-volume/) | PVC/PV aggregation |
+| 03 | [Multi-Namespace](./03-multi-namespace/) | Multiple namespaces |
+| 04 | [Multi-Node](./04-multi-node/) | Pods across multiple nodes |
+| 05 | [Cluster Capacity](./05-cluster-capacity/) | Node capacity calculations |
+
+### Phase 2: Cost Categories & Capacity (5 scenarios)
+
+| # | Scenario | Description |
+|---|----------|-------------|
+| 06 | [Cost Category](./06-cost-category/) | Namespace cost category mapping |
+| 07 | [Unallocated Capacity](./07-unallocated-capacity/) | Unused cluster resources |
+| 08 | [Shared PV Nodes](./08-shared-pv-nodes/) | PVs shared across nodes |
+| 09 | [Days in Month](./09-days-in-month/) | Month boundary handling |
+| 10 | [Storage Cost Category](./10-storage-cost-category/) | Storage with cost categories |
+
+### Phase 3: Labels & Edge Cases (5 scenarios)
+
+| # | Scenario | Description |
+|---|----------|-------------|
+| 11 | [PVC Capacity GB](./11-pvc-capacity-gb/) | PVC capacity calculations |
+| 12 | [Label Precedence](./12-label-precedence/) | Pod > Namespace > Node label merge |
+| 13 | [Labels Special Chars](./13-labels-special-chars/) | Special characters in labels |
+| 14 | [Empty Labels](./14-empty-labels/) | Handling empty/null labels |
+| 15 | [Effective Usage](./15-effective-usage/) | MAX(usage, request) calculation |
+
+### Phase 4: Advanced Scenarios (5 scenarios)
+
+| # | Scenario | Description |
+|---|----------|-------------|
+| 16 | [All Labels](./16-all-labels/) | Combined pod + volume labels |
+| 17 | [Node Roles](./17-node-roles/) | Worker/master/infra nodes |
+| 18 | [Zero Usage](./18-zero-usage/) | Pods with zero resource usage |
+| 19 | [VM Pods](./19-vm-pods/) | KubeVirt VM pods |
+| 20 | [Storage No Pod](./20-storage-no-pod/) | Storage without associated pods |
+
+---
+
+## Directory Structure
+
+Each scenario directory contains:
+
+```
+XX-scenario-name/
+├── README.md           # Scenario description and validation details
+└── manifest.yml        # Test manifest (nise format)
+```
+
+---
+
+## What Each Scenario Validates
+
+| Scenario | Primary Validation | Secondary Validation |
+|----------|-------------------|---------------------|
+| 01 Basic Pod | Row count, CPU/memory hours | Daily aggregation |
+| 02 Storage Volume | PVC capacity, storage class | Volume labels |
+| 03 Multi-Namespace | Namespace count | Per-namespace totals |
+| 04 Multi-Node | Node count | Per-node capacity |
+| 05 Cluster Capacity | Cluster totals | Node vs cluster capacity |
+| 06 Cost Category | cost_category_id assigned | Namespace matching |
+| 07 Unallocated | Unallocated rows exist | Capacity - usage |
+| 08-20 | Various edge cases | Specific to scenario |
+
+---
+
+## Running Validation Manually
+
+### Step 1: Generate Test Data
 
 ```bash
-./scripts/run_ocp_scenario_tests.sh --scenario 01
+nise report ocp \
+  -s 2025-10-01 -e 2025-10-02 \
+  --ocp-cluster-id test-cluster \
+  -w test-manifests/ocp-only/01-basic-pod/manifest.yml
+```
+
+### Step 2: Upload to MinIO
+
+```bash
+python scripts/csv_to_parquet_minio.py \
+  --input-dir ./generated-data \
+  --bucket cost-usage
+```
+
+### Step 3: Run Aggregation
+
+```bash
+python src/main.py \
+  --ocp-only \
+  --ocp-provider-uuid $OCP_UUID \
+  --year 2025 --month 10
+```
+
+### Step 4: Validate
+
+```bash
+python scripts/validate_ocp_totals.py \
+  test-manifests/ocp-only/01-basic-pod/manifest.yml
 ```
 
 ---
 
-## 📝 Scenario File Format
+## Validation Queries
 
-```yaml
-# ocp_scenario_01_basic_pod.yml
-scenario:
-  id: 1
-  name: "Basic Pod CPU/Memory"
-  description: "Validates pod CPU and memory aggregation"
-  trino_sql_lines: "51-100"
+### Row Count and Totals
 
-ocp:
-  cluster_id: "test-cluster-001"
-  nodes:
-    - name: "worker-1"
-      role: "worker"
-      cpu_cores: 4
-      memory_gb: 16
-  namespaces:
-    - name: "app-namespace"
-      pods:
-        - name: "app-pod-1"
-          cpu_request: 0.5
-          cpu_usage: 0.3
-          memory_request_gb: 1.0
-          memory_usage_gb: 0.8
-          labels:
-            app: "frontend"
+```sql
+SELECT 
+    COUNT(*) as rows,
+    COUNT(DISTINCT namespace) as namespaces,
+    COUNT(DISTINCT node) as nodes,
+    ROUND(SUM(pod_usage_cpu_core_hours)::numeric, 4) as cpu_hours,
+    ROUND(SUM(pod_usage_memory_gigabyte_hours)::numeric, 4) as memory_hours
+FROM org1234567.reporting_ocpusagelineitem_daily_summary_p;
+```
 
-expected:
-  pod_usage_cpu_core_hours: 7.2  # 0.3 * 24
-  pod_request_cpu_core_hours: 12.0  # 0.5 * 24
-  pod_usage_memory_gigabyte_hours: 19.2  # 0.8 * 24
-  pod_request_memory_gigabyte_hours: 24.0  # 1.0 * 24
+### Per-Namespace Breakdown
+
+```sql
+SELECT 
+    namespace,
+    COUNT(*) as rows,
+    ROUND(SUM(pod_usage_cpu_core_hours)::numeric, 4) as cpu_hours
+FROM org1234567.reporting_ocpusagelineitem_daily_summary_p
+GROUP BY namespace
+ORDER BY namespace;
+```
+
+### Storage Validation
+
+```sql
+SELECT 
+    namespace,
+    persistentvolumeclaim,
+    ROUND(persistentvolumeclaim_capacity_gigabyte::numeric, 2) as capacity_gb
+FROM org1234567.reporting_ocpusagelineitem_daily_summary_p
+WHERE data_source = 'Storage';
 ```
 
 ---
 
-## ✅ Success Criteria
+## Related Documentation
 
-| Criteria | Target |
-|----------|--------|
-| Scenarios Passing | 23/23 (100%) |
-| Trino SQL Coverage | 100% of lines |
-| Core Features | 12/12 validated |
-| Edge Cases | 11/11 handled |
+- [OCP-on-AWS Scenarios](../ocp-on-aws/)
+- [Benchmark Results](../../docs/benchmarks/OCP_BENCHMARK_RESULTS.md)
+- [Architecture Overview](../../docs/architecture/)
+- [Validation Script](../../scripts/validate_ocp_totals.py)
 
----
-
-## 📚 Related Documents
-
-- [OCP_ONLY_GAP_ANALYSIS.md](../../docs/OCP_ONLY_GAP_ANALYSIS.md) - Gap analysis
-- [MATCHING_LABELS.md](../../docs/MATCHING_LABELS.md) - OCP-on-AWS reference
-- Trino SQL: `reporting_ocpusagelineitem_daily_summary.sql`
-
----
-
-**Last Updated**: November 25, 2025

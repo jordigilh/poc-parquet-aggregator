@@ -23,15 +23,21 @@ source scripts/run_ocp_aws_scenario_tests.sh
 
 # Run specified scenarios
 for scenario_num in "${SCENARIOS[@]}"; do
-    # Find the scenario file
-    scenario_file=$(ls test-manifests/ocp-on-aws/ocp_aws_scenario_${scenario_num}_*.yml 2>/dev/null | head -1)
-
-    if [ -z "$scenario_file" ]; then
+    # Find the scenario directory (new structure: XX-name/manifest.yml)
+    scenario_dir=$(ls -d test-manifests/ocp-on-aws/${scenario_num}-* 2>/dev/null | head -1)
+    
+    if [ -z "$scenario_dir" ]; then
         echo "❌ Scenario $scenario_num not found"
         continue
     fi
+    
+    scenario_file="$scenario_dir/manifest.yml"
+    if [ ! -f "$scenario_file" ]; then
+        echo "❌ Manifest not found: $scenario_file"
+        continue
+    fi
 
-    scenario_name=$(basename "$scenario_file" .yml)
+    scenario_name=$(basename "$scenario_dir")
     echo ""
     echo "→ Testing $scenario_name..."
 

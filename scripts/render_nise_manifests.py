@@ -9,7 +9,7 @@ This solves the "nise random ID" problem by:
 
 Usage:
     python scripts/render_nise_manifests.py \
-        --template test-manifests/ocp_aws_scenario_01.yml \
+        --template test-manifests/ocp-on-aws/01-resource-matching/manifest.yml \
         --output test-data/rendered/scenario_01.yml
 """
 
@@ -157,7 +157,7 @@ def batch_render_manifests(manifest_dir, output_dir):
     print(f"   {context}\n")
 
     # Find all YAML manifests
-    manifests = list(manifest_dir.glob('ocp_aws_scenario_*.yml'))
+    manifests = list(manifest_dir.glob('*/manifest.yml'))
 
     if not manifests:
         print(f"❌ No manifests found in {manifest_dir}")

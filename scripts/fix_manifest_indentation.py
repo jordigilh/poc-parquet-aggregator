@@ -65,7 +65,7 @@ def fix_manifest(file_path):
 def main():
     # Fix all scenario manifests
     manifest_dir = Path('test-manifests')
-    manifests = sorted(manifest_dir.glob('ocp_aws_scenario_*.yml'))
+    manifests = sorted(manifest_dir.glob('*/manifest.yml'))
 
     if not manifests:
         print("❌ No manifests found!")
@@ -79,7 +79,7 @@ def main():
     print(f"\n✓ Fixed {len(manifests)} manifests!")
     print("\nVerify with:")
     print("  python3 scripts/render_nise_manifests.py \\")
-    print("    --template test-manifests/ocp_aws_scenario_01_resource_matching.yml \\")
+    print("    --template test-manifests/ocp-on-aws/01-resource-matching/manifest.yml \\")
     print("    --output /tmp/verify.yml")
     print("  python3 -c 'import yaml; d=yaml.safe_load(open(\"/tmp/verify.yml\")); print(\"resource_id\" in d[\"ocp\"][\"generators\"][0][\"OCPGenerator\"][\"nodes\"][0])'")
 

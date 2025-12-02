@@ -5,7 +5,17 @@
 ```
 test-manifests/
 ├── ocp-on-aws/          # OCP on AWS cost attribution scenarios
+│   ├── 01-resource-matching/
+│   │   ├── README.md
+│   │   └── manifest.yml
+│   ├── 02-tag-matching/
+│   │   └── ...
+│   └── ... (23 scenarios)
 ├── ocp-only/            # OCP-only cost scenarios
+│   ├── 01-basic-pod/
+│   │   ├── README.md
+│   │   └── manifest.yml
+│   └── ... (20 scenarios)
 ├── templates/           # Template files and examples
 └── README.md            # This file
 ```
@@ -24,7 +34,7 @@ test-manifests/
 - Multi-cluster scenarios
 - Edge cases (zero usage, partial matching, unmatched resources)
 
-**Current Scenarios**: 23 test manifests covering Trino SQL parity
+**Current Scenarios**: 23 test scenarios covering Trino SQL parity
 
 **Status**: ✅ All scenarios passing
 
@@ -43,9 +53,9 @@ See [`ocp-on-aws/README.md`](ocp-on-aws/README.md) for detailed scenario documen
 - Label handling and edge cases
 - Node capacity and cluster capacity
 
-**Current Scenarios**: 23 scenarios (12 core + 11 edge cases)
+**Current Scenarios**: 20 scenarios
 
-**Status**: 🚧 In Development
+**Status**: ✅ Implemented
 
 See [`ocp-only/README.md`](ocp-only/README.md) for detailed scenario documentation.
 
@@ -71,8 +81,8 @@ See [`ocp-only/README.md`](ocp-only/README.md) for detailed scenario documentati
 # Run all OCP-on-AWS scenarios
 ./scripts/run_ocp_aws_scenario_tests.sh
 
-# Run a specific scenario
-./scripts/run_ocp_aws_scenario_tests.sh test-manifests/ocp-on-aws/ocp_aws_scenario_01_resource_matching.yml
+# Run a specific scenario directory
+./scripts/run_ocp_aws_scenario_tests.sh 01-resource-matching
 ```
 
 ### Running OCP-Only Scenarios
@@ -91,16 +101,18 @@ See [`ocp-only/README.md`](ocp-only/README.md) for detailed scenario documentati
    - `ocp-on-aws/` for cloud provider integration scenarios
    - `ocp-only/` for standalone OCP scenarios
 
-2. **Copy a template**:
+2. **Create a new scenario directory**:
    ```bash
-   cp test-manifests/templates/ocp_aws_template.yml test-manifests/ocp-on-aws/my_new_scenario.yml
+   mkdir test-manifests/ocp-on-aws/XX-my-scenario
+   cp test-manifests/templates/ocp_aws_template.yml test-manifests/ocp-on-aws/XX-my-scenario/manifest.yml
    ```
 
-3. **Modify the scenario** with your test case specifics
+3. **Add a README.md** describing the scenario
 
 4. **Follow naming conventions**:
-   - OCP-on-AWS: `ocp_aws_scenario_##_description.yml`
-   - OCP-only: `ocp_scenario_##_description.yml`
+   - Directory: `XX-descriptive-name/`
+   - Main manifest: `manifest.yml`
+   - Variations: `variation.yml`
 
 ---
 
@@ -142,6 +154,8 @@ Test scenarios are validated using:
 2. **POC aggregation**: Processes data through the POC pipeline
 3. **Cost comparison**: Compares POC output against expected outcomes
 4. **Trino parity validation**: Ensures POC matches Trino SQL logic
+
+See the scenario READMEs for detailed validation methodology.
 
 ---
 
