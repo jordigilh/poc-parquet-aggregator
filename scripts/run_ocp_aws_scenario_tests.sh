@@ -24,44 +24,44 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Test scenarios
+# Test scenarios - directory names under test-manifests/ocp-on-aws/
 SCENARIOS=(
     # Phase 0: Happy Path (6 scenarios) - 70% confidence
-    "ocp_aws_scenario_01_resource_matching"
-    "ocp_aws_scenario_02_tag_matching"
-    "ocp_aws_scenario_03_multi_namespace"
-    "ocp_aws_scenario_04_network_costs"
-    "ocp_aws_scenario_05_storage_ebs"
-    "ocp_aws_scenario_06_multi_cluster"
+    "01-resource-matching"
+    "02-tag-matching"
+    "03-multi-namespace"
+    "04-network-costs"
+    "05-storage-ebs"
+    "06-multi-cluster"
 
     # Phase 1: Critical Edge Cases (4 scenarios) - 90% confidence
-    "ocp_aws_scenario_07_partial_matching"
-    "ocp_aws_scenario_08_zero_usage"
-    "ocp_aws_scenario_09_cost_types"
-    "ocp_aws_scenario_10_unmatched_storage"
+    "07-partial-matching"
+    "08-zero-usage"
+    "09-cost-types"
+    "10-unmatched-storage"
 
-    # Phase 4: Resilience (2 scenarios) - 99% confidence
-    "ocp_aws_scenario_11_corrupted_data"
-    "ocp_aws_scenario_12_trino_precision"
+    # Phase 2: Resilience (2 scenarios) - 99% confidence
+    "11-corrupted-data"
+    "12-trino-precision"
 
-    # Trino Compliance: Network & SavingsPlan (2 scenarios)
-    "ocp_aws_scenario_13_network_data_transfer"
-    "ocp_aws_scenario_14_savingsplan_costs"
+    # Phase 3: Trino Compliance - Network & SavingsPlan (2 scenarios)
+    "13-network-data-transfer"
+    "14-savingsplan-costs"
 
-    # Business Scenarios: AWS Services (3 scenarios)
-    "ocp_aws_scenario_15_rds_database_costs"
-    "ocp_aws_scenario_16_s3_storage_costs"
-    "ocp_aws_scenario_17_reserved_instances"
+    # Phase 4: AWS Services (3 scenarios)
+    "15-rds-database-costs"
+    "16-s3-storage-costs"
+    "17-reserved-instances"
 
-    # Critical Core Gaps: Multi-cluster & Non-CSI Storage (2 scenarios)
-    "ocp_aws_scenario_18_multi_cluster_shared_csi_disk"
-    "ocp_aws_scenario_19_non_csi_storage"
+    # Phase 5: Multi-cluster & Non-CSI Storage (2 scenarios)
+    "18-multi-cluster-shared-disk"
+    "19-non-csi-storage"
 
-    # Trino Parity Gaps: Generic Tag Matching (4 scenarios)
-    "ocp_aws_scenario_20_multi_cluster_alias_matching"
-    "ocp_aws_scenario_21_volume_labels_matching"
-    "ocp_aws_scenario_22_pv_name_suffix_matching"
-    "ocp_aws_scenario_23_multi_cluster_generic_pod_labels_matching"
+    # Phase 6: Advanced Tag Matching (4 scenarios)
+    "20-cluster-alias-matching"
+    "21-volume-labels-matching"
+    "22-pv-name-suffix-matching"
+    "23-generic-pod-labels-matching"
 )
 
 echo -e "${BLUE}=============================================="
@@ -133,7 +133,7 @@ for SCENARIO in "${SCENARIOS[@]}"; do
     echo -e "${BLUE}Test $TOTAL_TESTS/${#SCENARIOS[@]}: $SCENARIO${NC}"
     echo -e "${BLUE}========================================${NC}"
 
-    MANIFEST_FILE="$TEST_MANIFESTS_DIR/${SCENARIO}.yml"
+    MANIFEST_FILE="$TEST_MANIFESTS_DIR/${SCENARIO}/manifest.yml"
 
     if [ ! -f "$MANIFEST_FILE" ]; then
         echo -e "${RED}❌ Manifest not found: $MANIFEST_FILE${NC}"
@@ -588,7 +588,7 @@ VALIDATION QUERY - Run this to verify results yourself:
 ================================================================================
 
 -- Total cost and row count
-SELECT 
+SELECT
     COUNT(*) as output_rows,
     ROUND(SUM(unblended_cost)::numeric, 2) as total_cost,
     COUNT(DISTINCT namespace) as namespaces,
@@ -596,7 +596,7 @@ SELECT
 FROM org1234567.reporting_ocpawscostlineitem_project_daily_summary_p;
 
 -- Cost breakdown by namespace
-SELECT 
+SELECT
     namespace,
     COUNT(*) as rows,
     ROUND(SUM(unblended_cost)::numeric, 2) as cost
@@ -694,14 +694,14 @@ Connect to PostgreSQL and run:
 -- Connect: podman exec -it postgres-poc psql -U koku -d koku
 
 -- Total cost summary
-SELECT 
+SELECT
     COUNT(*) as output_rows,
     ROUND(SUM(unblended_cost)::numeric, 2) as total_cost,
     COUNT(DISTINCT namespace) as namespaces
 FROM org1234567.reporting_ocpawscostlineitem_project_daily_summary_p;
 
 -- Cost by namespace
-SELECT 
+SELECT
     namespace,
     ROUND(SUM(unblended_cost)::numeric, 2) as cost
 FROM org1234567.reporting_ocpawscostlineitem_project_daily_summary_p
