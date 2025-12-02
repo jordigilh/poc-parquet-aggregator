@@ -530,7 +530,7 @@ EOFC
             cd "$POC_ROOT"
             source venv/bin/activate
 
-            if python3 scripts/validate_totals_iqe_style.py "$MANIFEST_FILE" \
+            if python3 scripts/validate_ocp_aws_totals.py "$MANIFEST_FILE" \
                 > "$TEST_RESULTS_DIR/${SCENARIO}_validation.txt" 2>&1; then
                 STATUS="✅ PASSED"
                 PASSED_TESTS=$((PASSED_TESTS + 1))

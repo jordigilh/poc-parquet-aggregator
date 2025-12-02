@@ -3,7 +3,7 @@
 OCP-Only Validation: Validate CPU/Memory/Storage Totals
 
 This validation script compares expected vs actual aggregated values
-for OCP-only scenarios, similar to validate_totals_iqe_style.py for OCP-on-AWS.
+for OCP-only scenarios, similar to validate_ocp_aws_totals.py for OCP-on-AWS.
 
 Expected values in manifest:
   expected_outcome:
@@ -274,5 +274,9 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+
+
 
 
