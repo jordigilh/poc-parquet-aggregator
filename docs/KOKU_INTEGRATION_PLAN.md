@@ -1,8 +1,8 @@
 # POC Parquet Aggregator → Koku Integration Plan
 
-**Version**: 1.0  
-**Date**: December 2, 2025  
-**Confidence Level**: 90%  
+**Version**: 1.0
+**Date**: December 2, 2025
+**Confidence Level**: 90%
 **Estimated Effort**: 3-5 days
 
 ---
@@ -37,7 +37,7 @@ This document outlines the integration of the POC Parquet Aggregator into the ko
 ```
 src/
 ├── aggregator_pod.py           # OCP pod aggregation
-├── aggregator_storage.py       # OCP storage aggregation  
+├── aggregator_storage.py       # OCP storage aggregation
 ├── aggregator_unallocated.py   # Unallocated capacity
 ├── aggregator_ocp_aws.py       # OCP-on-AWS cost attribution
 ├── parquet_reader.py           # MinIO/S3 parquet reading
@@ -171,7 +171,7 @@ from .aggregator_ocp_aws import OCPAWSAggregator
 
 __all__ = [
     'PodAggregator',
-    'StorageAggregator', 
+    'StorageAggregator',
     'UnallocatedAggregator',
     'OCPAWSAggregator',
 ]
@@ -231,7 +231,7 @@ LOG = logging.getLogger(__name__)
 
 class POCAggregatorConfig:
     """Configuration for POC aggregator from koku settings."""
-    
+
     def __init__(self, schema_name: str):
         self.schema_name = schema_name
         self.s3_bucket = os.getenv('S3_BUCKET_NAME', settings.S3_BUCKET_NAME)
@@ -254,14 +254,14 @@ def process_ocp_parquet_poc(
 ) -> dict:
     """
     Process OCP parquet data using POC aggregator.
-    
+
     Args:
         schema_name: Database schema (org ID)
         provider_uuid: OCP provider UUID
         year: Year to process
         month: Month to process
         cluster_id: Optional cluster ID filter
-        
+
     Returns:
         dict with processing results and metrics
     """
@@ -269,10 +269,10 @@ def process_ocp_parquet_poc(
         f"POC: Starting OCP parquet processing for {schema_name}, "
         f"provider={provider_uuid}, period={year}-{month:02d}"
     )
-    
+
     config = POCAggregatorConfig(schema_name)
     results = {'status': 'success', 'aggregators': {}}
-    
+
     try:
         # Run Pod Aggregator
         pod_agg = PodAggregator(
@@ -285,7 +285,7 @@ def process_ocp_parquet_poc(
         pod_results = pod_agg.run()
         results['aggregators']['pod'] = pod_results
         LOG.info(f"POC: Pod aggregation complete: {pod_results}")
-        
+
         # Run Storage Aggregator
         storage_agg = StorageAggregator(
             provider_uuid=provider_uuid,
@@ -297,7 +297,7 @@ def process_ocp_parquet_poc(
         storage_results = storage_agg.run()
         results['aggregators']['storage'] = storage_results
         LOG.info(f"POC: Storage aggregation complete: {storage_results}")
-        
+
         # Run Unallocated Aggregator
         unalloc_agg = UnallocatedAggregator(
             provider_uuid=provider_uuid,
@@ -309,12 +309,12 @@ def process_ocp_parquet_poc(
         unalloc_results = unalloc_agg.run()
         results['aggregators']['unallocated'] = unalloc_results
         LOG.info(f"POC: Unallocated aggregation complete: {unalloc_results}")
-        
+
     except Exception as e:
         LOG.error(f"POC: OCP aggregation failed: {e}", exc_info=True)
         results['status'] = 'error'
         results['error'] = str(e)
-    
+
     return results
 
 
@@ -328,7 +328,7 @@ def process_ocp_aws_parquet_poc(
 ) -> dict:
     """
     Process OCP-on-AWS parquet data using POC aggregator.
-    
+
     Args:
         schema_name: Database schema (org ID)
         ocp_provider_uuid: OCP provider UUID
@@ -336,7 +336,7 @@ def process_ocp_aws_parquet_poc(
         year: Year to process
         month: Month to process
         cluster_id: Optional cluster ID filter
-        
+
     Returns:
         dict with processing results and metrics
     """
@@ -344,10 +344,10 @@ def process_ocp_aws_parquet_poc(
         f"POC: Starting OCP-on-AWS parquet processing for {schema_name}, "
         f"ocp={ocp_provider_uuid}, aws={aws_provider_uuid}, period={year}-{month:02d}"
     )
-    
+
     config = POCAggregatorConfig(schema_name)
     results = {'status': 'success', 'aggregators': {}}
-    
+
     try:
         # Run OCP-on-AWS Aggregator
         ocp_aws_agg = OCPAWSAggregator(
@@ -361,12 +361,12 @@ def process_ocp_aws_parquet_poc(
         ocp_aws_results = ocp_aws_agg.run()
         results['aggregators']['ocp_aws'] = ocp_aws_results
         LOG.info(f"POC: OCP-on-AWS aggregation complete: {ocp_aws_results}")
-        
+
     except Exception as e:
         LOG.error(f"POC: OCP-on-AWS aggregation failed: {e}", exc_info=True)
         results['status'] = 'error'
         results['error'] = str(e)
-    
+
     return results
 ```
 
@@ -394,9 +394,9 @@ def process_ocp_parquet_poc_task(
 ):
     """
     Celery task to run POC OCP parquet aggregation.
-    
+
     This task can be triggered manually for testing the POC aggregator:
-    
+
         from koku.masu.processor.tasks import process_ocp_parquet_poc_task
         process_ocp_parquet_poc_task.delay('org1234567', 'uuid', 2025, 10)
     """
@@ -420,9 +420,9 @@ def process_ocp_aws_parquet_poc_task(
 ):
     """
     Celery task to run POC OCP-on-AWS parquet aggregation.
-    
+
     This task can be triggered manually for testing the POC aggregator:
-    
+
         from koku.masu.processor.tasks import process_ocp_aws_parquet_poc_task
         process_ocp_aws_parquet_poc_task.delay('org1234567', 'ocp-uuid', 'aws-uuid', 2025, 10)
     """
@@ -512,7 +512,7 @@ python manage.py shell
 
 ```sql
 -- Compare POC output with existing Trino output
-SELECT 
+SELECT
     'POC' as source,
     COUNT(*) as rows,
     SUM(unblended_cost) as total_cost
@@ -521,7 +521,7 @@ WHERE usage_start >= '2025-10-01'
 
 UNION ALL
 
-SELECT 
+SELECT
     'Trino' as source,
     COUNT(*) as rows,
     SUM(unblended_cost) as total_cost
@@ -608,6 +608,6 @@ print(result)
 
 ---
 
-**Document Maintainer**: POC Integration Team  
+**Document Maintainer**: POC Integration Team
 **Last Updated**: December 2, 2025
 
