@@ -1,6 +1,6 @@
 # Core dependencies for Parquet reading and S3 access
 pyarrow>=14.0.0
-s3fs>=2023.12.0
+boto3>=1.28.0  # Aligned with Koku's S3 library
 
 # PostgreSQL connectivity
 psycopg2-binary>=2.9.9
