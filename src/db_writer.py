@@ -1,6 +1,7 @@
 """PostgreSQL database writer for aggregated OCP data."""
 
-from typing import Dict, List, Optional
+from functools import lru_cache
+from typing import Dict, List, Optional, Set
 
 import pandas as pd
 import psycopg2
@@ -8,6 +9,28 @@ import psycopg2.extensions
 from psycopg2.extras import execute_values
 
 from .utils import PerformanceTimer, get_logger
+
+
+class SchemaValidationError(Exception):
+    """Raised when DataFrame columns don't match database schema."""
+
+    def __init__(self, table_name: str, invalid_columns: List[str], valid_columns: Set[str]):
+        self.table_name = table_name
+        self.invalid_columns = invalid_columns
+        self.valid_columns = valid_columns
+        message = (
+            f"\n{'='*80}\n"
+            f"SCHEMA VALIDATION ERROR: Column mismatch for table '{table_name}'\n"
+            f"{'='*80}\n"
+            f"  ❌ Invalid columns in DataFrame: {invalid_columns}\n"
+            f"  ✅ Valid columns in database: {sorted(valid_columns)}\n\n"
+            f"  💡 Common fixes:\n"
+            f"     - Check if 'pod' should be 'resource_id' (database uses resource_id)\n"
+            f"     - Remove columns that don't exist in the target table\n"
+            f"     - Verify column names match the database schema exactly\n"
+            f"{'='*80}"
+        )
+        super().__init__(message)
 
 
 class DatabaseWriter:
@@ -183,6 +206,9 @@ class DatabaseWriter:
 
         with PerformanceTimer(f"Bulk COPY {len(df)} rows to PostgreSQL", self.logger):
             try:
+                # SCHEMA VALIDATION: Catch column mismatches early!
+                self.validate_dataframe_columns(df, table_name, exclude_columns=["uuid"])
+
                 # Optionally truncate
                 if truncate:
                     self._truncate_table(table_name)
@@ -251,6 +277,9 @@ class DatabaseWriter:
 
         with PerformanceTimer(f"Write {len(df)} rows to PostgreSQL", self.logger):
             try:
+                # SCHEMA VALIDATION: Catch column mismatches early!
+                self.validate_dataframe_columns(df, table_name, exclude_columns=["uuid"])
+
                 # Optionally truncate
                 if truncate:
                     self._truncate_table(table_name)
@@ -318,6 +347,9 @@ class DatabaseWriter:
 
         with PerformanceTimer(f"Write {len(df)} OCP-AWS rows to PostgreSQL", self.logger):
             try:
+                # SCHEMA VALIDATION: Catch column mismatches early!
+                self.validate_dataframe_columns(df, table_name, exclude_columns=["uuid"])
+
                 if truncate:
                     self._truncate_table(table_name)
 
@@ -493,6 +525,91 @@ class DatabaseWriter:
             return False
         return False
 
+    def get_table_columns(self, table_name: str) -> Set[str]:
+        """Get column names for a table from PostgreSQL information_schema.
+
+        Args:
+            table_name: Full table name (schema.table)
+
+        Returns:
+            Set of column names
+        """
+        # Parse schema and table from full name
+        parts = table_name.split(".")
+        if len(parts) == 2:
+            schema_name, tbl_name = parts
+        else:
+            schema_name = self.schema
+            tbl_name = table_name
+
+        query = """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = %s AND table_name = %s
+        """
+
+        try:
+            with self.connection.cursor() as cursor:
+                cursor.execute(query, (schema_name, tbl_name))
+                columns = {row[0] for row in cursor.fetchall()}
+
+            self.logger.debug(f"Table {table_name} has {len(columns)} columns")
+            return columns
+        except Exception as e:
+            self.logger.warning(f"Could not fetch columns for {table_name}: {e}")
+            return set()
+
+    def validate_dataframe_columns(
+        self,
+        df: pd.DataFrame,
+        table_name: str,
+        exclude_columns: Optional[List[str]] = None,
+    ) -> None:
+        """Validate that DataFrame columns exist in the target table.
+
+        This catches column mismatches (like 'pod' vs 'resource_id') BEFORE
+        attempting to write, providing clear error messages.
+
+        Args:
+            df: DataFrame to validate
+            table_name: Target table name
+            exclude_columns: Columns to exclude from validation (e.g., 'uuid')
+
+        Raises:
+            SchemaValidationError: If DataFrame has columns not in database
+        """
+        exclude = set(exclude_columns or [])
+        df_columns = set(df.columns) - exclude
+        table_columns = self.get_table_columns(table_name)
+
+        if not table_columns:
+            self.logger.warning(
+                f"Could not fetch schema for {table_name}, skipping validation"
+            )
+            return
+
+        # Find columns in DataFrame that don't exist in table
+        invalid_columns = df_columns - table_columns
+
+        if invalid_columns:
+            self.logger.error(
+                "Schema validation failed",
+                table=table_name,
+                invalid_columns=list(invalid_columns),
+                df_columns=list(df_columns),
+                table_columns=list(table_columns),
+            )
+            raise SchemaValidationError(
+                table_name=table_name,
+                invalid_columns=list(invalid_columns),
+                valid_columns=table_columns,
+            )
+
+        self.logger.debug(
+            f"Schema validation passed for {table_name}",
+            columns_validated=len(df_columns),
+        )
+
     def create_streaming_writer(self, table_type: str = "ocp_aws") -> "StreamingDBWriter":
         """Create a streaming writer for incremental chunk writes.
 
@@ -588,6 +705,12 @@ class StreamingDBWriter:
 
         self.chunk_count += 1
         chunk_rows = len(df)
+
+        # SCHEMA VALIDATION on first chunk only (for performance)
+        if self._columns is None:
+            self.db_writer.validate_dataframe_columns(
+                df, self.table_name, exclude_columns=["uuid"]
+            )
 
         # Prepare columns (first time only)
         if self._columns is None:
