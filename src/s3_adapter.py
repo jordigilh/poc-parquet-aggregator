@@ -163,3 +163,4 @@ def check_s3_connectivity() -> bool:
         logger.error("S3 connectivity check failed", error=str(e))
         return False
 
+

@@ -156,3 +156,4 @@ def verify_table_exists(table_name: str) -> bool:
         logger.error("Table existence check failed", table=table_name, error=str(e))
         return False
 
+

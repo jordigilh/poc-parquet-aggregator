@@ -840,7 +840,7 @@ class PodAggregator:
         df["persistentvolumeclaim_capacity_gigabyte_months"] = None
         df["volume_request_storage_gigabyte_months"] = None
         df["persistentvolumeclaim_usage_gigabyte_months"] = None
-        df["csi_volume_handle"] = None
+        # NOTE: csi_volume_handle column does NOT exist in Koku database - REMOVED (Bug #8)
 
         # all_labels = merge(pod_labels, volume_labels) - Trino SQL lines 651-654
         # For Pod data, volume_labels is NULL, so all_labels = pod_labels
@@ -856,6 +856,8 @@ class PodAggregator:
         # Select columns in correct order (PostgreSQL schema - no partition columns)
         # NOTE: Partition columns (source, year, month, day) are for Hive/Trino only, not PostgreSQL
         # all_labels added per Trino SQL lines 651-654
+        # NOTE: Koku database schema uses "resource_id" NOT "pod" (Bug #7)
+        # NOTE: Koku database does NOT have "csi_volume_handle" column (Bug #8)
         output_columns = [
             "uuid",
             "report_period_id",
@@ -866,8 +868,7 @@ class PodAggregator:
             "usage_end",
             "namespace",
             "node",
-            "pod",
-            "resource_id",
+            "resource_id",  # Database column (NOT "pod" - Bug #7)
             "pod_labels",
             "pod_usage_cpu_core_hours",
             "pod_request_cpu_core_hours",
@@ -894,7 +895,7 @@ class PodAggregator:
             "persistentvolumeclaim_usage_gigabyte_months",
             "source_uuid",
             "infrastructure_usage_cost",
-            "csi_volume_handle",
+            # "csi_volume_handle" - REMOVED: Column does NOT exist in Koku DB (Bug #8)
             "cost_category_id",
         ]
 
