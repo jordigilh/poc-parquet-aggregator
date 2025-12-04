@@ -35,7 +35,7 @@ class ParquetReader:
         # Initialize s3fs filesystem
         self.fs = self._create_s3_filesystem()
 
-        self.logger.info("Initialized Parquet reader", endpoint=self.endpoint, bucket=self.bucket)
+        self.logger.info(f"Initialized Parquet reader (endpoint={self.endpoint}, bucket={self.bucket})")
 
     def _create_s3_filesystem(self) -> s3fs.S3FileSystem:
         """Create S3 filesystem client.
@@ -73,10 +73,10 @@ class ParquetReader:
 
         try:
             files = self.fs.glob(f"{full_prefix}/**/*.parquet")
-            self.logger.info(f"Found {len(files)} Parquet files", prefix=s3_prefix, count=len(files))
+            self.logger.info(f"Found {len(files)} Parquet files (prefix={s3_prefix}, count={len(files)})")
             return [f"s3://{f}" for f in files]
         except Exception as e:
-            self.logger.error("Failed to list Parquet files", prefix=s3_prefix, error=str(e))
+            self.logger.error(f"Failed to list Parquet files (prefix={s3_prefix}, error={e})")
             raise
 
     def read_parquet_file(
@@ -123,7 +123,7 @@ class ParquetReader:
                 return df
 
             except Exception as e:
-                self.logger.error("Failed to read Parquet file", file=s3_uri, error=str(e))
+                self.logger.error(f"Failed to read Parquet file (file={s3_uri}, error={e})")
                 raise
 
     def read_parquet_streaming(
@@ -141,7 +141,7 @@ class ParquetReader:
         """
         s3_path = s3_uri.replace("s3://", "")
 
-        self.logger.info("Starting streaming read", file=Path(s3_uri).name, chunk_size=chunk_size)
+        self.logger.info(f"Starting streaming read (file={Path(s3_uri).name}, chunk_size={chunk_size})")
 
         try:
             # Open Parquet file
@@ -150,18 +150,18 @@ class ParquetReader:
             total_rows = parquet_file.metadata.num_rows
             chunks_count = (total_rows + chunk_size - 1) // chunk_size
 
-            self.logger.info("Parquet file metadata", total_rows=total_rows, chunks=chunks_count)
+            self.logger.info(f"Parquet file metadata (total_rows={total_rows}, chunks={chunks_count})")
 
             # Read in batches
             for batch_idx, batch in enumerate(parquet_file.iter_batches(batch_size=chunk_size, columns=columns)):
                 df = batch.to_pandas()
 
-                self.logger.debug(f"Read chunk {batch_idx + 1}/{chunks_count}", rows=len(df))
+                self.logger.debug(f"Read chunk {batch_idx + 1}/{chunks_count} (rows={len(df)})")
 
                 yield df
 
         except Exception as e:
-            self.logger.error("Failed to stream Parquet file", file=s3_uri, error=str(e))
+            self.logger.error(f"Failed to stream Parquet file (file={s3_uri}, error={e})")
             raise
 
     def read_pod_usage_line_items(
@@ -247,7 +247,7 @@ class ParquetReader:
         files = self.list_parquet_files(s3_prefix)
 
         if not files:
-            self.logger.warning("No node labels found", prefix=s3_prefix)
+            self.logger.warning(f"No node labels found (prefix={s3_prefix})")
             return pd.DataFrame()
 
         # Read and concatenate all files
@@ -261,7 +261,7 @@ class ParquetReader:
             return pd.DataFrame()
 
         combined_df = pd.concat(dfs, ignore_index=True)
-        self.logger.info(f"Combined {len(dfs)} node label files", total_rows=len(combined_df))
+        self.logger.info(f"Combined {len(dfs)} node label files (total_rows={len(combined_df)})")
         return combined_df
 
     def read_namespace_labels_line_items(self, provider_uuid: str, year: str, month: str) -> pd.DataFrame:
@@ -281,7 +281,7 @@ class ParquetReader:
         files = self.list_parquet_files(s3_prefix)
 
         if not files:
-            self.logger.warning("No namespace labels found", prefix=s3_prefix)
+            self.logger.warning(f"No namespace labels found (prefix={s3_prefix})")
             return pd.DataFrame()
 
         # Read and concatenate all files
@@ -295,7 +295,7 @@ class ParquetReader:
             return pd.DataFrame()
 
         combined_df = pd.concat(dfs, ignore_index=True)
-        self.logger.info(f"Combined {len(dfs)} namespace label files", total_rows=len(combined_df))
+        self.logger.info(f"Combined {len(dfs)} namespace label files (total_rows={len(combined_df)})")
         return combined_df
 
     def read_storage_usage_line_items(
@@ -380,7 +380,7 @@ class ParquetReader:
         if not files:
             return pd.DataFrame()
 
-        self.logger.info(f"Reading {len(files)} files in parallel", workers=max_workers)
+        self.logger.info(f"Reading {len(files)} files in parallel (workers={max_workers})")
 
         dfs = []
         with PerformanceTimer(f"Parallel read ({len(files)} files)", self.logger):
@@ -396,7 +396,7 @@ class ParquetReader:
                         if not df.empty:
                             dfs.append(df)
                     except Exception as e:
-                        self.logger.error(f"Failed to read file in parallel", file=file, error=str(e))
+                        self.logger.error(f"Failed to read file in parallel (file={file}, error={e})")
                         # Continue with other files
 
         if not dfs:
@@ -404,7 +404,7 @@ class ParquetReader:
 
         # Concatenate all dataframes
         combined_df = pd.concat(dfs, ignore_index=True)
-        self.logger.info(f"Combined {len(dfs)} files", total_rows=len(combined_df))
+        self.logger.info(f"Combined {len(dfs)} files (total_rows={len(combined_df)})")
         return combined_df
 
     def get_optimal_columns_pod_usage(self) -> List[str]:
@@ -502,8 +502,8 @@ class ParquetReader:
         try:
             # Try to list bucket
             self.fs.ls(self.bucket)
-            self.logger.info("S3 connectivity test: SUCCESS", bucket=self.bucket)
+            self.logger.info(f"S3 connectivity test: SUCCESS (bucket={self.bucket})")
             return True
         except Exception as e:
-            self.logger.error("S3 connectivity test: FAILED", bucket=self.bucket, error=str(e))
+            self.logger.error(f"S3 connectivity test: FAILED (bucket={self.bucket}, error={e})")
             return False

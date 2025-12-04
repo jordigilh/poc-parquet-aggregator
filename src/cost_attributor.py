@@ -1352,5 +1352,6 @@ class CostAttributor:
                 "max": float(attributed_df["attribution_ratio"].max()),
             }
 
-        self.logger.info("Cost summary", **summary)
+        summary_str = ", ".join(f"{k}={v}" for k, v in summary.items())
+        self.logger.info(f"Cost summary ({summary_str})")
         return summary

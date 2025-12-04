@@ -392,7 +392,7 @@ class AWSDataLoader:
 
             # Read files (streaming or standard)
             if streaming:
-                self.logger.info("Using streaming mode for AWS CUR", chunk_size=chunk_size)
+                self.logger.info(f"Using streaming mode for AWS CUR (chunk_size={chunk_size})")
 
                 def stream_all_files():
                     """Stream all AWS CUR files chunk by chunk."""
@@ -562,5 +562,6 @@ class AWSDataLoader:
             },
         }
 
-        self.logger.info("AWS resource summary", **summary)
+        summary_str = ", ".join(f"{k}={v}" for k, v in summary.items())
+        self.logger.info(f"AWS resource summary ({summary_str})")
         return summary

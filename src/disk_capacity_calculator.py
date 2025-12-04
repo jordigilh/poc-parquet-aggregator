@@ -333,7 +333,8 @@ class DiskCapacityCalculator:
             "> 1000 GB": int((capacity_df["capacity"] >= 1000).sum()),
         }
 
-        self.logger.info("Capacity summary", **summary)
+        summary_str = ", ".join(f"{k}={v}" for k, v in summary.items())
+        self.logger.info(f"Capacity summary ({summary_str})")
         return summary
 
     def validate_capacities(

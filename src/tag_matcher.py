@@ -538,7 +538,8 @@ class TagMatcher:
                 aws_df[aws_df["tag_matched"]]["lineitem_productcode"].value_counts().to_dict()
             )
 
-        self.logger.info("Tag matching summary", **summary)
+        summary_str = ", ".join(f"{k}={v}" for k, v in summary.items())
+        self.logger.info(f"Tag matching summary ({summary_str})")
         return summary
 
     def validate_tag_matching_results(self, aws_df: pd.DataFrame, expected_match_rate_min: float = 0.0) -> bool:

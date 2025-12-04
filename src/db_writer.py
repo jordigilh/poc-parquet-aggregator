@@ -74,7 +74,7 @@ class DatabaseWriter:
             )
             self.logger.info("Database connection established")
         except Exception as e:
-            self.logger.error("Failed to connect to database", error=str(e))
+            self.logger.error(f"Failed to connect to database (error={e})")
             raise
 
     def disconnect(self):
@@ -132,7 +132,7 @@ class DatabaseWriter:
 
                     return keys
             except Exception as e:
-                self.logger.error("Failed to fetch enabled tag keys", error=str(e))
+                self.logger.error(f"Failed to fetch enabled tag keys (error={e})")
                 raise
 
     def get_cost_category_namespaces(self) -> pd.DataFrame:
@@ -149,10 +149,10 @@ class DatabaseWriter:
 
             try:
                 df = pd.read_sql(query, self.connection)
-                self.logger.info("Fetched cost category namespaces", count=len(df))
+                self.logger.info(f"Fetched cost category namespaces (count={len(df)})")
                 return df
             except Exception as e:
-                self.logger.error("Failed to fetch cost category namespaces", error=str(e))
+                self.logger.error(f"Failed to fetch cost category namespaces (error={e})")
                 # Non-critical, return empty DataFrame
                 return pd.DataFrame()
 
@@ -183,7 +183,7 @@ class DatabaseWriter:
                 )
                 return df
             except Exception as e:
-                self.logger.error("Failed to fetch node roles", error=str(e))
+                self.logger.error(f"Failed to fetch node roles (error={e})")
                 # Non-critical, return empty DataFrame
                 return pd.DataFrame()
 
@@ -330,7 +330,7 @@ class DatabaseWriter:
 
             except Exception as e:
                 self.connection.rollback()
-                self.logger.error("Failed to write summary data", error=str(e), rows=len(df))
+                self.logger.error(f"Failed to write summary data (error={e}, rows={len(df)})")
                 raise
 
     def write_ocp_aws_summary_data(self, df: pd.DataFrame, batch_size: int = 1000, truncate: bool = False) -> int:
@@ -431,7 +431,7 @@ class DatabaseWriter:
 
             except Exception as e:
                 self.connection.rollback()
-                self.logger.error("Failed to write OCP-AWS data", error=str(e), rows=len(df))
+                self.logger.error(f"Failed to write OCP-AWS data (error={e}, rows={len(df)})")
                 raise
 
     def _truncate_table(self, table_name: str):
@@ -449,7 +449,7 @@ class DatabaseWriter:
             self.logger.info(f"Truncated table: {table_name}")
         except Exception as e:
             self.connection.rollback()
-            self.logger.error(f"Failed to truncate table: {table_name}", error=str(e))
+            self.logger.error(f"Failed to truncate table: {table_name} (error={e})")
             raise
 
     def validate_summary_data(self, provider_uuid: str, year: str, month: str) -> Dict:
@@ -501,11 +501,12 @@ class DatabaseWriter:
                         "total_request_memory_gb_hours": float(row[7]) if row[7] else 0.0,
                     }
 
-                    self.logger.info("Summary data validation", **result)
+                    result_str = ", ".join(f"{k}={v}" for k, v in result.items())
+                    self.logger.info(f"Summary data validation ({result_str})")
 
                     return result
             except Exception as e:
-                self.logger.error("Failed to validate summary data", error=str(e))
+                self.logger.error(f"Failed to validate summary data (error={e})")
                 raise
 
     def test_connectivity(self) -> bool:
@@ -522,7 +523,7 @@ class DatabaseWriter:
                     self.logger.info("Database connectivity test: SUCCESS")
                     return True
         except Exception as e:
-            self.logger.error("Database connectivity test: FAILED", error=str(e))
+            self.logger.error(f"Database connectivity test: FAILED (error={e})")
             return False
         return False
 
@@ -755,7 +756,7 @@ class StreamingDBWriter:
 
         self.total_rows += chunk_rows
 
-        self.logger.debug(f"Chunk {self.chunk_count} written", rows=chunk_rows, total=self.total_rows)
+        self.logger.debug(f"Chunk {self.chunk_count} written (rows={chunk_rows}, total={self.total_rows})")
 
         # Free memory immediately
         del df_insert, data

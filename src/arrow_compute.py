@@ -181,7 +181,7 @@ class ArrowLabelProcessor:
 
         Performance: 10-50x faster than pandas operations
         """
-        self.logger.info("Processing labels with Arrow compute", rows=len(node_labels_series))
+        self.logger.info(f"Processing labels with Arrow compute (rows={len(node_labels_series)})")
 
         # Step 1: Parse JSON strings to dicts (vectorized)
         node_dicts = self.parse_json_labels_vectorized(node_labels_series)

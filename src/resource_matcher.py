@@ -276,7 +276,8 @@ class ResourceMatcher:
                 aws_df[aws_df["resource_id_matched"]]["lineitem_productcode"].value_counts().to_dict()
             )
 
-        self.logger.info("Resource matching summary", **summary)
+        summary_str = ", ".join(f"{k}={v}" for k, v in summary.items())
+        self.logger.info(f"Resource matching summary ({summary_str})")
         return summary
 
     def validate_matching_results(self, aws_df: pd.DataFrame, expected_match_rate_min: float = 0.0) -> bool:

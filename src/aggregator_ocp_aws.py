@@ -585,7 +585,8 @@ class OCPAWSAggregator:
 
             # Log summary
             summary = self.resource_matcher.get_matched_resources_summary(matched_aws)
-            self.logger.info("✓ Resource ID matching complete", **summary)
+            summary_str = ", ".join(f"{k}={v}" for k, v in summary.items())
+            self.logger.info(f"✓ Resource ID matching complete ({summary_str})")
 
             # DEBUG: Check for cost columns after matching
             cost_cols = [c for c in matched_aws.columns if "cost" in c.lower()]
@@ -593,11 +594,9 @@ class OCPAWSAggregator:
                 matched_aws["lineitem_unblendedcost"].sum() if "lineitem_unblendedcost" in matched_aws.columns else 0
             )
             self.logger.info(
-                "DEBUG: After resource ID matching",
-                matched_rows=len(matched_aws),
-                cost_columns=cost_cols[:5],  # Show first 5
-                lineitem_unblendedcost_sum=cost_sum,
-                has_lineitem_unblendedcost="lineitem_unblendedcost" in matched_aws.columns,
+                f"DEBUG: After resource ID matching (matched_rows={len(matched_aws)}, "
+                f"cost_columns={cost_cols[:5]}, lineitem_unblendedcost_sum={cost_sum}, "
+                f"has_lineitem_unblendedcost={'lineitem_unblendedcost' in matched_aws.columns})"
             )
 
             return matched_aws
@@ -638,7 +637,8 @@ class OCPAWSAggregator:
 
             # Log summary
             summary = self.tag_matcher.get_tag_matching_summary(tagged_aws)
-            self.logger.info("✓ Tag matching complete", **summary)
+            summary_str = ", ".join(f"{k}={v}" for k, v in summary.items())
+            self.logger.info(f"✓ Tag matching complete ({summary_str})")
 
             return tagged_aws
 
@@ -734,7 +734,8 @@ class OCPAWSAggregator:
 
             # Log summary
             summary = self.disk_calculator.get_capacity_summary(capacities)
-            self.logger.info("✓ Disk capacity calculation complete", **summary)
+            summary_str = ", ".join(f"{k}={v}" for k, v in summary.items())
+            self.logger.info(f"✓ Disk capacity calculation complete ({summary_str})")
 
             return capacities
 
@@ -809,7 +810,7 @@ class OCPAWSAggregator:
                 aws_matched_df=compute_aws,  # Only non-network, non-EBS costs
             )
 
-            self.logger.info("✓ Computed compute cost attribution", rows=len(compute_attributed))
+            self.logger.info(f"✓ Computed compute cost attribution (rows={len(compute_attributed)})")
 
             # Attribute network costs to "Network unattributed" namespace
             # Groups by node and data_transfer_direction
@@ -819,9 +820,8 @@ class OCPAWSAggregator:
 
             if not network_attributed.empty:
                 self.logger.info(
-                    "✓ Computed network cost attribution",
-                    rows=len(network_attributed),
-                    unique_nodes=network_attributed["node"].nunique(),
+                    f"✓ Computed network cost attribution (rows={len(network_attributed)}, "
+                    f"unique_nodes={network_attributed['node'].nunique()})"
                 )
 
             # Attribute storage costs (PVCs on volumes) - CSI-based
@@ -919,7 +919,8 @@ class OCPAWSAggregator:
             if not network_attributed.empty:
                 network_summary = self.network_handler.get_network_summary(network_attributed)
                 summary["network_costs"] = network_summary
-            self.logger.info("✓ Cost attribution complete", **summary)
+            summary_str = ", ".join(f"{k}={v}" for k, v in summary.items())
+            self.logger.info(f"✓ Cost attribution complete ({summary_str})")
 
             return combined
 

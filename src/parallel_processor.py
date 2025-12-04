@@ -59,7 +59,7 @@ class ParallelChunkProcessor:
 
         Performance: 2-4x faster on multi-core systems
         """
-        self.logger.info("Starting parallel chunk processing", workers=self.max_workers)
+        self.logger.info(f"Starting parallel chunk processing (workers={self.max_workers})")
 
         # Choose executor based on configuration
         ExecutorClass = ThreadPoolExecutor if self.use_threads else ProcessPoolExecutor
@@ -72,7 +72,7 @@ class ParallelChunkProcessor:
             future_to_idx = {}
             for idx, chunk in enumerate(chunks):
                 total_chunks += 1
-                self.logger.debug(f"Submitting chunk {idx+1}", rows=len(chunk))
+                self.logger.debug(f"Submitting chunk {idx+1} (rows={len(chunk)})")
 
                 future = executor.submit(
                     self._process_single_chunk_wrapper,
@@ -176,7 +176,7 @@ class ChunkBatcher:
             if len(batch) >= self.batch_size:
                 # Combine batch into single DataFrame
                 combined = pd.concat(batch, ignore_index=True)
-                self.logger.debug(f"Created batch", num_chunks=len(batch), total_rows=batch_rows)
+                self.logger.debug(f"Created batch (num_chunks={len(batch)}, total_rows={batch_rows})")
                 yield combined
                 batch = []
                 batch_rows = 0
@@ -184,7 +184,7 @@ class ChunkBatcher:
         # Yield remaining chunks
         if batch:
             combined = pd.concat(batch, ignore_index=True)
-            self.logger.debug(f"Created final batch", num_chunks=len(batch), total_rows=batch_rows)
+            self.logger.debug(f"Created final batch (num_chunks={len(batch)}, total_rows={batch_rows})")
             yield combined
 
 

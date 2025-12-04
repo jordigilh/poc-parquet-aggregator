@@ -101,19 +101,18 @@ class PodAggregator:
         )
         with PerformanceTimer("Pod usage aggregation", self.logger):
             # Step 1: Pre-process labels
-            self.logger.info("Step 1: Preparing pod usage data", rows=len(pod_usage_df))
+            self.logger.info(f"Step 1: Preparing pod usage data (rows={len(pod_usage_df)})")
             pod_usage_df = self._prepare_pod_usage_data(pod_usage_df)
-            self.logger.info("✓ Pod usage prepared", rows=len(pod_usage_df))
+            self.logger.info(f"✓ Pod usage prepared (rows={len(pod_usage_df)})")
 
             # Step 2: Join with node labels
             if node_labels_df is not None and not node_labels_df.empty:
                 self.logger.info(
-                    "Step 2: Joining node labels",
-                    pod_rows=len(pod_usage_df),
-                    node_label_rows=len(node_labels_df),
+                    f"Step 2: Joining node labels (pod_rows={len(pod_usage_df)}, "
+                    f"node_label_rows={len(node_labels_df)})"
                 )
                 pod_usage_df = self._join_node_labels(pod_usage_df, node_labels_df)
-                self.logger.info("✓ Node labels joined", result_rows=len(pod_usage_df))
+                self.logger.info(f"✓ Node labels joined (result_rows={len(pod_usage_df)})")
             else:
                 # No node labels - use empty JSON object (not None to avoid NaN issues)
                 pod_usage_df["node_labels"] = "{}"
@@ -121,12 +120,11 @@ class PodAggregator:
             # Step 3: Join with namespace labels
             if namespace_labels_df is not None and not namespace_labels_df.empty:
                 self.logger.info(
-                    "Step 3: Joining namespace labels",
-                    pod_rows=len(pod_usage_df),
-                    namespace_label_rows=len(namespace_labels_df),
+                    f"Step 3: Joining namespace labels (pod_rows={len(pod_usage_df)}, "
+                    f"namespace_label_rows={len(namespace_labels_df)})"
                 )
                 pod_usage_df = self._join_namespace_labels(pod_usage_df, namespace_labels_df)
-                self.logger.info("✓ Namespace labels joined", result_rows=len(pod_usage_df))
+                self.logger.info(f"✓ Namespace labels joined (result_rows={len(pod_usage_df)})")
             else:
                 # No namespace labels - use empty JSON object (not None to avoid NaN issues)
                 pod_usage_df["namespace_labels"] = "{}"
@@ -134,9 +132,8 @@ class PodAggregator:
             # Step 4-6: Process labels (parse, merge, convert to JSON)
             # Use Arrow compute if available (10-100x faster), otherwise list comprehension (3-5x faster)
             self.logger.info(
-                "Step 4-6: Processing labels",
-                rows=len(pod_usage_df),
-                method="Arrow" if self.use_arrow else "List comprehension",
+                f"Step 4-6: Processing labels (rows={len(pod_usage_df)}, "
+                f"method={'Arrow' if self.use_arrow else 'List comprehension'})"
             )
 
             label_results = self._process_labels_optimized(pod_usage_df)
@@ -166,9 +163,7 @@ class PodAggregator:
             result_df = self._format_output(aggregated_df)
 
             self.logger.info(
-                "Pod aggregation complete",
-                input_rows=len(pod_usage_df),
-                output_rows=len(result_df),
+                f"Pod aggregation complete (input_rows={len(pod_usage_df)}, output_rows={len(result_df)})"
             )
 
             return result_df
@@ -267,7 +262,7 @@ class PodAggregator:
 
             if parallel_enabled:
                 # PARALLEL PROCESSING: Process multiple chunks simultaneously
-                self.logger.info("Using parallel chunk processing", workers=max_workers)
+                self.logger.info(f"Using parallel chunk processing (workers={max_workers})")
 
                 # Collect chunks from iterator first (needed for parallel processing)
                 chunk_list = list(pod_usage_chunks)
@@ -300,11 +295,10 @@ class PodAggregator:
                             aggregated_chunks.append(chunk_aggregated)
 
                             self.logger.info(
-                                f"Chunk {chunk_idx + 1}/{chunk_count} completed",
-                                output_rows=len(chunk_aggregated),
+                                f"Chunk {chunk_idx + 1}/{chunk_count} completed (output_rows={len(chunk_aggregated)})"
                             )
                         except Exception as e:
-                            self.logger.error(f"Chunk {chunk_idx} failed", error=str(e))
+                            self.logger.error(f"Chunk {chunk_idx} failed (error={e})")
                             raise
 
                 del chunk_list, chunk_data_list
@@ -319,9 +313,7 @@ class PodAggregator:
                     total_input_rows += len(chunk_df)
 
                     self.logger.info(
-                        f"Processing chunk {chunk_count}",
-                        rows=len(chunk_df),
-                        cumulative_rows=total_input_rows,
+                        f"Processing chunk {chunk_count} (rows={len(chunk_df)}, cumulative_rows={total_input_rows})"
                     )
 
                     # Process chunk
@@ -335,14 +327,11 @@ class PodAggregator:
                     aggregated_chunks.append(chunk_aggregated)
 
                     self.logger.debug(
-                        f"Chunk {chunk_count} aggregated",
-                        output_rows=len(chunk_aggregated),
+                        f"Chunk {chunk_count} aggregated (output_rows={len(chunk_aggregated)})"
                     )
 
             self.logger.info(
-                f"All chunks processed",
-                chunks=chunk_count,
-                total_input_rows=total_input_rows,
+                f"All chunks processed (chunks={chunk_count}, total_input_rows={total_input_rows})"
             )
 
             # Combine all aggregated chunks
@@ -351,12 +340,12 @@ class PodAggregator:
                 return pd.DataFrame()
 
             combined_df = pd.concat(aggregated_chunks, ignore_index=True)
-            self.logger.info(f"Chunks combined", combined_rows=len(combined_df))
+            self.logger.info(f"Chunks combined (combined_rows={len(combined_df)})")
 
             # Final aggregation to merge duplicate keys across chunks
             # (Same (date, namespace, node) might appear in multiple chunks)
             aggregated_df = self._final_aggregation_across_chunks(combined_df)
-            self.logger.info(f"Final aggregation complete", final_rows=len(aggregated_df))
+            self.logger.info(f"Final aggregation complete (final_rows={len(aggregated_df)})")
 
             # Free memory
             del combined_df

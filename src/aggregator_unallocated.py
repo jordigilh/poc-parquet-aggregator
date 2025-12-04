@@ -50,7 +50,7 @@ class UnallocatedCapacityAggregator:
         self.report_period_id = ocp_config.get("report_period_id", 0)
         self.provider_uuid = ocp_config.get("provider_uuid", "")
 
-        self.logger.info("Initialized UnallocatedCapacityAggregator", cluster_id=self.cluster_id)
+        self.logger.info(f"Initialized UnallocatedCapacityAggregator (cluster_id={self.cluster_id})")
 
     def get_node_roles(self) -> pd.DataFrame:
         """Fetch node roles from reporting_ocp_nodes table.

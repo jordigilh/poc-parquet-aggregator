@@ -46,7 +46,7 @@ class NetworkCostHandler:
         # Get markup percentage from config
         self.markup_percent = config.get("aws", {}).get("markup", 0.0)
 
-        self.logger.info("Initialized network cost handler", markup_percent=self.markup_percent)
+        self.logger.info(f"Initialized network cost handler (markup_percent={self.markup_percent})")
 
     def filter_network_costs(self, aws_matched_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
@@ -261,5 +261,6 @@ class NetworkCostHandler:
             "total_usage_amount": (network_df["usage_amount"].sum() if "usage_amount" in network_df.columns else 0),
         }
 
-        self.logger.info("Network cost summary", **summary)
+        summary_str = ", ".join(f"{k}={v}" for k, v in summary.items())
+        self.logger.info(f"Network cost summary ({summary_str})")
         return summary

@@ -116,7 +116,7 @@ class StorageAggregator:
         Returns:
             Aggregated storage summary DataFrame with data_source='Storage'
         """
-        self.logger.info("Starting storage aggregation", input_rows=len(storage_df))
+        self.logger.info(f"Starting storage aggregation (input_rows={len(storage_df)})")
 
         if storage_df.empty:
             self.logger.warning("No storage data to aggregate")
@@ -137,7 +137,7 @@ class StorageAggregator:
         # Step 2: Group and aggregate by day + PVC
         aggregated = self._group_and_aggregate(storage_with_nodes)
 
-        self.logger.info("Grouped storage data", output_rows=len(aggregated))
+        self.logger.info(f"Grouped storage data (output_rows={len(aggregated)})")
 
         # Step 3: Join with node labels
         aggregated = self._join_node_labels(aggregated, node_labels_df)
@@ -157,7 +157,7 @@ class StorageAggregator:
         # Step 7: Format output
         result = self._format_output(aggregated)
 
-        self.logger.info("Storage aggregation complete", output_rows=len(result))
+        self.logger.info(f"Storage aggregation complete (output_rows={len(result)})")
 
         # Cleanup
         if self.config.get("performance", {}).get("delete_intermediate_dfs", True):
@@ -339,7 +339,7 @@ class StorageAggregator:
 
         aggregated = df.groupby(group_keys, dropna=False).agg(agg_dict).reset_index()
 
-        self.logger.info("Grouped storage data", input_rows=len(df), output_rows=len(aggregated))
+        self.logger.info(f"Grouped storage data (input_rows={len(df)}, output_rows={len(aggregated)})")
 
         # Convert byte-seconds to gigabyte-months
         aggregated = self._convert_metrics_to_gigabyte_months(aggregated)
@@ -442,7 +442,7 @@ class StorageAggregator:
         # Deduplicate node labels to avoid Cartesian product
         node_labels_df = node_labels_df.drop_duplicates(subset=["usage_start", "node"])
 
-        self.logger.debug("Joining with node labels", node_label_rows=len(node_labels_df))
+        self.logger.debug(f"Joining with node labels (node_label_rows={len(node_labels_df)})")
 
         before_count = len(df)
 
@@ -694,7 +694,7 @@ class StorageAggregator:
         # Replace any remaining NaN with None for PostgreSQL NULL
         result = result.replace({np.nan: None})
 
-        self.logger.info("Storage output formatted", rows=len(result), data_source="Storage")
+        self.logger.info(f"Storage output formatted (rows={len(result)}, data_source=Storage)")
 
         return result
 

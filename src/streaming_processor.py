@@ -161,21 +161,19 @@ class StreamingProcessor:
                     processed_chunks.append(result)
                     total_output_rows += len(result)
 
-                    self.logger.debug(f"Chunk {chunk_count} processed", output_rows=len(result))
+                    self.logger.debug(f"Chunk {chunk_count} processed (output_rows={len(result)})")
 
                 # Free memory immediately
                 del chunk_df
                 gc.collect()
 
             except Exception as e:
-                self.logger.error(f"Failed to process chunk {chunk_count}", error=str(e))
+                self.logger.error(f"Failed to process chunk {chunk_count} (error={e})")
                 raise
 
         self.logger.info(
-            "All chunks processed (serial)",
-            chunks=chunk_count,
-            total_input_rows=total_input_rows,
-            total_output_rows=total_output_rows,
+            f"All chunks processed (serial) (chunks={chunk_count}, "
+            f"total_input_rows={total_input_rows}, total_output_rows={total_output_rows})"
         )
 
         # Combine results
@@ -198,7 +196,7 @@ class StreamingProcessor:
         combine_fn: Callable,
     ) -> pd.DataFrame:
         """Process chunks in parallel (multi-threaded)."""
-        self.logger.info("Using PARALLEL chunk processing", workers=self.max_workers)
+        self.logger.info(f"Using PARALLEL chunk processing (workers={self.max_workers})")
 
         # Collect chunks first (required for parallel distribution)
         # Note: This means parallel mode uses more memory during collection
@@ -236,7 +234,7 @@ class StreamingProcessor:
                     )
 
                 except Exception as e:
-                    self.logger.error(f"Chunk {chunk_idx} failed", error=str(e))
+                    self.logger.error(f"Chunk {chunk_idx} failed (error={e})")
                     raise
 
         # Free chunk list
@@ -244,10 +242,8 @@ class StreamingProcessor:
         gc.collect()
 
         self.logger.info(
-            "All chunks processed (parallel)",
-            chunks=chunk_count,
-            total_input_rows=total_input_rows,
-            total_output_rows=total_output_rows,
+            f"All chunks processed (parallel) (chunks={chunk_count}, "
+            f"total_input_rows={total_input_rows}, total_output_rows={total_output_rows})"
         )
 
         # Combine results
