@@ -247,6 +247,7 @@ class TestStorageAggregatorBehavior:
         # Check that we got node info from pod data
         assert result["node"].notna().any(), "Some nodes should be populated"
 
+    @pytest.mark.skip(reason="Bug #8: csi_volume_handle column removed - doesn't exist in Koku DB")
     def test_csi_volume_handle_preserved(
         self,
         storage_aggregator,
@@ -255,7 +256,11 @@ class TestStorageAggregatorBehavior:
         sample_node_labels,
         sample_namespace_labels,
     ):
-        """Verify csi_volume_handle is preserved (critical for AWS matching)."""
+        """Verify csi_volume_handle is preserved (critical for AWS matching).
+
+        SKIPPED: Bug #8 - Koku's database doesn't have csi_volume_handle column.
+        The column was removed from the output schema to align with Koku.
+        """
         result = storage_aggregator.aggregate(
             sample_storage_data,
             sample_pod_data,
@@ -377,7 +382,7 @@ class TestStorageAggregatorBehavior:
             "persistentvolume",
             "storageclass",
             "volume_labels",
-            "csi_volume_handle",
+            # NOTE: csi_volume_handle removed - column doesn't exist in Koku DB (Bug #8)
             "persistentvolumeclaim_capacity_gigabyte_months",
             "volume_request_storage_gigabyte_months",
             "persistentvolumeclaim_usage_gigabyte_months",
@@ -532,8 +537,13 @@ class TestStorageAggregatorEdgeCases:
         assert len(result) == 1, "Should produce output for zero metrics"
         assert result.iloc[0]["persistentvolumeclaim_capacity_gigabyte_months"] == 0.0
 
+    @pytest.mark.skip(reason="Bug #8: csi_volume_handle column removed - doesn't exist in Koku DB")
     def test_null_csi_volume_handle(self, storage_aggregator):
-        """Verify NULL csi_volume_handle is handled correctly."""
+        """Verify NULL csi_volume_handle is handled correctly.
+
+        SKIPPED: Bug #8 - Koku's database doesn't have csi_volume_handle column.
+        The column was removed from the output schema to align with Koku.
+        """
         storage_data = pd.DataFrame(
             {
                 "interval_start": pd.to_datetime(["2025-10-01 00:00:00"]),

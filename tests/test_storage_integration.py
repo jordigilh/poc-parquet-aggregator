@@ -162,10 +162,11 @@ class TestStorageIntegration:
         assert len(result) == 3, "Should have 3 rows (one per PVC)"
         assert (result["data_source"] == "Storage").all(), "All rows should be Storage"
 
-        # Verify CSI handles are preserved
-        expected_handles = {"vol-aaa111", "vol-bbb222", "vol-ccc333"}
-        actual_handles = set(result["csi_volume_handle"].unique())
-        assert expected_handles == actual_handles, "CSI handles must be preserved"
+        # NOTE: csi_volume_handle removed from output (Bug #8 - column doesn't exist in Koku DB)
+        # Instead verify the PVC names are preserved
+        expected_pvcs = {"web-pvc", "api-pvc", "db-pvc"}
+        actual_pvcs = set(result["persistentvolumeclaim"].unique())
+        assert expected_pvcs == actual_pvcs, "PVC names must be preserved"
 
     def test_pod_and_storage_combined_have_different_data_sources(self, integration_config, complete_test_dataset):
         """Verify pod and storage aggregations have different data_source values."""
@@ -358,13 +359,13 @@ class TestStoragePodCombinedOutput:
         storage_cols = set(storage_result.columns)
 
         # Core columns must match
+        # NOTE: 'pod' column removed from output (Bug #7 - Koku DB uses 'resource_id' not 'pod')
         core_columns = {
             "usage_start",
             "usage_end",
             "data_source",
             "namespace",
             "node",
-            "pod",
             "resource_id",
             "cluster_id",
             "source_uuid",
