@@ -207,14 +207,15 @@ class DatabaseWriter:
         with PerformanceTimer(f"Bulk COPY {len(df)} rows to PostgreSQL", self.logger):
             try:
                 # SCHEMA VALIDATION: Catch column mismatches early!
-                self.validate_dataframe_columns(df, table_name, exclude_columns=["uuid"])
+                self.validate_dataframe_columns(df, table_name)
 
                 # Optionally truncate
                 if truncate:
                     self._truncate_table(table_name)
 
-                # Prepare data for COPY (exclude uuid - PostgreSQL generates it)
-                columns = [col for col in df.columns.tolist() if col != "uuid"]
+                # Bug #9 fix: Include uuid - Koku DB requires it (NOT NULL, no default)
+                # UUIDs are generated in the aggregators
+                columns = list(df.columns)
                 df_insert = df[columns].copy()
 
                 # CRITICAL: Replace all NaN values with None for PostgreSQL
@@ -278,14 +279,14 @@ class DatabaseWriter:
         with PerformanceTimer(f"Write {len(df)} rows to PostgreSQL", self.logger):
             try:
                 # SCHEMA VALIDATION: Catch column mismatches early!
-                self.validate_dataframe_columns(df, table_name, exclude_columns=["uuid"])
+                self.validate_dataframe_columns(df, table_name)
 
                 # Optionally truncate
                 if truncate:
                     self._truncate_table(table_name)
 
-                # Prepare data for insert (exclude uuid - PostgreSQL generates it)
-                columns = [col for col in df.columns.tolist() if col != "uuid"]
+                # Bug #9 fix: Include uuid - Koku DB requires it (NOT NULL, no default)
+                columns = list(df.columns)
                 df_insert = df[columns].copy()
 
                 # CRITICAL: Replace all NaN values with None for PostgreSQL
@@ -348,13 +349,13 @@ class DatabaseWriter:
         with PerformanceTimer(f"Write {len(df)} OCP-AWS rows to PostgreSQL", self.logger):
             try:
                 # SCHEMA VALIDATION: Catch column mismatches early!
-                self.validate_dataframe_columns(df, table_name, exclude_columns=["uuid"])
+                self.validate_dataframe_columns(df, table_name)
 
                 if truncate:
                     self._truncate_table(table_name)
 
-                # Prepare data (exclude uuid)
-                columns = [col for col in df.columns.tolist() if col != "uuid"]
+                # Bug #9 fix: Include uuid - Koku DB requires it (NOT NULL, no default)
+                columns = list(df.columns)
                 df_insert = df[columns].copy()
 
                 # Convert dict/JSON columns to JSON strings for JSONB columns
@@ -708,13 +709,12 @@ class StreamingDBWriter:
 
         # SCHEMA VALIDATION on first chunk only (for performance)
         if self._columns is None:
-            self.db_writer.validate_dataframe_columns(
-                df, self.table_name, exclude_columns=["uuid"]
-            )
+            self.db_writer.validate_dataframe_columns(df, self.table_name)
 
+        # Bug #9 fix: Include uuid - Koku DB requires it (NOT NULL, no default)
         # Prepare columns (first time only)
         if self._columns is None:
-            self._columns = [col for col in df.columns.tolist() if col != "uuid"]
+            self._columns = list(df.columns)
             column_names = ", ".join(self._columns)
             self._insert_query = f"INSERT INTO {self.table_name} ({column_names}) VALUES %s"
 

@@ -7,6 +7,7 @@ Implements Trino SQL lines 491-581 from reporting_ocpusagelineitem_daily_summary
 - Creates "Worker unallocated" namespace for worker nodes
 """
 
+import uuid as uuid_lib
 from typing import Dict, Optional
 
 import numpy as np
@@ -84,9 +85,15 @@ class UnallocatedCapacityAggregator:
         if node_roles_df.empty:
             return pd.DataFrame(columns=["node", "resource_id", "node_role"])
 
+        # Bug #12 fix: Convert node_role from Categorical to string before max()
+        # Pandas cannot perform max() on non-ordered Categorical columns
+        df = node_roles_df.copy()
+        if df["node_role"].dtype.name == "category":
+            df["node_role"] = df["node_role"].astype(str)
+
         # Group by node + resource_id and take MAX of node_role
         # This matches Trino: SELECT max(node_role) AS node_role
-        aggregated = node_roles_df.groupby(["node", "resource_id"], as_index=False).agg({"node_role": "max"})
+        aggregated = df.groupby(["node", "resource_id"], as_index=False).agg({"node_role": "max"})
 
         return aggregated
 
@@ -336,5 +343,8 @@ class UnallocatedCapacityAggregator:
         result["pod_labels"] = "{}"
         result["volume_labels"] = None
         result["all_labels"] = "{}"  # Trino SQL lines 651-654: empty for unallocated
+
+        # Generate UUIDs - Bug #13 fix: Koku DB requires uuid (NOT NULL, no default)
+        result["uuid"] = [str(uuid_lib.uuid4()) for _ in range(len(result))]
 
         return result

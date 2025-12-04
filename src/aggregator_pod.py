@@ -1,5 +1,6 @@
 """OCP Pod usage aggregation logic (replicates Trino SQL)."""
 
+import uuid as uuid_lib
 from collections import defaultdict
 from datetime import date
 from typing import Dict, List, Optional, Tuple
@@ -820,16 +821,16 @@ class PodAggregator:
         df["pod_labels"] = df["merged_labels"]
 
         # Add fixed columns
-        df["uuid"] = None  # PostgreSQL will generate
+        # Bug #9 fix: Generate UUIDs - Koku DB requires uuid (NOT NULL, no default)
+        df["uuid"] = [str(uuid_lib.uuid4()) for _ in range(len(df))]
         df["report_period_id"] = self.report_period_id
         df["cluster_id"] = self.cluster_id
         df["cluster_alias"] = self.cluster_alias
         df["data_source"] = "Pod"
         df["usage_end"] = df["usage_start"]  # Same as usage_start for daily
 
-        # Pod column (NULL for aggregated data - individual pod names lost during grouping)
-        if "pod" not in df.columns:
-            df["pod"] = None
+        # NOTE: "pod" column removed - Koku DB uses "resource_id" instead (Bug #7)
+        # The aggregator already has "resource_id" from the grouping/processing
 
         # Storage columns (NULL for pod data)
         df["persistentvolumeclaim"] = None

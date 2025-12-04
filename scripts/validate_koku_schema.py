@@ -186,29 +186,29 @@ def main():
     print(f"\n📋 POC OCP-AWS Summary Columns ({len(POC_OCP_AWS_SUMMARY_COLUMNS)} total):")
     for i, col in enumerate(POC_OCP_AWS_SUMMARY_COLUMNS, 1):
         print(f"   {i:2d}. {col}")
-    
+
     if args.dry_run:
         print("\n⏭️  Dry run - skipping database validation")
         print("   Run with database connection to validate against actual schema")
         sys.exit(0)
-    
+
     # Connect to database and validate
     print(f"\n🔗 Connecting to {args.host}:{args.port}/{args.database}...")
-    
+
     try:
         errors = False
-        
+
         # Validate OCP Summary table
         ocp_table = "reporting_ocpusagelineitem_daily_summary"
         ocp_columns = get_koku_table_columns(
             args.host, args.port, args.database, args.user, args.password, args.schema, ocp_table
         )
-        
+
         print(f"\n📊 OCP Summary Table: {args.schema}.{ocp_table}")
         print(f"   Found {len(ocp_columns)} columns in database")
-        
+
         ocp_results = validate_columns(POC_OCP_SUMMARY_COLUMNS, ocp_columns, ocp_table)
-        
+
         if ocp_results["invalid_in_poc"]:
             print(f"\n❌ INVALID COLUMNS IN POC OCP OUTPUT:")
             for col in sorted(ocp_results["invalid_in_poc"]):
@@ -216,21 +216,21 @@ def main():
             errors = True
         else:
             print(f"   ✅ All {len(POC_OCP_SUMMARY_COLUMNS)} POC columns valid")
-        
+
         if ocp_results["missing_from_poc"]:
             print(f"\n   ⚠️  {len(ocp_results['missing_from_poc'])} optional DB columns not in POC output")
-        
+
         # Validate OCP-AWS Summary table
         aws_table = "reporting_ocpawscostlineitem_project_daily_summary_p"
         aws_columns = get_koku_table_columns(
             args.host, args.port, args.database, args.user, args.password, args.schema, aws_table
         )
-        
+
         print(f"\n📊 OCP-AWS Summary Table: {args.schema}.{aws_table}")
         print(f"   Found {len(aws_columns)} columns in database")
-        
+
         aws_results = validate_columns(POC_OCP_AWS_SUMMARY_COLUMNS, aws_columns, aws_table)
-        
+
         if aws_results["invalid_in_poc"]:
             print(f"\n❌ INVALID COLUMNS IN POC OCP-AWS OUTPUT:")
             for col in sorted(aws_results["invalid_in_poc"]):
@@ -238,10 +238,10 @@ def main():
             errors = True
         else:
             print(f"   ✅ All {len(POC_OCP_AWS_SUMMARY_COLUMNS)} POC columns valid")
-        
+
         if aws_results["missing_from_poc"]:
             print(f"\n   ⚠️  {len(aws_results['missing_from_poc'])} optional DB columns not in POC output")
-        
+
         # Final result
         if errors:
             print("\n" + "=" * 80)
@@ -253,7 +253,7 @@ def main():
             print("✅ VALIDATION PASSED - All POC columns exist in database!")
             print("=" * 80)
             sys.exit(0)
-            
+
     except Exception as e:
         print(f"\n❌ Database connection failed: {e}")
         print("   Make sure you can connect to the Koku database")
